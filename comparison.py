@@ -17,8 +17,15 @@ plt.rcParams.update({'figure.max_open_warning': 0,'text.usetex': False})
 # settings for models to solve
 T = 4
 specs = {
-    'model 1':{'latexname':'EGM', 'par':{'sigma_love':0.2,'T':T,'num_A':20,'max_A':1.5,'num_love':3,"num_power":15,"EGM":True}},
+    'model 1':{'latexname':'EGM', 'par':{'σL':0.2,'T':T,'num_A':20,'max_A':1.5,'num_love':3,"num_power":15,"EGM":True}},
 }
+
+
+
+specs = {
+    'model 1':{'latexname':'EGM2', 'par':{'meet': 0.15590901,'σL0':0.0836045,'σL':0.0836045,'α2':0.31534971,'α1':1.0-0.31534971}}}
+
+
 
 # solve different models (takes several minutes)
 models = {}

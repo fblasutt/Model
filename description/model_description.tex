@@ -1,0 +1,352 @@
+\documentclass[12pt]{article}
+%\documentclass[AEJ]{AEA}
+\usepackage[round, sort , authoryear]{natbib}
+
+
+\usepackage{pgf}
+%%% PAGE DIMENSIONS
+\usepackage[margin=2cm]{geometry}
+\usepackage{blindtext} % to change the page dimensions
+
+%Matthias style below
+\usepackage{palatino,amssymb,amsfonts,amsmath,amsthm,latexsym}
+\usepackage{graphicx,xcolor,booktabs,array,rotating}
+\usepackage{multirow,bigdelim,dcolumn,booktabs}
+\usepackage[T1]{fontenc}
+\usepackage[detect-all]{siunitx}
+\usepackage{epstopdf}
+\usepackage{rotating}
+\usepackage{bm,subcaption}
+
+
+%required by R
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage[normalem]{ulem}
+\usepackage[normalem]{ulem}
+\usepackage[utf8]{inputenc}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{dcolumn}
+\usepackage{mathtools}% http://ctan.org/pkg/mathtools
+
+
+%Fort title position
+\usepackage{titling}
+
+%For new line in table
+\usepackage{array}
+\usepackage{makecell}
+
+
+
+%Write a vecor
+\newcommand{\myvec}[1]{\ensuremath{\begin{pmatrix}#1\end{pmatrix}}}
+
+%New environments
+\newtheorem{lemma}{Lemma}
+\newtheorem{assumption}{Assumption}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+
+
+%For tables position
+\usepackage{float}
+\restylefloat{table}
+
+%Fancy table
+\usepackage{tabularx,booktabs}
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
+
+\usepackage[utf8]{inputenc} 
+\usepackage{graphicx} % support the \includegraphics command and options
+\usepackage{epstopdf}
+\usepackage[hang]{footmisc}
+\usepackage{lipsum}
+\usepackage{setspace}
+\usepackage[parfill]{parskip} % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{pgfplots}
+\usepgfplotslibrary{fillbetween}
+\pgfplotsset{compat=1.13}
+\usepackage{caption}
+\usepackage{threeparttablex}
+\usepackage{color, colortbl}
+\definecolor{Gray}{gray}{0.9}
+%%% PACKAGES
+\usepackage{placeins}
+\usepackage{booktabs} % for much better looking tables
+\usepackage{array} % for better arrays (eg matrices) in maths
+\usepackage{paralist} % very flexible & customisable lists (eg. enumerate/itemize, etc.)
+\usepackage{verbatim} % adds environment for commenting out blocks of text & for better verbatim
+
+
+% These packages are all incorporated in the memoir class to one degree or another...
+%\usepackage{amsmath}
+\numberwithin{table}{section}
+\usepackage{cases}
+\usepackage{graphicx}
+%
+\usepackage{float}
+\usepackage{authblk}
+\usepackage{pgfplots}
+\usepackage{pdfpages}
+\linespread{1.39}%\linespread{1.37}
+\setlength{\footnotemargin}{4mm}
+\usepackage{amssymb} 
+\usepackage{tabularx}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\addtolength{\footnotesep}{2mm} % change to 1mm
+
+%For Counting Figures in the Appendix
+\usepackage{chngcntr}
+
+%No Counting within section
+\DeclareCaptionLabelSeparator{none}{}
+%\captionsetup{labelsep=none}
+\counterwithout{figure}{section}
+\counterwithout{table}{section}
+
+%footnote space
+\setlength{\footnotesep}{0.35cm}
+\interfootnotelinepenalty=10000
+
+
+%Nice Figure and table headers
+\captionsetup[figure]{labelfont={sc},name={Figure},justification=justified}
+\captionsetup[table]{labelfont={sc},name={Table},justification=justified}
+
+%For subtables
+\usepackage{subcaption}
+\usepackage[justification=centering]{caption}
+%For having the catption above tables
+\usepackage{float}
+\floatstyle{plaintop}
+\restylefloat{table}
+
+%For bar charts in table
+\newlength\MAX  \setlength\MAX{20mm}
+\newcommand*\Chart[1]{#1~\rlap{\textcolor{blue!20}{\rule{#1\MAX}{2ex}}}}
+\newcommand*\Chartguys[1]{{\textcolor{blue!30}{\rule{6ex}{#1\MAX}}}}
+\newcommand*\Chartgirls[1]{{\textcolor{red!30}{\rule{6ex}{#1\MAX}}}}
+
+%For stars...
+\def\sym#1{\ifmmode^{#1}\else\(^{#1}\)\fi}
+
+\renewcommand{\thesubfigure}{ (\alph{subfigure})}
+\captionsetup[sub]{labelformat=simple}
+%Math stuff
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\setcounter{MaxMatrixCols}{10}
+
+
+
+\usepackage{booktabs}   % for nice tables
+\usepackage[colorlinks=false, linktocpage=true]{hyperref}
+\hypersetup{
+	colorlinks,
+	linkcolor={blue!50!black},
+	citecolor={blue!50!black},
+	urlcolor={blue!80!black}
+}
+% use for hypertext
+\usepackage[colorinlistoftodos]{todonotes}
+\setlength{\marginparwidth}{2cm}
+\newenvironment{customlegend}[1][]{%
+	\begingroup
+	% inits/clears the lists (which might be populated from previous
+	% axes):
+	\pgfplots@init@cleared@structures
+	\pgfplotsset{#1}%
+}{%
+	% draws the legend:
+	\pgfplots@createlegend
+	\endgroup
+}%
+%For Figures, below
+
+\usepackage{tikz}
+\usetikzlibrary{shapes}
+\usepgflibrary{arrows} % LATEX and plain TEX and pure pgf
+\usepgflibrary[arrows] % ConTEXt and pure pgf
+\usetikzlibrary{arrows} % LATEX and plain TEX when using
+\usetikzlibrary{arrows,decorations.markings}
+\usetikzlibrary[arrows] % ConTEXt when using Tik Z
+\usepackage{hyperref}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Space between paragraphs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\allowdisplaybreaks
+%\setlength{\parindent}{0em}
+\setlength{\parskip}{1.0ex plus0.0ex minus0.5ex}
+
+%%%%%%%%%%%%%%%%%%%5
+%Nicer start of paragraph
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\makeatletter
+
+\renewcommand\section{\@startsection{section}{1}{0cm}{-1.5ex \@plus
+		-.2ex \@minus -.2ex}%
+	{.5ex \@plus.2ex} {\normalfont\large\bfseries}}
+
+\renewcommand\subsection{\@startsection{subsection}{1}{0cm}{-1.5ex \@plus
+		-.2ex \@minus -.2ex}%
+	{.5ex \@plus.2ex} {\normalfont\bfseries}}
+
+\renewcommand\subsubsection{\@startsection{subsubsection}{1}{0cm}{-1.5ex \@plus
+		-.2ex \@minus -.2ex}%
+	{.5ex \@plus.2ex} {\normalfont}}
+
+\makeatother
+\begin{document}
+
+%opening
+\title{Limited-commitment life-cycle model of marriage formation and dissolution}
+\author{}
+
+\maketitle
+
+\section{Model description}
+
+We develop a life-cycle model of marriage formation and dissolution. In each period $t=0,1,\cdots,T-1$, men and women can be single or in a couple. If single, they have a probability of meeting a potential partner. Upon meeting, they decide whether to marry or remain single depending on the match quality draw and the shocks to their idiosyncratic productivities. Couples also draw innovations to these variables and, based on the outcomes, decide whether to stay together or divorce (see Figure~\ref{fig:scheme}). Singles and couples make consumption and savings decisions, allocating their resources to private or home goods expenditures. Up to period $T_R$, couples additionally decide on women's employment: women's time can be used for home production at the expense of reduced market productivity. Men always work until they retire. Starting from period $T_R$, agents are retired. 
+
+\begin{figure}[h!]\centering
+	\caption{}
+	\label{fig:scheme}
+	\resizebox{0.5\textwidth}{!}{\input{graph_transitions3.tex}}
+\end{figure}
+
+Couples act cooperatively and their decisions are subject to limited commitment, which is capture by time-varying Pareto weight which adjust to meet participation constraints. 
+
+\textbf{Preferences.} Women $f$ and men $m$ discount the future at the rate $\beta$ and their preferences are separable over time. Agents derive utility from consuming $\mathcal{C}$, which is a CES aggregate of private goods  $c$ and home goods $Q$:
+\[
+\mathcal{C}(c,Q) = \left[(1-\alpha) c^\varphi+\alpha Q^\varphi\right]^{\frac{1}{\varphi}}.
+\]
+Home goods $Q$ can be interpreted in terms of both quantity and quality of children, as well as the goods and services produced within the home, such as washing clothes or preparing meals. The intra-period utility of a single agent $s\in\{f,m\}$ is of the constant relative risk aversion type:
+\[u(c^s_t,Q^s_t)=\frac{{[\mathcal{C}(c^s_t,Q^s_t)]}^{1-\sigma}}{1-\sigma},\]
+where $\sigma$ is the relative risk aversion and the superscript $s$ on $Q$ accounts for the fact that there is no partner to share the home good. The utility of an agent $s\in\{f,m\}$ in a couple is:
+\[u^{C}(c^s_t,Q_t,\psi_t)=\frac{{[\mathcal{C}(c^s_t,Q_t)]}^{1-\sigma}}{1-\sigma}+\psi_t,\]
+where the match quality $\psi$ can be interpreted as the non-economic value of living together with a romantic partner or spouse. Variable $\psi$ evolves according to the following law of motion:
+\[\psi_t=\psi_{t-1}+\epsilon_t,\text{ where }\epsilon_t \overset{\text{i.i.d.}}{\sim}\mathcal{N}(0,\sigma^2_{\psi}). \]
+The love shock at the first meeting can have a different variance, denoted by $\sigma^2_{\psi,I}$. 
+
+\textbf{Home production.} Each individual $s$ has one unit of time. Before retirement, singles and all men are always employed ($P^s_t=1$) and inelastically supply a fraction  $1-\phi$ ($\phi$) of their time to the labor market (home production).  Women in a couple can be non-employed ($P^f_t=0$), devoting all their time to producing home goods $Q$. Otherwise, they can be employed ($P^f_t=1$) and supply time $\phi$ to home production. Home goods can also be produced by purchasing home inputs $d$. We define the production function of home goods for singles of gender $s\in\{f,m\}$ as
+\begin{equation}\label{eq:pfunctions}
+	Q^s_t=[\chi(\underbrace{d^s_t}_{\text{\makebox[0pt]{home inputs}}})^\nu+(1-\chi)(\underbrace{\phi}_{\text{\makebox[0pt]{time}}})^\nu ]^{\frac{1}{\nu}},
+\end{equation}
+while for couples:
+\begin{equation}\label{eq:pfunction}
+	Q_t=[\chi(\underbrace{\strut d_t}_{\text{\makebox[0pt]{home inputs}}})^\nu+(1-\chi) {(\underbrace{\phi}_{\text{\makebox[0pt]{men's time}}}+\underbrace{(\phi+(1-{{\color{orange}}P^f_t})(1-\phi))}_{\text{women's time}}}^\nu ]^{\frac{1}{\nu}}, \text{ where }0<\nu<1.
+\end{equation}
+The parameter $\nu$ represents the degree of substitutability between time and market inputs in home goods production. Since $0<\nu<1$, time and home inputs are substitutes. This implies that, as the price $p$ of home inputs relative to private consumption decreases, women spend less time on home production and more on market work. %However, the lower the substitutability between time and home inputs, the more market inputs are required to offset the reduced time spent on home production.
+
+\textbf{Labor income.} The labor income for agents $s\in\{f,m\}$ depends on their age $t$ and on component $z^s_t$:
+\begin{equation}\label{eq:ldeterm}
+	\ln(w^s_t)=\iota^{s}_0+\iota^{s}_1 t+\iota^{s}_2 t^2+\iota^{s}_3 t^3+\hat{z}^s_t,\quad z^s_t = \hat{z}^s_t+z^{sL}_t, 
+\end{equation}
+where $\iota^{s}_i, i\in\{0,1,2\}$ captures the gender-specific evolution of (potential) earnings $w^s_t$ over the life-cycle. The variable $\hat{z}^s_t$ is the permanent component of income, while the component $z^{sL}_t$ captures the productivity losses associated with non-employment. The permanent income component  $\hat{z}^s_t$ displays the following dynamics:
+\begin{align}\label{eq:pcomp}
+	&\hat{z}^s_t=\hat{z}^s_{t-1}+ \zeta^s_t\text{, where }\hat{z}^s_{0}=\zeta^s_{0}\sim\mathcal{N}(0,\sigma_{0 \zeta s}^{2}),\\
+	&\nonumber\zeta^s_{t}\overset{\text{i.i.d.}}{\sim}\mathcal{N}(0,\sigma_{\zeta s}^{2})\text{ for singles, while for couples }
+		\zeta_t^i  \sim \mathcal{N}(0,  \sigma_{\zeta^i}^2) \ \forall i \in\{f,m\}
+\end{align}
+Note that if the covariance between the persistent income shocks of partners/spouses ($\sigma_{\zeta^{mf}}$) is positive, the income shocks experienced by members of a couple are correlated. This correlation may arise due to various factors, such as both partners working in the same industry. Component $z^{sL}_t$ captures the productivity losses compared to a scenario where the individual always worked:
+\begin{equation}\label{eq:skilloss}
+	z^{sL}_t=z^{sL}_{t-1}-(1-P_{t-1}^s) \mu \kappa_t\text{, where }z^{sL}_{0}=0, \ \kappa_t\sim \text{Bernoulli}(p_\kappa),
+\end{equation}
+where $P^s_t$ is an employment dummy. The parameters $\mu$ and $p_\kappa$ define the expected productivity losses for non-employed women. Note that equations \eqref{eq:pcomp}-\eqref{eq:skilloss} can be expressed as
+\begin{equation}\label{eq:z}
+	z^s_t=z^s_{t-1}+ \zeta^s_t -(1-P_{t-1}^s) \mu \kappa_t\text{, where shocks follow the distributions in equations \eqref{eq:pcomp}-\eqref{eq:skilloss}.}
+\end{equation}
+Starting from period $T_R$, agents retire and subsequently receive a fraction of $w^s_{T_R-1}$ in each following period.
+
+%It can be interpreted as a reduced form way of capturing both the missed opportunity to accumulate human capital while working and the skill atrophy from interruptions \citep{adda2017}. Modeling the loss in productivity for not working is an important feature of our model as it incentivizes women who expect to divorce or break up soon to join the labor force. 
+
+
+
+\textbf{Budget constraints.} The budget constraint of a single agent of gender  $s\in\{f,m\}$ is:
+\begin{equation}\label{eq:bcs}
+	a^s_{t+1}=(1+r) a^s_t+w^s_t(1-\phi)-c^s_t-d^s_t-\mathcal{T}^s(y^s_t), \text{ with }a^s_{t+1}\geq0,
+\end{equation}
+where $a^s$ are the agent's savings and $w^s$ is the wage. The term $\mathcal{T}^s(\cdot)$ is the gender-dependent income tax function, which captures the progressive nature of the US system. The variable $y^s_t=r a^s_t+ w^s_t(1-\phi)$ is the income of the agent.
+The budget constraint for a married couple is:
+\begin{equation}\label{eq:bcm}
+	a_{t+1}=(1+r) a_t+w^m_t(1-\phi)+P^f_t w^f_t(1-\phi)-c^f_t-c^m_t-d_t-\mathcal{T}^j(y^f_t+y^m_t), \text{ with }a_{t+1}\geq0.
+\end{equation}
+
+For married couples, $\mathcal{T}^j(\cdot)$ is applied to household income, which reflects the fact that married couples file their taxes jointly [to see in Japan/Netherlands]. An important feature of our model is the role of property rights, which determines how household assets $a_t$ are divided between former partners after divorce. Formally, $a^m_t+a^f_t=a_t.$ Upon divorce, each spouse keeps half of the assets ($a^m_t=a^f_t$).
+
+\subsection{Value functions}
+
+\textbf{Problem of singles}
+A single agent $s\in\{f,m\}$ in $t$ makes decisions about private consumption, savings, and home inputs. In $t+1$, she meets a potential partner of the opposite sex $s^*$ with probability $\lambda_{t+1}$, and she can decide to enter marry, which also depends on whether the potential partner will agree. The agent's choices are represented by the vector $\mathbf{q}^s_t=\{a^s_{t+1},c^s_t,d^s_t\}$, while $\boldsymbol{\omega}^s_t=\{a^s_t,z^s_t,z^{s^*}_t\}$ is the vector of state variables. Variable $z^{s^*}_t$ plays a crucial role in shaping the individual's expectations about future potential partners, which we will explain in more detail later in this Section. We denote by $V_t^{sS}(\boldsymbol{\omega}^s_t)$ the value function of agent $s$: 
+\begin{align}\label{eq:v_single}
+	&V_t^{sS}(\boldsymbol{\omega}^s_t)=\max_{\mathbf{q}^s_t} u(c^s_t,Q^s_t)+\beta E_t \bigg\{
+	%
+	\\\nonumber\tag{no meeting}&(1-\lambda_{t+1})V^{sS}_{t+1}(\boldsymbol{\omega}^s_{t+1})+
+	%
+	\\\nonumber\tag{meeting, stay single} & \lambda_{t+1} (1-M_{t+1}(\boldsymbol{\Omega}_{t+1})) V^{sS}_{t+1}(\boldsymbol{\omega}_{t+1})+
+	%
+	\\\nonumber\tag{meeting, marry} & \lambda_{t+1} M_{t+1}(\boldsymbol{\Omega}_{t+1}) V^{sM}_{t+1}(\boldsymbol{\Omega}_{t+1}) \bigg\},
+	%
+	\\\nonumber &\text{s.t. budget constraint for singles \eqref{eq:bcs},} 
+\end{align}
+where $V^{sM}(\boldsymbol{\Omega}_{t+1})$ is the individual values of being married, while $\boldsymbol{\Omega}_{t+1}$ is the vector of state variables for the couple's problem. Later in this Section we give more information on how these variables are determined. Note that the value function of those who have just broken up from cohabitation coincides with that of singles. The problem of the divorcee is identical to that of singles.
+
+
+\textbf{Household planning problem for married couples} Marriage is denoted by $M$. Couples solve a Pareto problem where the wife's weight is $\theta^f_t$ and the husband's is $1-\theta^f_t$. Pareto weights can vary over time. We first define the problem for a couple that decided to stay married in $t$ with given Pareto weight $\theta^f_t$. Then we discuss the evolution of the Pareto weights and the decision to divorce $D_{t}(\boldsymbol{\Omega}_{t})\in\{0,1\}$, where $\boldsymbol{\Omega}_t=\{a_t,z^f_t,z^m_t,\psi_t,\theta^f_t | \pi\}$ is the state vector of this problem. The formal problem of a couple that stays married in $t$ is:
+\begin{equation}
+	V_t^{M}(\boldsymbol{\Omega}_t)=\max_{\mathbf{q}^{M}_t} \left\{\begin{array}{c}
+		\theta_t^f u^C(c_t^f, Q_t, \psi_t)+(1-\theta_t^f) u^C(c_t^m, Q_t, \psi_t) \\
+		+\beta E_t\left[\begin{array}{c}
+			(1-D_{t+1}(\boldsymbol{\Omega}_{t+1})) V_{t+1}^{M}(\boldsymbol{\Omega}_{t + 1}) \\
+			+D_{t+1}(\boldsymbol{\Omega}_{t+1})\left\{\theta_t^f V_{t+1}^{fD}(\boldsymbol{\omega}_{t + 1}^f)+(1-\theta_t^f) V_{t+1}^{mD}(\boldsymbol{\omega}_{t+1}^m)\right\}
+		\end{array}\right]
+	\end{array}\right\}
+\end{equation}
+s.t. budget constraint \eqref{eq:bcm};\text{ if } $D_{t+1}(\boldsymbol{\Omega}_{t+1})=1: a^m_{t+1}=(1-\pi) a_{t+1}, a^f_{t+1}=\pi a_{t+1}, \pi=0.5$ 
+
+The value of marriage for spouse $s \in\{f, m\}$ is defined recursively. In the last period $T$ it is $V_T^{sM}(\boldsymbol{\Omega}_{t})=u^C(\tilde{c}_T^{s}, \tilde{Q}_T, \psi_T)$ while for $t<T$ it equals
+$$
+V_t^{sM}(\boldsymbol{\Omega}_t)=u^C(\tilde{c}_t^{s}, \tilde{Q}_t, \psi_t)+\beta E_t\left[(1-D_{t+1}(\boldsymbol{\Omega}_{t + 1})) V_{t+1}^{sM}(\boldsymbol{\Omega}_{t+1})+D_{t+1}(\boldsymbol{\Omega}_{t + 1}) V_{t+1}^{sD}(\boldsymbol{\omega}_{t+1}^s)\right].
+$$
+We now address the determination of divorce and the Pareto weight $\theta_{t+1}^f$. Marriage persists as long as the participation constraints for both spouses are simultaneously met. This occurs when the utility of being married is at least as large as the utility of divorcing for both the husband and the wife:
+\begin{equation}\label{eq:pcm}
+	V_{t+1}^{sM}(\boldsymbol{\Omega}_{t+1}) \geq V_{t+1}^{sD}(\boldsymbol{\omega}_{t+1}^s)  \text { for } s \in\{f, m\}
+\end{equation}
+If condition \eqref{eq:pcm} holds for both spouses, the couple stays married, and the Pareto weight in $t+1$ is equal to the Pareto weight in $t$. If the condition \eqref{eq:pcm} holds for one spouse but not for the other, the new Pareto weight is $\theta_{t+1}^f=\operatorname{argmin}_{\theta^*}\left|\theta_t^f-\theta^*\right|$ such that participation both constraints \eqref{eq:pcm} hold. Divorce occurs if there is no $\theta_{t+1}^f$ such that participation constraints \eqref{eq:pcm}  are satisfied simultaneously. Hence, the decision to divorce follows:
+$$
+D_{t+1}\left(\boldsymbol{\Omega}_{t+1}\right)= \begin{cases}0, & \text{ if } \exists \ \theta_{t+1}^f  \text{ such that participation constraints \eqref{eq:pcm} are both satisfied. } \\ 1, & \text{ otherwise. }\end{cases}
+$$
+Pareto weights adjust whenever a participation constraint is binding. If a spouse is better off divorcing, the other spouse will attempt to dissuade them by offering more bargaining power, making them indifferent between divorcing and staying married. Risk-sharing is less functional in this framework than under the mutual consent regime since variations in the Pareto weight imply less smooth consumption profiles over time. Labor market specialization is also less functioning since, conditionally on having the same state variables, the risk of divorce is higher, which makes women willing to insure against this event through labor market participation. 
+
+
+%Property rights upon divorce plays a significant role when splitting is unilateral: for example under community properly the least wealthy member can bargain a higher share of resources since the threat of divorce is real. This could not happen under a title-based regime.
+
+\subsection{Partnership choice and the marriage market}\label{ssec:marriage_market}
+In each period $t$ singles have a probability $\lambda_t$ of meeting a potential partner. Conditionally on having met someone, agents need to know the distribution of potential partners over productivity and assets. Given that the mating market is of the partial equilibrium type in our model, we need to parametrize the distribution of potential partners and make a series of assumptions. Below, we describe our parametrization choices and assumptions. We also described how the Pareto weight is set for a couple that just met. We denote by the symbol ``*'' the potential partner of the opposite gender. To simplify the computations needed to solve the model, after retirement singles cannot meet new partners, and couples cannot divorce, breakup, or renegotiate.
+
+\textbf{Productivities.} Individual $i$ of gender $s$ draws in $t=0$ a potential partner with productivity $z^{s^*}_0\sim\mathcal{N}(0,\sigma^2_{0 \zeta s^*})$.\footnote{Note that the productivity of $i$ and the \textit{potential} partner are uncorrelated in $t=0$. However, in the cross-section,  productivity between \textit{actual} partners may be positively correlated.} If $i$ enters a relationship in $t=0$, then $z^{s^*}_0$ will be the partner's productivity. Otherwise, if $i$ stays single in $t=0$, the distribution of next-period potential partners' productivity $z^{s^*}_1$ follows Equation~\eqref{eq:z}: $z^{s^*}_1=z^{s^*}_0+\zeta^{s*}_1$, where the shock $\zeta^{s*}_1$ is uncorrelated with $i$'s productivity innovations.\footnote{Since individuals cannot jump from one relationship to another in two consecutive periods, it is as if the potential partner was single at $t=0$, hence $P^{s*}_0=1$.} Likewise, if $i$ is still single in $t\geq1$, the potential partner's productivity will also evolve idiosyncratically following Equation~\eqref{eq:z}. Finally, if $i$ separates in $t$ from a partner with productivity $z^{s^*}_t$, the productivity of potential partners in $t+1$ will once again follow equations \eqref{eq:z}: $z^{s^*}_{t+1}=z^{s^*}_t+\zeta^{s*}_{t+1}$.
+
+\textbf{Assets.} For singles of gender $s$ and assets $a_t^{s}$, the assets of the potential partner are $a_t^{s*}=\alpha^a_s a_t^{s}.$
+
+\textbf{Pareto weight.} Two potential partners who have just met and have a positive surplus of entering into a relationship and marry ($M_{t}(\boldsymbol{\Omega}_{t})=1$) determine their initial Pareto weight $\theta^f_t$ by maximizing the following Nash product:
+\begin{equation}\label{nash_couple}
+	\theta^f_t= \argmax_{\theta\in [0,1]} \big[V_t^{fR}(\boldsymbol{\Omega}^{-1}_t,\theta)- V_t^{fS}(\boldsymbol{\omega}^f_t)\big]\times\big[ V_t^{mR}(\boldsymbol{\Omega}^{-1}_t,\theta)- V_t^{mS}(\boldsymbol{\omega}^m_t)\big],
+\end{equation}
+where $\boldsymbol{\Omega}^{-1}_t$ is the state vector of the couple excluding the Pareto weight. The use of symmetric Nash bargaining to set the initial Pareto weight is common in the literature.
+
+
+
+\end{document}

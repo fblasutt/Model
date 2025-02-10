@@ -4,6 +4,7 @@ import numpy as np
 from consav import linear_interp
 from numba import config 
 from consav.grids import nonlinspace
+from scipy.integrate import quad
 import setup
 
 #general configuratiion and glabal variables  (common across files)
@@ -24,19 +25,53 @@ def util(c_priv,c_pub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=0.0,ishom=0.0)
     return ((α1*c_priv**ϕ1 + α2*homegood**ϕ1)**ϕ2)/(1.0-ρ)+love
 
  
-@njit(cache=cache) 
-def resources_couple(par,t,ih,iz,assets):     
+@njit(cache=cache)  
+def resources_couple(par,t,ih,iz,assets):      
+      
+ 
+    
+    izw=iz//par.num_zm;izm=iz%par.num_zw  
+    r=par.R-1.0 
+      
+    yh =   par.grid_zm[t,izm,ih]  
+    yw_w = par.grid_zw[t,izw,ih]*par.grid_wlp[1] 
+    yw_n = par.grid_zw[t,izw,ih]*par.grid_wlp[0] 
      
-    izw=iz//par.num_zm;izm=iz%par.num_zw 
+    tax_work =     (yh+yw_w+r*assets) -  .9817526*(yh+yw_w+r*assets)**(1-.0951248)
+    tax_not_work = (yh+yw_n+r*assets) -  .9817526*(yh+yw_n+r*assets)**(1-.0951248)
+    
+    
      
-    #resources depending on employment 
-    res_not_work = par.R*assets + np.exp(np.log(par.grid_zw[t,izw])+par.grid_h[ih])*par.grid_wlp[0] + par.grid_zm[t,izm]  
-    res_work     = par.R*assets + np.exp(np.log(par.grid_zw[t,izw])+par.grid_h[ih])*par.grid_wlp[1] + par.grid_zm[t,izm]  
-     
-    # change resources if retired: women should not work!  
-    if t>=par.Tr: return res_not_work, res_not_work  
-    else:         return res_not_work, res_work  
+    #resources depending on employment  
+    res_not_work = par.R*assets + (yh +yw_n-tax_not_work-0*0.0765*(yh +yw_n)) 
+    res_work     = par.R*assets + (yh +yw_w-tax_work-0*0.0765*(yh +yw_w) ) 
+      
+    # change resources if retired: women should not work!   
+    if t>=par.Tr: return res_work,     res_work,yh,yw_w 
+    else:         return res_not_work, res_work,yh,yw_w 
 
+
+@njit(cache=cache)  
+def income_single(par,t,ih,iz,assets,women=True): 
+     
+    
+    iz_i=iz//par.num_zm if women else iz%par.num_zw 
+    r=par.R-1.0 
+     
+    labor_income =  par.grid_zw[t,iz_i,ih] if women else par.grid_zm[t,iz_i,ih]#without HC! 
+   
+    tax_income_m = (labor_income+r*assets) -.9215397*(labor_income+r*assets)**(1-.079307)#taxes(labor_income,s=True)# 
+    tax_income_w = (labor_income+r*assets) -.9438169*(labor_income+r*assets)**(1-.0558105)#taxes(labor_income,s=True)# 
+    
+
+    #tax_income_m = (labor_income) -.8647291*(labor_income)**(1-.146648) 
+    #tax_income_w = (labor_income) -.8804861*(labor_income)**(1-.1165) 
+     
+     
+    if women: return (labor_income-tax_income_w-0*0.0765*labor_income) 
+    else:     return (labor_income-tax_income_m-0*0.0765*labor_income) 
+    
+    
 @njit(cache=cache)
 def couple_util(Cpriv,Ctot,power,ishom,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):#function to minimize
     """
@@ -104,21 +139,48 @@ def intraperiod_allocation_single(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
     
     return C_priv,C_tot - C_priv#=C_pub
 
-def labor_income(t0,t1,t2,t3,T,Tr,sigma_persistent,sigma_init,npts,pension):  
-      
-  
-    X, Pi, Pi0 =rouw_nonst(T,sigma_persistent,sigma_init,npts)  
-      
-    if sigma_persistent<0.001:      
-        for t in range(T):X[t][:]=0.0  
-        for t in range(T-1):Pi[t]=np.eye(npts)  
-          
-    for t in range(Tr-1,T-1): Pi[t][:]=np.eye(npts)  
-    for t in range(T):X[t][:]=np.exp(X[t]+t0+t1*t+t2*t**2+t3*t**3)  
-    for t in range(Tr,T):X[t][:]=pension*X[Tr-1] 
-  
-    return np.array(X), Pi, Pi0 
+def labor_income(t0,t1,t2,t3,T,Tr,sigma_persistent,sigma_init,npts,grid_h,women=True): 
+     
+    
+    X, Pi, Pi0 =rouw_nonst(T,sigma_persistent,sigma_init,npts) 
+    XX=np.zeros((T,npts,len(grid_h)))
+    
+    if sigma_persistent<0.001:     
+        for t in range(T-1):Pi[t]=np.eye(npts) 
+         
+    for t in range(Tr-1,T-1): Pi[t][:]=np.eye(npts) 
+    
+    for t in range(T):
+        for i in range(len(grid_h)):
+            if women:       
+                XX[t,:,i]=np.exp(X[t]+t0+t1*(t-2)+t2*(t-2)**2+t3*(t-2)**3+grid_h[i])
+            else:
+                XX[t,:,i]=np.exp(X[t]+t0+t1*t+t2*t**2+t3*t**3) 
+            
+    for t in range(Tr,T):
+        for i in range(len(grid_h)):
+            XX[t,:,i]=pens(XX[Tr-1,:,i])#pens(XX[Tr-1,:,i])
+ 
+    return XX, Pi, Pi0
    
+#function to compute pension
+def pens(value):
+    
+    #Bend points: 1989, https://www.ssa.gov/oact/cola/bendpoints.html
+    
+    #Matters only income below threshold 
+    valuef=value.copy()
+
+    deflator=1.3782117944263717
+    normalization=18414.542781866283
+    thresh1=339*12*deflator/normalization
+    thresh2=2044*12*deflator/normalization
+    
+    inc1=np.minimum(valuef,thresh1)
+    inc2=np.maximum(np.minimum(valuef,thresh2)-thresh1,0)
+    inc3=np.maximum(valuef-thresh2,0)
+    
+    return inc1*0.9+inc2*0.32+inc3*0.15 
 
 
 ###########################
@@ -194,6 +256,7 @@ def rouw_nonst_one(sd0,sd1,npts):
     
     return Pi
 
+
 @njit(fastmath=True)
 def mc_simulate(statein,Piin,shocks):
     """This simulates transition one period ahead for a Markov chain
@@ -206,6 +269,23 @@ def mc_simulate(statein,Piin,shocks):
     """ 
     return  np.sum(np.cumsum(Piin[:,statein])<shocks)
 
+@njit(fastmath=True)
+def rescale_matrix(Π,tol=1e-4):
+    """Rescale transition matrix by eliminating close to zero elements
+    
+    Args:
+        Π: n*n square tranistion matrix
+        tol: elements of Π below tol are set to 0
+    
+    """
+    
+    zeros = Π < tol
+    for i in range(len(Π)):
+        
+        Π[zeros[:,i],i] = 0.0
+        Π[:,i] = Π[:,i] / np.sum(Π[:,i])
+        
+    return Π 
 
 ##########################
 # Other routines below
