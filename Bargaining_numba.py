@@ -28,7 +28,7 @@ class HouseholdModelClass(EconModelClass):
         par.div_A_share = 0.5 # divorce share of wealth to wife
 
         # Utility: CES aggregator or additively linear
-        par.ρ = 1.5#        # CRRA      
+        par.ρ = 2.0#        # CRRA      
         par.α1 = 0.65
         par.α2 = 0.35
         par.ϕ1 = 0.43
@@ -41,6 +41,8 @@ class HouseholdModelClass(EconModelClass):
         
         #Taste shock
         par.σ = 0.02 #taste shock applied to working/not working
+        
+        par.γ=0.5#woemn's relative power during nash bargaining
         
 
         
@@ -63,22 +65,24 @@ class HouseholdModelClass(EconModelClass):
         par.pr_h_change = 2/46# 0.025 # probability that  human capital depreciates
 
         # love/match quality
-        par.num_love = 11
+        par.num_love = 7
         par.σL = 0.1; par.σL0 = 0.1
         
-        # income of men and women: gridpoints
-        par.num_zw=3;par.num_zm=3; par.num_z=par.num_zm*par.num_zw
+        # productivity of men and women: gridpoints
+        par.num_ϵw=2;par.num_ϵm=2#transitory
+        par.num_pw=3;par.num_pm=3#persistent
+        par.num_zw=par.num_pw*par.num_ϵw;par.num_zm=par.num_pm*par.num_ϵw#total by gender
+        par.num_z=par.num_zm*par.num_zw#total, couple
         
         # income of men and women: parameters of the age log-polynomial
         par.t0m=0.000;par.t1m=0.07095764 ;par.t2m= -0.00186095  ;par.t3m= 0.00000941  ;
         par.t0w=-0.728 ;par.t1w= 0.07851440  ;par.t2w=-0.00191743   ;par.t3w=0.00000941  ;
     
-        # income of men and women: sd of income shocks in t=0 and after that
-        par.σzw=0.16435;par.σ0zw= 0.37913;par.σzm=0.14162;par.σ0zm=0.38338
+        # productivity of men and women: sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks
+        par.σpw=0.16435;par.σϵw=0.08;par.σ0w= 0.37913;
+        par.σpm=0.14162;par.σϵm=0.08;par.σ0m=0.38338
         
-        # money you get at retirement
-        par.pension = 0.2
-        
+
         # pre-computation fo consumption
         par.num_Ctot = 150;par.max_Ctot = par.max_A*2
         
@@ -111,10 +115,10 @@ class HouseholdModelClass(EconModelClass):
         par.Πh_n = [par.Πh_nt*(t<par.Tr)+(t>=par.Tr)*np.eye(par.num_h)  for t in range(par.T)] 
         
         # bargaining power. non-linear grid with more mass in both tails.        
-        par.grid_power = usr.grid_fat_tails(0.01,0.99,par.num_power)
+        par.grid_power = usr.grid_fat_tails(0.0001,0.9999,par.num_power)
 
         # love grid and shock    
-        par.grid_love,par.Πl,par.Πl0= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_love)
+        par.grid_love,par.Πl,par.Πl0= usr.addaco_nonst(par.T,par.σL,par.σL0,par.num_love)
         
         # grid for women's labor supply
         par.grid_wlp=np.array([0.0,1.0]);par.num_wlp=len(par.grid_wlp)
@@ -132,8 +136,12 @@ class HouseholdModelClass(EconModelClass):
         par.grid_marg_u_s = np.nan + np.ones(par.num_Ctot)# singles
    
         # income shocks grids: singles and couples
-        par.grid_zw,par.Π_zw, par.Π_zw0 = usr.labor_income(par.t0w,par.t1w,par.t2w,par.t3w,par.T,par.Tr,par.σzw,par.σ0zw,par.num_zw,par.grid_h,women=True) 
-        par.grid_zm,par.Π_zm, par.Π_zm0=  usr.labor_income(par.t0m,par.t1m,par.t2m,par.t3m,par.T,par.Tr,par.σzm,par.σ0zm,par.num_zm,par.grid_h,women=False) 
+        par.grid_zw,par.grid_ϵw,par.grid_pw,par.Π_zw, par.Π_zw0 =\
+            usr.labor_income(par.t0w,par.t1w,par.t2w,par.t3w,par.T,par.Tr,par.σpw,par.σϵw,par.σ0w,par.num_pw,par.num_ϵw,par.grid_h,women=True) 
+        
+        par.grid_zm,par.grid_ϵm,par.grid_pm,par.Π_zm, par.Π_zm0=\
+            usr.labor_income(par.t0m,par.t1m,par.t2m,par.t3m,par.T,par.Tr,par.σpm,par.σϵw,par.σ0m,par.num_pm,par.num_ϵw,par.grid_h,women=False)
+        
         par.Π=[np.kron(par.Π_zw[t],par.Π_zm[t]) for t in range(par.T-1)] # couples trans matrix, possible to change this and make shocks correlated
 
         #Simulation
@@ -351,18 +359,18 @@ def marriage_mkt(par,vcw,vcm,vsw,vsm):
         if θmin>θmax: return vsw,vsm,-1.0,False #again, negative surplus for any b. power
         else:#find the the b. powdr that maximizes symmetric nash bargaining
         
-            θ, v = usr.optimizer(nash_bargaining,θmin,θmax,args=(par.grid_power,wp,mp))
+            θ, v = usr.optimizer(nash_bargaining,θmin,θmax,args=(par.grid_power,wp,mp,par.γ))
             vcwi = linear_interp.interp_1d(par.grid_power,vcw,θ)
             vcmi = linear_interp.interp_1d(par.grid_power,vcm,θ)  
             
             return vcwi,vcmi,θ,True
 
 @njit
-def nash_bargaining(x,xgrid,wp,mp):
+def nash_bargaining(x,xgrid,wp,mp,γ):
     
    wpθ=linear_interp.interp_1d(xgrid,wp,x)
    mpθ=linear_interp.interp_1d(xgrid,mp,x)
-   return  -wpθ*mpθ
+   return  -wpθ**γ*mpθ**(1.0-γ)
     
 @njit(parallel=parallel)
 def solve_single_egm(sol,par,t):

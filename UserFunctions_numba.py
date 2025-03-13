@@ -1,10 +1,12 @@
 from numba import njit
 from numba_stats import norm
 import numpy as np
-from consav import linear_interp
 from numba import config 
+from consav import linear_interp
 from consav.grids import nonlinspace
+from consav.markov import rouwenhorst
 from scipy.integrate import quad
+
 import setup
 
 #general configuratiion and glabal variables  (common across files)
@@ -60,8 +62,8 @@ def income_single(par,t,ih,iz,assets,women=True):
      
     labor_income =  par.grid_zw[t,iz_i,ih] if women else par.grid_zm[t,iz_i,ih]#without HC! 
    
-    tax_income_m = (labor_income+r*assets) -.9215397*(labor_income+r*assets)**(1-.079307)#taxes(labor_income,s=True)# 
-    tax_income_w = (labor_income+r*assets) -.9438169*(labor_income+r*assets)**(1-.0558105)#taxes(labor_income,s=True)# 
+    tax_income_m = 0.0#(labor_income+r*assets) -.9215397*(labor_income+r*assets)**(1-.079307)#taxes(labor_income,s=True)# 
+    tax_income_w = 0.0#(labor_income+r*assets) -.9438169*(labor_income+r*assets)**(1-.0558105)#taxes(labor_income,s=True)# 
     
 
     #tax_income_m = (labor_income) -.8647291*(labor_income)**(1-.146648) 
@@ -139,29 +141,45 @@ def intraperiod_allocation_single(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
     
     return C_priv,C_tot - C_priv#=C_pub
 
-def labor_income(t0,t1,t2,t3,T,Tr,sigma_persistent,sigma_init,npts,grid_h,women=True): 
+def labor_income(t0,t1,t2,t3,T,Tr,sigma_p,sigma_ϵ,sigma_init,n_p,n_ϵ,grid_h,women=True): 
      
+    ###################
+    # Grids here
+    ##################
     
-    X, Pi, Pi0 =rouw_nonst(T,sigma_persistent,sigma_init,npts) 
-    XX=np.zeros((T,npts,len(grid_h)))
+    # Persistent shocks
+    P, PiP, Pi0P =rouw_nonst(T,sigma_p,sigma_init,n_p) 
     
-    if sigma_persistent<0.001:     
-        for t in range(T-1):Pi[t]=np.eye(npts) 
-         
-    for t in range(Tr-1,T-1): Pi[t][:]=np.eye(npts) 
+    # Transitory shocks
+    grid,trans,_,_,_=rouwenhorst(0.0,0.0,sigma_ϵ,n=n_ϵ)
+    
+
+    #Store here all the components of earnings
+    XX,XP,XT,XH,XD=np.zeros((5,T,n_p*n_ϵ,len(grid_h)))
     
     for t in range(T):
         for i in range(len(grid_h)):
-            if women:       
-                XX[t,:,i]=np.exp(X[t]+t0+t1*(t-2)+t2*(t-2)**2+t3*(t-2)**3+grid_h[i])
-            else:
-                XX[t,:,i]=np.exp(X[t]+t0+t1*t+t2*t**2+t3*t**3) 
             
+            XT[t,:,i]=(np.zeros(P[t].shape)[:,None]+grid[None,:]).flatten()
+            XP[t,:,i]=(P[t][:,None]+np.zeros(grid.shape)[None,:]).flatten()
+            XH[t,:,i] = grid_h[i] if women else 0.0
+            XD[t,:,i] = t0+t1*t+t2*t**2+t3*t**3
+            
+
+    XX=np.exp(XT+XP+XH+XD)
     for t in range(Tr,T):
         for i in range(len(grid_h)):
-            XX[t,:,i]=pens(XX[Tr-1,:,i])#pens(XX[Tr-1,:,i])
+            XX[t,:,i]=pens(XX[Tr-1,:,i])
+    
+    #####################
+    # Transition matrices
+    ####################
+    Pi =[np.kron(PiP[t],trans) for t in range(T-1)]
+    Pi0=[np.kron(Pi0P[t],trans) for t in range(T-1)]
+    for t in range(Tr-1,T-1): Pi[t][:]=np.eye(n_p*n_ϵ) 
+    
  
-    return XX, Pi, Pi0
+    return XX, XT,XP, Pi, Pi0
    
 #function to compute pension
 def pens(value):
@@ -213,7 +231,58 @@ def normcdf_tr(z,nsd=5):
     
 def normcdf_ppf(z): return norm.ppf(z,0.0,1.0)       
         
+def addaco_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=50,mean=np.array([0.0],)):
+  
+    if mean.shape[0]!=T-1:mean=np.zeros(T-1) 
+    # start with creating list of points
+    sd_z = sd_rw(T,sigma_persistent,sigma_init)
+    sd_z0 = np.array([np.sqrt(sd_z[t]**2-sigma_init**2) for t in range(T)])
+        
+    Pi = list();Pi0 = list();X = list();Int=list()
+
+
+    #Probabilities per period
+    Pr=normcdf_ppf((np.cumsum(np.ones(npts+1))-1)/npts)
     
+    #Create interval limits
+    for t in range(0,T):Int = Int + [Pr*sd_z[t]]
+        
+    
+    #Create gridpoints
+    for t in range(T):
+        line=np.zeros(npts)
+        for i in range(npts):
+            line[i]= sd_z[t]*npts*(norm.pdf(Int[t][i]  /sd_z[t],0.0,1.0)-\
+                                   norm.pdf(Int[t][i+1]/sd_z[t],0.0,1.0))
+            
+        X = X + [line]
+
+    def integrand(x,e,e1,sd,sds,mean):
+        return np.exp(-(x**2)/(2*sd**2))*(norm.cdf((e1-x-mean)/sds,0.0,1.0)-\
+                                          norm.cdf((e- x-mean)/sds,0.0,1.0))
+            
+            
+    #Fill probabilities
+    for t in range(1,T):
+        Pi_here = np.zeros([npts,npts]);Pi_here0 = np.zeros([npts,npts])
+        for i in range(npts):
+            for jj in range(npts):
+                
+                Pi_here[i,jj]=npts/np.sqrt(2*np.pi*sd_z[t-1]**2)\
+                    *quad(integrand,Int[t-1][i],Int[t-1][i+1],
+                     args=(Int[t][jj],Int[t][jj+1],sd_z[t],sigma_persistent,mean[t-1]))[0]
+                
+                Pi_here0[i,jj]= norm.cdf(Int[t][jj+1],0.0,sigma_init)-\
+                                   norm.cdf(Int[t][jj],0.0,sigma_init)
+                                   
+            #Adjust probabilities to get exactly 1: the integral is an approximation
+            Pi_here[i,:]=Pi_here[i,:]/np.sum(Pi_here[i,:])
+            Pi_here0[i,:]=Pi_here0[i,:]/np.sum(Pi_here0[i,:])
+                
+        Pi = Pi + [Pi_here.T]
+        Pi0 = Pi0 + [Pi_here0.T]
+        
+    return X, Pi, Pi0   
 
 def rouw_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=10): 
     
