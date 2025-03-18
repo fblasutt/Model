@@ -152,7 +152,8 @@ def labor_income(t0,t1,t2,t3,T,Tr,sigma_p,sigma_ϵ,sigma_init,n_p,n_ϵ,grid_h,wo
     
     # Transitory shocks
     grid,trans,_,_,_=rouwenhorst(0.0,0.0,sigma_ϵ,n=n_ϵ)
-    
+
+
 
     #Store here all the components of earnings
     XX,XP,XT,XH,XD=np.zeros((5,T,n_p*n_ϵ,len(grid_h)))
@@ -174,8 +175,8 @@ def labor_income(t0,t1,t2,t3,T,Tr,sigma_p,sigma_ϵ,sigma_init,n_p,n_ϵ,grid_h,wo
     #####################
     # Transition matrices
     ####################
-    Pi =[np.kron(PiP[t],trans) for t in range(T-1)]
-    Pi0=[np.kron(Pi0P[t],trans) for t in range(T-1)]
+    Pi =[np.kron(PiP[t],trans.T) for t in range(T-1)]
+    Pi0=[np.kron(Pi0P[t],trans.T) for t in range(T-1)]
     for t in range(Tr-1,T-1): Pi[t][:]=np.eye(n_p*n_ϵ) 
     
  

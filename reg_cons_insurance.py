@@ -8,6 +8,7 @@ added in the paper
 import numpy as np
 import Bargaining_numba as brg
 from consav import linear_interp
+import UserFunctions_numba as usr 
 
 #Root 
 root='C:/Users/32489/Dropbox/Family Risk Sharing'
@@ -57,9 +58,16 @@ def selection(m,par,name):
     #Log consumption growth for wife, husband and share of wife's expenses
     ΔCm  =np.log(Cm[:,b+1:e+1])  -np.log(Cm[:,b:e])
     ΔCw  =np.log(Cw[:,b+1:e+1])  -np.log(Cw[:,b:e])  
-    Δws =np.log(Cw[:,b+1:e+1]/(Cw[:,b+1:e+1]+Cm[:,b+1:e+1]))  -np.log(Cw[:,b:e]/(Cw[:,b:e]+Cm[:,b:e]))
+    Δws =np.log(Cw[:,b+1:e+1]/(Cm[:,b+1:e+1]))  -np.log(Cw[:,b:e]/(Cm[:,b:e]))#poww[:,b+1:e+1]-poww[:,b:e]#np.log(Q[:,b+1:e+1]/(m.sim.C_tot[:,b+1:e+1]))  -np.log(Q[:,b:e]/(m.sim.C_tot[:,b:e]))#
     ΔC =np.log(m.sim.C_tot[:,b+1:e+1])-np.log(m.sim.C_tot[:,b:e])
     ΔQ=np.log(Q[:,b+1:e+1])-np.log(Q[:,b:e])
+    
+    #Now the equivalent changes, but in levels not in log
+    ΔLCm  =Cm[:,b+1:e+1]  -Cm[:,b:e]
+    ΔLCw  =Cw[:,b+1:e+1]  -Cw[:,b:e]
+    ΔLws =Cw[:,b+1:e+1]/(Cm[:,b+1:e+1])  -Cw[:,b:e]/(Cm[:,b:e])#poww[:,b+1:e+1]-poww[:,b:e]#
+    ΔLC =m.sim.C_tot[:,b+1:e+1]-m.sim.C_tot[:,b:e]
+    ΔLQ=Q[:,b+1:e+1]-Q[:,b:e]
 
     #################################
     #Income Shocks below
@@ -83,12 +91,21 @@ def selection(m,par,name):
     Δϵw=ϵw[:,b+1:e+1]-ϵw[:,b:e]   
     Δz=Δzm+Δzw
     Δϵ=Δϵm+Δϵw
+    
+    #Total shocks(transitory+persistent)
+    Δtm=Δzm+Δϵm
+    Δtw=Δzw+Δϵw
 
-    #changes in income (husband m, wife w and total)
+    #Log changes in income (husband m, wife w and total)
     ΔYm  =np.log(m.sim.incm[:,b+1:e+1])  -np.log(m.sim.incm[:,b:e])
     ΔYw  =np.log(m.sim.incw[:,b+1:e+1])  -np.log(m.sim.incw[:,b:e])
     ΔY   =np.log(m.sim.incm[:,b+1:e+1]+m.sim.WLP[:,b+1:e+1]*m.sim.incw[:,b+1:e+1])  -np.log(m.sim.incm[:,b:e]+m.sim.WLP[:,b:e]*m.sim.incw[:,b:e])
 
+    #Level changes in income
+    ΔLYm  =m.sim.incm[:,b+1:e+1]  -m.sim.incm[:,b:e]
+    ΔLYw  =m.sim.incw[:,b+1:e+1]*m.sim.WLP[:,b+1:e+1]  -m.sim.incw[:,b:e]*m.sim.WLP[:,b:e]
+    ΔLY   =ΔLYm+ΔLYw
+       
     #changes in income one period ahed (t+1) (husband m, wife w and total)
     ΔY1m  =np.log(m.sim.incm[:,b+2:e+2])  -np.log(m.sim.incm[:,b+1:e+1])
     ΔY1w  =np.log(m.sim.incw[:,b+2:e+2])  -np.log(m.sim.incw[:,b+1:e+1])
@@ -103,13 +120,20 @@ def selection(m,par,name):
     ΔYYm  =ΔYm+ΔY1m+ΔY_1m 
     ΔYYw  =ΔYw+ΔY1w+ΔY_1w 
     ΔYY   =ΔY+ΔY1+ΔY1   
+    
+    #Change in WLP
+    ΔWLP=m.sim.WLP[:,b+1:e+1]-m.sim.WLP[:,b:e]
      
 
+    #TODO  understand while women shocks are small to negative
+    #problem: np.mean(np.diff(MB.sol.Vm_remain_couple,axis=3)>0)
+    
     ##################################
     #Compute and store pass-through   
     ##################################
     
-    
+    #Notation: all: means all income Y (transitory + persistent); per: persistent shock, tra: transitory shock
+    #all_x_y means shock of x's income on m's expenditure
     indc={'all_m_m':np.cov(ΔYm[sm],ΔCm[sm])[0,1]/np.var(ΔYm[sm]),
          'all_m_w':np.cov(ΔYm[sm],ΔCw[sm])[0,1]/np.var(ΔYm[sm]),
          'all_w_m':np.cov(ΔYw[smw],ΔCm[smw])[0,1]/np.var(ΔYw[smw]),
@@ -123,13 +147,35 @@ def selection(m,par,name):
          'tra_w_m':np.cov(Δϵw[smw],ΔCm[smw])[0,1]/np.var(Δϵw[smw]),
          'tra_w_w':np.cov(Δϵw[smw],ΔCw[smw])[0,1]/np.var(Δϵw[smw])}
     
+    level={'all_m_m':np.cov(ΔLYm[sm],ΔLCm[sm])[0,1]/np.var(ΔLYm[sm]),
+          'all_m_w':np.cov(ΔLYm[sm],ΔLCw[sm])[0,1]/np.var(ΔLYm[sm]),
+          'all_w_m':np.cov(ΔLYw[sm],ΔLCm[sm])[0,1]/np.var(ΔLYw[sm]),
+          'all_w_w':np.cov(ΔLYw[sm],ΔLCw[sm])[0,1]/np.var(ΔLYw[sm])}
+         
+    
+    #Pass-through on women's consumption share
     w_sh={'all_m':np.cov(ΔYm[sm],Δws[sm])[0,1]/np.var(ΔYm[sm]),         
           'all_w':np.cov(ΔYw[smw],Δws[smw])[0,1]/np.var(ΔYw[smw]),
           'per_m':np.cov(Δzm[sm],Δws[sm])[0,1]/np.var(Δzm[sm]),
           'per_w':np.cov(Δzw[smw],Δws[smw])[0,1]/np.var(Δzw[smw]),
           'tra_m':np.cov(Δϵm[sm],Δws[sm])[0,1]/np.var(Δϵm[sm]),
-          'tra_w':np.cov(Δϵw[smw],Δws[smw])[0,1]/np.var(Δϵw[smw])}
+          'tra_w':np.cov(Δϵw[smw],Δws[smw])[0,1]/np.var(Δϵw[smw]),
+          'level_m':np.cov(ΔLYm[sm],ΔLws[sm])[0,1]/np.var(ΔLYm[sm]),         
+          'level_w':np.cov(ΔLYw[sm],ΔLws[sm])[0,1]/np.var(ΔLYw[sm])}
     
+    
+    #Effect of income shocks on WLP (in percentage points)
+    wlp= {'all_m':np.cov(Δtm[sm],ΔWLP[sm])[0,1]/np.var(Δtm[sm]),         
+          'all_w':np.cov(Δtw[sm],ΔWLP[sm])[0,1]/np.var(Δtw[sm]),
+          'per_m':np.cov(Δzm[sm],ΔWLP[sm])[0,1]/np.var(Δzm[sm]),
+          'per_w':np.cov(Δzw[sm],ΔWLP[sm])[0,1]/np.var(Δzw[sm]),
+          'tra_m':np.cov(Δϵm[sm],ΔWLP[sm])[0,1]/np.var(Δϵm[sm]),
+          'tra_w':np.cov(Δϵw[sm],ΔWLP[sm])[0,1]/np.var(Δϵw[sm])}
+    
+    
+
+    
+    #Pass-throughs of various components of income on total consumption
     totc={'all':np.cov(ΔY[sm],ΔC[sm])[0,1]/np.var(ΔY[sm]),         
           'per':np.cov(Δz[sm],ΔC[sm])[0,1]/np.var(Δz[sm]),
           'tra':np.cov(Δϵ[sm],ΔC[sm])[0,1]/np.var(Δϵ[sm]),          
@@ -138,8 +184,12 @@ def selection(m,par,name):
           'tra_m':np.cov(Δϵm[sm],ΔC[sm])[0,1]/np.var(Δϵm[sm]),
           'all_w':np.cov(ΔYw[smw],ΔC[smw])[0,1]/np.var(ΔYw[smw]),         
           'per_w':np.cov(Δzw[smw],ΔC[smw])[0,1]/np.var(Δzw[smw]),
-          'tra_w':np.cov(Δϵw[smw],ΔC[smw])[0,1]/np.var(Δϵw[smw])}
+          'tra_w':np.cov(Δϵw[smw],ΔC[smw])[0,1]/np.var(Δϵw[smw]),
+          'level_s':np.cov(ΔLY[sm],ΔLC[sm])[0,1]/np.var(ΔLY[sm]),   
+          'level_m':np.cov(ΔLYm[sm],ΔLC[sm])[0,1]/np.var(ΔLYm[sm]),     
+          'level_w':np.cov(ΔLYw[sm],ΔLC[sm])[0,1]/np.var(ΔLYw[sm])} 
     
+    #Pass-throughs of various components of income on public ependiture
     Qins={'all':np.cov(ΔY[sm],ΔQ[sm])[0,1]/np.var(ΔY[sm]),         
           'per':np.cov(Δz[sm],ΔQ[sm])[0,1]/np.var(Δz[sm]),
           'tra':np.cov(Δϵ[sm],ΔQ[sm])[0,1]/np.var(Δϵ[sm]),
@@ -148,9 +198,12 @@ def selection(m,par,name):
           'per_m':np.cov(Δzm[sm],ΔQ[sm])[0,1]/np.var(Δzm[sm]),
           'per_w':np.cov(Δzw[smw],ΔQ[smw])[0,1]/np.var(Δzw[smw]),
           'tra_m':np.cov(Δϵm[sm],ΔQ[sm])[0,1]/np.var(Δϵm[sm]),
-          'tra_w':np.cov(Δϵw[smw],ΔQ[smw])[0,1]/np.var(Δϵw[smw])}
+          'tra_w':np.cov(Δϵw[smw],ΔQ[smw])[0,1]/np.var(Δϵw[smw]),
+          'level_s':np.cov(ΔLY[sm],ΔLQ[sm])[0,1]/np.var(ΔLY[sm]),   
+          'level_m':np.cov(ΔLYm[sm],ΔLQ[sm])[0,1]/np.var(ΔLYm[sm]),     
+          'level_w':np.cov(ΔLYw[sm],ΔLQ[sm])[0,1]/np.var(ΔLYw[sm])} 
     
-    
+    #BPP moment for MPC
     BPP_MPC={'al_tot':np.cov(ΔY1[sm1],ΔC[sm1])[0,1]/np.cov(ΔY[sm1],ΔY1[sm1])[0,1],
              'al_Q':np.cov(ΔY1[sm1],ΔQ[sm1])[0,1]/np.cov(ΔY[sm1],ΔY1[sm1])[0,1],
              'al_cm':np.cov(ΔY1[sm1],ΔCm[sm1])[0,1]/np.cov(ΔY[sm1],ΔY1[sm1])[0,1],
@@ -164,7 +217,7 @@ def selection(m,par,name):
              'yw_cm':np.cov(ΔY1w[smw1],ΔCm[smw1])[0,1]/np.cov(ΔYw[smw1],ΔY1w[smw1])[0,1],
              'yw_cw':np.cov(ΔY1w[smw1],ΔCw[smw1])[0,1]/np.cov(ΔYw[smw1],ΔY1w[smw1])[0,1]}
              
-    
+    #BPP moment describing inurance to persistent income shocks
     BPP_PER={'al_tot':np.cov(ΔYY[sm11],ΔC[sm11])[0,1]/np.cov(ΔY[sm11],ΔYY[sm11])[0,1],
              'al_Q':np.cov(ΔYY[sm11],ΔQ[sm11])[0,1]/np.cov(ΔY[sm11],ΔYY[sm11])[0,1],
              'al_cm':np.cov(ΔYY[sm11],ΔCm[sm11])[0,1]/np.cov(ΔY[sm11],ΔYY[sm11])[0,1],
@@ -177,6 +230,9 @@ def selection(m,par,name):
              'yw_Q':np.cov(ΔYYw[smw11],ΔQ[smw11])[0,1]/np.cov(ΔYw[smw11],ΔYYw[smw11])[0,1],
              'yw_cm':np.cov(ΔYYw[smw11],ΔCm[smw11])[0,1]/np.cov(ΔYw[smw11],ΔYYw[smw11])[0,1],
              'yw_cw':np.cov(ΔYYw[smw11],ΔCw[smw11])[0,1]/np.cov(ΔYw[smw11],ΔYYw[smw11])[0,1]}
+    
+    
+    
              
 
     
@@ -188,20 +244,31 @@ def selection(m,par,name):
                                                                       np.mean((Cm/m.sim.C_tot)[(m.sim.couple==1) & (m.sim.WLP==1)]),
                                                                       np.mean((Cw/m.sim.C_tot)[(m.sim.couple==1) & (m.sim.WLP==1)])))
   
-    return {'indc':indc,'w_sh':w_sh,'totc':totc,'Qins':Qins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER}
+    return {'indc':indc,'w_sh':w_sh,'totc':totc,'Qins':Qins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,'wlp':wlp,'level':level}
 
 ##################################################
 #Solve and simulate the benchmark model
 ##################################################
-xc=np.array([0.66155087, 0.01160402, 0.04700252, 0.7367213 , 0.49304332])
-xc=np.array([0.64867595, 0.02158587, 0.04203985, 0.74206264, 0.5083394 ])
+xc=np.array([0.62304791, 0.02951767, 0.03566191, 0.74445101, 0.49170177])
+xc=np.array([0.59711125, 0.08309608, 0.07246665, 0.75837416, 0.50298593])
 
-specs = {'model 1':{'latexname':'EGM2', 'par':{'θ':xc[0],'meet':1.0,'σL0':xc[1],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
+
+specs = {'model 1':{'latexname':'EGM2', 'par':{'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
 MB = brg.HouseholdModelClass(name='model 1',par=specs['model 1']['par'])
 MB.spec = specs['model 1']
+MB.par.θ=xc[0] 
+MB.par.meet=xc[1]
+MB.par.λ_grid = np.ones(MB.par.T)*xc[1] 
+MB.par.grid_love,MB.par.Πl,MB.par.Πl0= usr.addaco_nonst(MB.par.T,xc[2],xc[2],MB.par.num_love)    
+MB.par.α2=xc[3] 
+MB.par.α1=1.0-xc[3]
+MB.par.γ=xc[4]
 MB.solve()
 MB.simulate()
 
+
+
+        
 ##################################################
 #Run the selection code for both kind of models:
 #################################################
@@ -244,8 +311,16 @@ table=r"...husband income & "+p33(B['BPP_PER']['ym_tot'])+' & '+p33(B['BPP_PER']
       r'...wife income    & '+p33(B['BPP_PER']['yw_tot'])+' & '+p33(B['BPP_PER']['yw_Q'])+' & '+p33(B['BPP_PER']['yw_cm'])+' & '+p33(B['BPP_PER']['yw_cw'])+'  \\\\ '+\
       r'...total income   & '+p33(B['BPP_PER']['al_tot'])+' & '+p33(B['BPP_PER']['al_Q'])+' & '+p33(B['BPP_PER']['al_cm'])+' & '+p33(B['BPP_PER']['al_cw'])+'  \\\\\\bottomrule '
 with open(root+'/Model/results/BPP_PER.tex', 'w') as f: f.write(table); f.close() 
-	
 
+#labor supply	
+table=r'  '+p33(B['wlp']['tra_w'])+' & '+p33(B['wlp']['tra_m'])+' & '+p33(B['wlp']['per_w'])+' & '+p33(B['wlp']['per_m'])+' & '+p33(B['wlp']['all_w'])+' & '+p33(B['wlp']['all_m'])+'  \\\\\\bottomrule '
+with open(root+'/Model/results/WLP.tex', 'w') as f: f.write(table); f.close() 
+
+#level changes in consumption out of a level change in all income
+table=r"...total income   & \textbf{"+p33(B['totc']['level_s'])+'} & '+p33(B['Qins']['level_s'])+' & & &    \\\\ '+\
+      r'...wife income    & '+p33(B['totc']['level_w'])+' & '+p33(B['Qins']['level_w'])+'& '+' \\textbf{'+p33(B['level']['all_w_m'])+'} &  \\textbf{'+p33(B['level']['all_w_w'])+'} &  \\textbf{'+p33(B['w_sh']['level_w'])+'}    \\\\ '+\
+      r'...husband income & '+p33(B['totc']['level_m'])+' &  '+p33(B['Qins']['level_m'])+'& '+' \\textbf{'+p33(B['level']['all_m_m'])+'} &  \\textbf{'+p33(B['level']['all_m_w'])+'} &  \\textbf{'+p33(B['w_sh']['level_m'])+'}    \\\\\\bottomrule'
+with open(root+'/Model/results/level.tex', 'w') as f: f.write(table); f.close() 
 
 
 

@@ -46,6 +46,8 @@
 	\end{threeparttable}
 \end{table}
 
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%
 %Transitory income changes
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -140,5 +142,60 @@
 	\end{threeparttable}
 \end{table}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Income shocks and labor supply
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{table}[h]\centering
+	
+	\caption{Women's employment response (in percentage points) to different types of income shocks}
+	\label{table:shocks_WLP}
+	\begin{threeparttable}[t]\centering
+		\begin{tabular*}{\textwidth}{@{\extracolsep{\textwidth minus \textwidth}}cccccc}
+			\toprule
+			  \multicolumn{2}{c}{Transitory shocks}  &  \multicolumn{2}{c}{Persistent shocks} & \multicolumn{2}{c}{Transitory+persistent shocks}   \\[0.5ex]
+			
+		    \cmidrule(lr){1-2}    \cmidrule(lr){3-4}  \cmidrule(lr){5-6} 
+			
+			
+			
+			 Wife  & Husband  &Wife  & Husband  & Wife  & Husband     \\[0.5ex]
+			  (1)& (2) & (3) & (4) & (5)  & (6)  \\[0.5ex]
+			\midrule		
+			\input{WLP}    
+			\\[-2.5ex] 
+		\end{tabular*}
+		\begin{tablenotes}[flushleft]
+			\footnotesize{\item \textsc{Notes}: the income shocks relate to \textit{potential log income} $y$. In the case of women, a positive potential income shocks does not translate in more earnings if the women does not work. The numbers displayed in the table are OLS coefficients:
+				
+				$$\frac{E(\Delta y_t \  \Delta WLP_t)}{E(\Delta y_t)},$$
+			
+			where $\Delta WLP$ is the change in women's employment over two consecutive periods.
+				
+			}
+		\end{tablenotes}
+	\end{threeparttable}
+\end{table}
 
+%%%%%%%%%%%%%%%%%%%%%%%%
+%Level
+%%%%%%%%%%%%%%%%%%%%%%%
+\begin{table}[h]\centering
+	
+	\caption{Pass-through of changes in income on consumption and consumption shares, using changes in...}
+	\label{table:level}
+	\begin{threeparttable}[t]\centering
+		\begin{tabular*}{\textwidth}{l@{\extracolsep{\textwidth minus \textwidth}}ccccc}
+			\toprule
+			& Total Exp  & Common Exp  & Husband Exp & Wife Exp & Wife share  \\[0.5ex]
+			&  (1)& (2) & (3) & (4) & (5)   \\[0.5ex]
+			\midrule		
+			\input{level}    
+			\\[-2.5ex] 
+		\end{tabular*}
+		\begin{tablenotes}[flushleft]
+			\footnotesize{\item \textsc{Notes}: Coefficient interpretation: 1 yen change in income leads to X yen change in expenditure. 
+			}
+		\end{tablenotes}
+	\end{threeparttable}
+\end{table}
 \end{document}

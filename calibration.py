@@ -6,8 +6,7 @@ Created on Fri Feb 23 15:31:56 2024
 """ 
  
 import numpy as np 
-import Bargaining_numba as brg 
-import setup 
+import Bargaining_numba as brg  
 import UserFunctions_numba as usr 
 import dfols 
 from consav import linear_interp
@@ -22,14 +21,13 @@ N=10_000#sample size
 
 
 # POints: [θ,σL0,σL,α2,γ]
-xc=np.array([0.211,0.08,0.083,0.71,0.50])
-xc=np.array([0.66155087, 0.01160402, 0.04700252, 0.7367213 , 0.49304332])
-xl=np.array([0.40,0.004,0.004,0.50,0.45]) 
-xu=np.array([0.80,0.150,0.150,0.85,0.65]) 
+xc=np.array([0.59711125, 0.08309608, 0.07246665, 0.75837416, 0.50298593])
+xl=np.array([0.20,0.004,0.0001,0.50,0.3]) 
+xu=np.array([0.95,0.5,0.15,0.85,0.65]) 
 
 #Parametrize the model 
-par = {'simN':N,'meet': 1.0,
-       'θ':0.65,'σL0':0.0836045,'σL':0.0836045,'α2':0.31534971*2.25,'α1':1.0-0.31534971*2.25} 
+par = {'simN':N,
+       'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]} 
 model = brg.HouseholdModelClass(par=par)  
 
  
@@ -46,7 +44,9 @@ def q(pt):
 
         M = model.copy(name='numba_new_copy')    
         M.par.θ=pt[0] 
-        M.par.grid_love,M.par.Πl,M.par.Πl0= usr.addaco_nonst(M.par.T,pt[2],pt[1],M.par.num_love)    
+        M.par.meet=pt[1]
+        M.par.λ_grid = np.ones(M.par.T)*pt[1] 
+        M.par.grid_love,M.par.Πl,M.par.Πl0= usr.addaco_nonst(M.par.T,pt[2],pt[2],M.par.num_love)    
         M.par.α2=pt[3] 
         M.par.α1=1.0-pt[3]
         M.par.γ=pt[4]
@@ -92,11 +92,11 @@ def q(pt):
         
     
                         
-        fit =((WLP-.7059118))**2+((share_m-0.92965754))**2+((share_d-.3936217))**2+((MQ-0.80))**2+((MCw-0.065))**2
+        fit =((WLP-.5956))**2+((share_m-0.92965754))**2+((share_d-.3936217))**2+((MQ-0.80))**2+((MCw-0.065))**2
         print('Point is {}, fit is {}'.format(pt,fit))  
         print('Simulated moments are {}'.format([WLP,share_m,share_d,MQ,MCw]))
       
-        return [((WLP-.7059118)),((share_m-0.92965754)),((share_d-.3936217)),((MQ-0.80)),((MCw-0.065))]   
+        return [((WLP-.5956)),((share_m-0.92965754)),((share_d-.3936217)),((MQ-0.80)),((MCw-0.065))]   
      
     except:
 
@@ -114,7 +114,7 @@ if __name__ == '__main__':
  
 
 
-    res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=150, bounds=(xl,xu),  
+    res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
                 npt=len(xc)+5,scaling_within_bounds=True,   
                 user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
                               'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  

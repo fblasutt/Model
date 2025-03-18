@@ -16,9 +16,10 @@ plt.rcParams.update({'figure.max_open_warning': 0,'text.usetex': False})
 
 # settings for models to solve
 
+xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.48123509])
 
-specs = {
-    'model 1':{'latexname':'EGM2', 'par':{'θ':0.21,'meet': 0.15590901,'σL0':0.0836045,'σL':0.0836045,'α2':0.31534971,'α1':1.0-0.31534971}}}
+specs = {'model 1':{'latexname':'EGM2', 'par':{'θ':xc[0],'meet':1.0,'σL0':xc[1],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
+
 
 
 

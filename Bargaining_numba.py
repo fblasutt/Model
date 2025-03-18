@@ -57,7 +57,7 @@ class HouseholdModelClass(EconModelClass):
         par.num_A = 15;par.max_A = 75.0
         
         # bargaining power
-        par.num_power = 11
+        par.num_power = 15
         
         #women's human capital states
         par.num_h = 2
@@ -79,8 +79,8 @@ class HouseholdModelClass(EconModelClass):
         par.t0w=-0.728 ;par.t1w= 0.07851440  ;par.t2w=-0.00191743   ;par.t3w=0.00000941  ;
     
         # productivity of men and women: sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks
-        par.σpw=0.16435;par.σϵw=0.08;par.σ0w= 0.37913;
-        par.σpm=0.14162;par.σϵm=0.08;par.σ0m=0.38338
+        par.σpw=0.16435;par.σϵw=0.08*1.5;par.σ0w= 0.37913;
+        par.σpm=0.14162;par.σϵm=0.08*1.5;par.σ0m=0.38338
         
 
         # pre-computation fo consumption
@@ -503,11 +503,11 @@ def solve_remain_couple_egm(par,sol,t):
                     #Eventual rebargaining happens below
                     for iA in range(par.num_A):        
                         
-                        idx_s_w = (t,ih,iz//par.num_zm,iA);idx_s_m = (t,0,iz%par.num_zw,iA)
+                        idx_s = (t,ih,iz,iA)
                         idxx = [(t,ih,iz,i,iL,iA) for i in range(par.num_power)]               
                         list_couple = (sol.Vw_couple, sol.Vm_couple)                 #couple        list
                         list_raw    = (Vw[ih,iz,:,iL,iA],Vm[ih,iz,:,iL,iA])          #remain-couple list
-                        list_single = (sol.Vw_single[idx_s_w],sol.Vm_single[idx_s_m])#single        list
+                        list_single = (sol.Vw_single[idx_s],sol.Vm_single[idx_s])#single        list
                         iswomen     = (True,False)                                   #iswomen? in   list
                         
                         check_participation_constraints(par,sol.power,par.grid_power,list_raw,list_single,idxx,list_couple,iswomen)   
@@ -674,7 +674,7 @@ def simulate_lifecycle(sim,sol,par):
 
 
             # indices and resources
-            idx = (t,ih[i,t],iz[i,t],slice(None),love[i,t]);iz_w=iz[i,t]//par.num_zm;iz_m=iz[i,t]%par.num_zw
+            idx = (t,ih[i,t],iz[i,t],slice(None),love[i,t])
             idx_s = (t,ih[i,t],iz[i,t],slice(None),love[i,t])
             incw[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Aw[i,t],women=True);incm[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Am[i,t],women=False)          
             M_resourcesNW,M_resourcesW, incmt,incwt = usr.resources_couple(par,t,ih[i,t],iz[i,t],A[i,t])
@@ -683,14 +683,16 @@ def simulate_lifecycle(sim,sol,par):
             if (couple_lag[i,t]) & (t<par.Tr):# do rebargaining power and divorce choice ifin a couple and not retired                 
 
                 # value of transitioning into singlehood
-                list_single = (linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz_w],Aw[i,t]),
-                               linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,      0,iz_m],Am[i,t]))
+                list_single = (linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t]),
+                               linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t]))
 
                 list_raw    = (np.array([interp1d(sol.Vw_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]),
                                np.array([interp1d(sol.Vm_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]))
 
                 check_participation_constraints(par,power,np.array([power_lag[i,t]]),list_raw,list_single,[(i,t)],nosim=False)
                 
+                # if  (power[i,t]> power_lag[i,t]) & (incw[i,t]<incw[i,t-1]):
+                #     power[3,3,3]=5
                 
                 couple[i,t] = False if power[i,t] < 0.0 else True # partnership status: divorce is coded as -1
                     
@@ -733,8 +735,8 @@ def simulate_lifecycle(sim,sol,par):
             else: # single
                
                 # pick relevant solution for single
-                sol_single_w = sol.Cw_tot_single[t,ih[i,t],iz_w]
-                sol_single_m = sol.Cm_tot_single[t,      0,iz_m]
+                sol_single_w = sol.Cw_tot_single[t,ih[i,t],iz[i,t]]
+                sol_single_m = sol.Cm_tot_single[t,ih[i,t],iz[i,t]]
 
                 # optimal consumption allocations
                 Cw_tot[i,t] = linear_interp.interp_1d(par.grid_Aw,sol_single_w,Aw[i,t])
