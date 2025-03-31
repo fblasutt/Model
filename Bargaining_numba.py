@@ -58,6 +58,8 @@ class HouseholdModelClass(EconModelClass):
         
         # bargaining power
         par.num_power = 15
+        par.power_min=1e-5
+        par.power_max=1.0-par.power_min
         
         #women's human capital states
         par.num_h = 2
@@ -115,7 +117,7 @@ class HouseholdModelClass(EconModelClass):
         par.Πh_n = [par.Πh_nt*(t<par.Tr)+(t>=par.Tr)*np.eye(par.num_h)  for t in range(par.T)] 
         
         # bargaining power. non-linear grid with more mass in both tails.        
-        par.grid_power = usr.grid_fat_tails(0.0001,0.9999,par.num_power)
+        par.grid_power = usr.grid_fat_tails(par.power_min,par.power_max,par.num_power)
 
         # love grid and shock    
         par.grid_love,par.Πl,par.Πl0= usr.addaco_nonst(par.T,par.σL,par.σL0,par.num_love)
@@ -192,8 +194,8 @@ class HouseholdModelClass(EconModelClass):
         sim.Am = np.nan + np.ones(shape_sim)            # m's assets
         sim.couple = np.zeros(shape_sim,dtype=bool)        # In a couple? True/False
         sim.couple_lag = np.zeros(shape_sim,dtype=bool)    # In a couple? True/False
-        sim.power = np.nan + np.ones(shape_sim)         # barg power
-        sim.power_lag = np.ones(shape_sim)              # barg power index
+        sim.power = -100.0*np.ones(shape_sim)         # barg power
+        sim.power_lag = -100.0*np.ones(shape_sim)              # barg power index
         sim.love = np.ones(shape_sim,dtype=np.int_)     # love
         sim.incw = np.nan + np.ones(shape_sim)          # w's income
         sim.incm = np.nan + np.ones(shape_sim)          # m's income
@@ -350,18 +352,20 @@ def marriage_mkt(par,vcw,vcm,vsw,vsm):
        
     wp = vcw - vsw; mp = vcm - vsm # surplus of being in a couple by pareto weight and gender
               
-    if (wp[-1]<0) | (mp[0]<0): return vsw,vsm,-1.0, False # negative surplus for any b. power
+    if (wp[-1]<0) | (mp[0]<0): return vsw,vsm,-100.0, False # negative surplus for any b. power
     else:
 
-        θmin = linear_interp.interp_1d(vcw,      par.grid_power,      vsw)
-        θmax = linear_interp.interp_1d(vcm[::-1],par.grid_power[::-1],vsm)
+        θmin = np.maximum(linear_interp.interp_1d(vcw,      par.grid_power,      vsw),par.power_min)
+        θmax = np.minimum(linear_interp.interp_1d(vcm[::-1],par.grid_power[::-1],vsm),par.power_max)
         
-        if θmin>θmax: return vsw,vsm,-1.0,False #again, negative surplus for any b. power
+        if θmin>θmax: return vsw,vsm,-100.0,False #again, negative surplus for any b. power
         else:#find the the b. powdr that maximizes symmetric nash bargaining
         
             θ, v = usr.optimizer(nash_bargaining,θmin,θmax,args=(par.grid_power,wp,mp,par.γ))
             vcwi = linear_interp.interp_1d(par.grid_power,vcw,θ)
             vcmi = linear_interp.interp_1d(par.grid_power,vcm,θ)  
+            
+                
             
             return vcwi,vcmi,θ,True
 
@@ -370,7 +374,7 @@ def nash_bargaining(x,xgrid,wp,mp,γ):
     
    wpθ=linear_interp.interp_1d(xgrid,wp,x)
    mpθ=linear_interp.interp_1d(xgrid,mp,x)
-   return  -wpθ**γ*mpθ**(1.0-γ)
+   return  -wpθ**γ*mpθ**(1.0-γ)#-γ*np.log(wpθ)-(1.0-γ)*np.log(mpθ)#
     
 @njit(parallel=parallel)
 def solve_single_egm(sol,par,t):
@@ -595,7 +599,7 @@ def check_participation_constraints(par,solpower,gridpower,list_raw,list_single,
                      
         #2) no iP values consistent with marriage
         elif (max_Sw < 0.0) | (max_Sm < 0.0): 
-            solpower[idx[iP]] = -1.0 #update power, below update value function
+            solpower[idx[iP]] = -100.0 #update power, below update value function
             if nosim:divorce(list_couple,list_single,idx[iP])
                 
         #3) some iP are (invidivually) consistent with marriage: try rebargaining
@@ -612,7 +616,7 @@ def check_participation_constraints(par,solpower,gridpower,list_raw,list_single,
                                         
             # 3.3) divorce: men (women) wants to leave & woman (men) not happy to shift some bargaining power
             elif ((power<power_at_0_w) & (Sm_at_0_w <=0)) | ((power>power_at_0_m) & (Sw_at_0_m <=0)):
-                solpower[idx[iP]] = -1.0  #update power, below update value function
+                solpower[idx[iP]] = -100.0  #update power, below update value function
                 if nosim:divorce(list_couple,list_single,idx[iP])
                 
             # 3.4) no-one wants to leave
@@ -694,7 +698,7 @@ def simulate_lifecycle(sim,sol,par):
                 # if  (power[i,t]> power_lag[i,t]) & (incw[i,t]<incw[i,t-1]):
                 #     power[3,3,3]=5
                 
-                couple[i,t] = False if power[i,t] < 0.0 else True # partnership status: divorce is coded as -1
+                couple[i,t] = False if power[i,t] <= -100.0 else True # partnership status: divorce is coded as -100
                     
             else: #meet a partner if single, eventually enter relationship
                 
