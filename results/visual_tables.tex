@@ -12,6 +12,8 @@
 \usepackage{eurosym}
 \usepackage{threeparttablex}
 \usepackage{tabularx}
+\usepackage{subcaption} % For subfigures with captions
+\usepackage{float} % Provides the [H] placement option
 \DeclareUnicodeCharacter{20AC}{\EUR{}}
 \usepackage[normalem]{ulem}
 
@@ -23,6 +25,119 @@
 
 \maketitle
 
+\section{Summary statistics and life-cycle behavior}
+
+%Summary statistics
+\begin{table}[h]\centering
+	
+	\caption{Summary statistics}
+	\label{table:sum_stat}
+	\begin{threeparttable}[t]\centering
+		\begin{tabular*}{\textwidth}{l@{\extracolsep{\textwidth minus \textwidth}}ccccc}
+			\toprule
+			& Household& Household  & Wife, Private & Husband, Private & Home good  \\
+        	& assets  & earnings  & consumption & consumption & expenditure  \\[0.5ex]			&  (1)& (2) & (3) & (4) & (5)   \\[0.5ex]
+			\midrule		
+			\input{sum_stat}    
+			\\[-2.5ex] 
+		\end{tabular*}
+		\begin{tablenotes}[flushleft]
+			\footnotesize{\item \textsc{Notes}: assets and earnings are measure across the population regardless of marital status, while other variables are measured among married households.
+			}
+		\end{tablenotes}
+	\end{threeparttable}
+\end{table}
+
+
+%Life-cycle behavior
+\begin{figure}[H]
+	\centering
+	% First picture
+	\begin{subfigure}{0.49\textwidth} % Adjust width as needed
+		\centering
+		\includegraphics[width=\textwidth]{lifecycle_aggregate.eps} % Replace with your first pgf file name
+		\caption{Married couples + single women}
+		\label{fig:picture1}
+	\end{subfigure}
+	% Second picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{lifecycle_married.eps} % Replace with your second pgf file name
+		\caption{Married couples}
+		\label{fig:picture2}
+	\end{subfigure}
+	% Third picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{lifecycle_singlew.eps} % Replace with your third pgf file name
+		\caption{Single women}
+		\label{fig:picture3}
+	\end{subfigure}
+	
+	\caption{Life-cycle behavior of different types of household, averages}
+	\label{fig:all_pictures}
+\end{figure}
+
+\section{Marital surplus, renegotiation and divorce}
+
+% distribution of marital surplus
+
+
+
+%Marital surplus, renegotiations and divorce
+
+\begin{figure}[H]
+	\centering
+	% First picture
+	\begin{subfigure}{0.49\textwidth} % Adjust width as needed
+		\centering
+		\includegraphics[width=\textwidth]{surp_ren_div.eps} % Replace with your first pgf file name
+		\caption{Renegotiations and divorces}
+		\label{fig:picture1}
+	\end{subfigure}
+	% Second picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{surp_div.eps} % Replace with your second pgf file name
+		\caption{Divorces}
+		\label{fig:picture2}
+	\end{subfigure}
+	% Third picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{surp_renw.eps} % Replace with your third pgf file name
+		\caption{Renegotiations triggered by the wife}
+		\label{fig:picture3}
+	\end{subfigure}
+		% Third picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{surp_renm.eps} % Replace with your third pgf file name
+		\caption{Renegotiation triggered by the husband}
+		\label{fig:picture3}
+	\end{subfigure}
+	
+	\caption{Marital surplus, renegotiation and divorce}
+	\label{fig:surp_ren}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{surplus_dist.eps} 
+	\caption{Marital surplus distribution (value of staying married - value of divorce)}
+	\label{fig:surplus dist}
+\end{figure}
+
+% distribution of marital surplus
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{match_earn_ren_div.eps} 
+	\caption{Share or divorces and renegotiations given relative earnings and match quality}
+	\label{fig:surplus match earn}
+\end{figure}
+
+
+\section{Consumption insurance regressions}
 %%%%%%%%%%%%%%%%%%%%%%%%
 %All income
 %%%%%%%%%%%%%%%%%%%%%%%

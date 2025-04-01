@@ -58,21 +58,21 @@ class HouseholdModelClass(EconModelClass):
         
         # bargaining power
         par.num_power = 15
-        par.power_min=1e-5
+        par.power_min=1e-3
         par.power_max=1.0-par.power_min
         
         #women's human capital states
         par.num_h = 2
-        par.drift = 1.84 #1.44716#1.84 #human capital depreciation drift
+        par.drift = 0.0#1.84 #1.44716#1.84 #human capital depreciation drift
         par.pr_h_change = 2/46# 0.025 # probability that  human capital depreciates
 
         # love/match quality
-        par.num_love = 7
+        par.num_love = 15
         par.σL = 0.1; par.σL0 = 0.1
         
         # productivity of men and women: gridpoints
         par.num_ϵw=2;par.num_ϵm=2#transitory
-        par.num_pw=3;par.num_pm=3#persistent
+        par.num_pw=5;par.num_pm=5#persistent
         par.num_zw=par.num_pw*par.num_ϵw;par.num_zm=par.num_pm*par.num_ϵw#total by gender
         par.num_z=par.num_zm*par.num_zw#total, couple
         
@@ -187,7 +187,18 @@ class HouseholdModelClass(EconModelClass):
         shape_sim = (par.simN,par.simT)
         sim.C_tot = np.nan + np.ones(shape_sim)         # total consumption
         sim.Cw_tot = np.nan + np.ones(shape_sim)        # total consumption w
-        sim.Cm_tot = np.nan + np.ones(shape_sim)        # total consumption m 
+        sim.Cm_tot = np.nan + np.ones(shape_sim)        # total consumption m
+        
+        sim.Cm = np.nan + np.ones(shape_sim)        # private consumption m
+        sim.Cw = np.nan + np.ones(shape_sim)        # private consumption w
+        sim.xm = np.nan + np.ones(shape_sim)        # public expenditure m
+        sim.xw = np.nan + np.ones(shape_sim)        # public expenditure w
+        
+        sim.Vsw = np.nan + np.ones(shape_sim)       # value function if divorce w
+        sim.Vsm = np.nan + np.ones(shape_sim)       # value function if divorce m
+        sim.Vcw = np.nan + np.ones(shape_sim)       # before-ren value function w
+        sim.Vcm = np.nan + np.ones(shape_sim)       # before-ren value function m
+        
         sim.iz = np.ones(shape_sim,dtype=np.int_)       # index of income shocks 
         sim.A = np.nan + np.ones(shape_sim)             # total assets (m+w)
         sim.Aw = np.nan + np.ones(shape_sim)            # w's assets
@@ -624,7 +635,6 @@ def check_participation_constraints(par,solpower,gridpower,list_raw,list_single,
                 solpower[idx[iP]] = power #update power, belowe update value function
                 if nosim:no_power_change(list_couple,list_raw,idx,iP,power)
  
-#@njit
 @njit
 def no_power_change(list_couple,list_raw,idx,iP,power):
     for i,key in enumerate(list_couple): key[idx[iP]] = list_raw[i][iP]        
@@ -636,7 +646,7 @@ def divorce(list_couple,list_single,idx):
 def do_power_change(par,list_couple,list_raw,idx,iP,power_at_0_i):    
     for i,key in enumerate(list_couple): 
         key[idx[iP]] = linear_interp.interp_1d(par.grid_power,list_raw[i],power_at_0_i)                             
-     
+        
 @njit
 def store(Vw,Vm,p_Vw,p_Vm,n_Vw,n_Vm,p_C_tot,n_C_tot, wlp,par,sol,t):
                 
@@ -660,6 +670,8 @@ def simulate_lifecycle(sim,sol,par):
     # unpacking some values to help numba optimize
     A=sim.A;Aw=sim.Aw;Am=sim.Am;couple=sim.couple;power=sim.power;C_tot=sim.C_tot;Cm_tot=sim.Cm_tot;Cw_tot=sim.Cw_tot;couple_lag=sim.couple_lag;power_lag=sim.power_lag
     love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;
+    xw=sim.xw;xm=sim.xm;Cw=sim.Cw;Cm=sim.Cm;
+    Vsm=sim.Vsm;Vsw=sim.Vsw;Vcm=sim.Vcm;Vcw=sim.Vcw;
     
     interp2d = lambda a,b,c : linear_interp.interp_2d(par.grid_power,par.grid_A,a,b,c)
     interp1d = lambda a,b   : linear_interp.interp_1d(par.grid_A,               a,b) 
@@ -686,17 +698,20 @@ def simulate_lifecycle(sim,sol,par):
             # first check if they want to remain together and what the bargaining power will be if they do.
             if (couple_lag[i,t]) & (t<par.Tr):# do rebargaining power and divorce choice ifin a couple and not retired                 
 
+                #Store before renegotiations utilities
+                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
+                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
+                Vcw[i,t]=interp2d(sol.Vw_remain_couple[idx],power_lag[i,t],A[i,t])
+                Vcm[i,t]=interp2d(sol.Vm_remain_couple[idx],power_lag[i,t],A[i,t])
+
                 # value of transitioning into singlehood
-                list_single = (linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t]),
-                               linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t]))
+                list_single = (Vsw[i,t],Vsm[i,t])
 
                 list_raw    = (np.array([interp1d(sol.Vw_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]),
                                np.array([interp1d(sol.Vm_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]))
 
                 check_participation_constraints(par,power,np.array([power_lag[i,t]]),list_raw,list_single,[(i,t)],nosim=False)
                 
-                # if  (power[i,t]> power_lag[i,t]) & (incw[i,t]<incw[i,t-1]):
-                #     power[3,3,3]=5
                 
                 couple[i,t] = False if power[i,t] <= -100.0 else True # partnership status: divorce is coded as -100
                     
@@ -710,14 +725,14 @@ def simulate_lifecycle(sim,sol,par):
                 else:  #while meetin happens, continue below
 
                     # Utility as a single and as a couple for main individual and potential partner
-                    Vsw = linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
-                    Vsm = linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
+                    Vsw_ = linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
+                    Vsm_ = linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
                        
-                    Vcw =  np.array([interp2d(sol.Vw_remain_couple[idx_s],powe,A[i,t]) for powe in par.grid_power])
-                    Vcm =  np.array([interp2d(sol.Vm_remain_couple[idx_s],powe,A[i,t]) for powe in par.grid_power])
+                    Vcw_ =  np.array([interp2d(sol.Vw_remain_couple[idx_s],powe,A[i,t]) for powe in par.grid_power])
+                    Vcm_ =  np.array([interp2d(sol.Vm_remain_couple[idx_s],powe,A[i,t]) for powe in par.grid_power])
                     
                     #Do Nash bargaining to decide whether to marry and eventually set initial Pareto wight
-                    _,_ ,power[i,t],couple[i,t] = marriage_mkt(par,Vcw,Vcm,Vsw,Vsm)
+                    _,_ ,power[i,t],couple[i,t] = marriage_mkt(par,Vcw_,Vcm_,Vsw_,Vsm_)
 
             # update behavior
             if couple[i,t]:
@@ -735,6 +750,12 @@ def simulate_lifecycle(sim,sol,par):
                 if t< par.simT-1:A[i,t+1] = M_resources - C_tot[i,t]#
                 if t< par.simT-1:Aw[i,t+1] =       par.div_A_share * A[i,t]# in case of divorce 
                 if t< par.simT-1:Am[i,t+1] = (1.0-par.div_A_share) * A[i,t]# in case of divorce 
+                
+                Cw[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_Ctot,sol.pre_Ctot_Cw_priv[wlp[i,t]],sim.power[i,t],sim.C_tot[i,t])
+                Cm[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_Ctot,sol.pre_Ctot_Cm_priv[wlp[i,t]],sim.power[i,t],sim.C_tot[i,t])
+                xw[i,t]=sim.C_tot[i,t]-Cm[i,t]-Cw[i,t]
+                xm[i,t]=sim.C_tot[i,t]-Cm[i,t]-Cw[i,t]
+      
                
             else: # single
                
@@ -746,6 +767,10 @@ def simulate_lifecycle(sim,sol,par):
                 Cw_tot[i,t] = linear_interp.interp_1d(par.grid_Aw,sol_single_w,Aw[i,t])
                 Cm_tot[i,t] = linear_interp.interp_1d(par.grid_Am,sol_single_m,Am[i,t])   
                 C_tot[i,t] = Cw_tot[i,t] + Cm_tot[i,t]
+                              
+                Cw[i,t],xw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.ϕ1,par.ϕ2,par.α1,par.α2,par.θ,par.λ,par.tb)
+                Cm[i,t],xw[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.ϕ1,par.ϕ2,par.α1,par.α2,par.θ,par.λ,par.tb)
+
 
                 # update end-of-period states
                 Mw = par.R*Aw[i,t] + incw[i,t] # total resources woman
@@ -756,3 +781,4 @@ def simulate_lifecycle(sim,sol,par):
                     else:            Am[i,t+1] = Mm - Cm_tot[i,t]; Aw[i,t+1] = Am[i,t+1]/par.relw
                     A[i,t+1]  = Aw[i,t+1] + Am[i,t+1] 
                     
+  

@@ -36,23 +36,10 @@ def selection(m,par,name):
     #Consumption  below
     ##################################
 
-    #Women individual consumption
-    poww=np.fmax(np.fmin(m.sim.power,0.999),0.001)
-    CwP,CwNP,Cw=np.zeros((3,par.simT*par.simN))  
-    linear_interp.interp_2d_vec(par.grid_power,par.grid_Ctot,m.sol.pre_Ctot_Cw_priv[1],poww.flatten(),m.sim.C_tot.flatten(),CwP)  
-    linear_interp.interp_2d_vec(par.grid_power,par.grid_Ctot,m.sol.pre_Ctot_Cw_priv[0],poww.flatten(),m.sim.C_tot.flatten(),CwNP)  
-    Cw = (m.sim.WLP.flatten()*CwP+(1-m.sim.WLP.flatten())*CwNP).reshape((par.simN,par.simT))  
-    Cw[m.sim.couple==0]=np.nan 
-
-    #Men individual consumption
-    CmP,CmNP,Cm=np.zeros((3,par.simT*par.simN)) 
-    linear_interp.interp_2d_vec(par.grid_power,par.grid_Ctot,m.sol.pre_Ctot_Cm_priv[1],poww.flatten(),m.sim.C_tot.flatten(),CmP) 
-    linear_interp.interp_2d_vec(par.grid_power,par.grid_Ctot,m.sol.pre_Ctot_Cm_priv[0],poww.flatten(),m.sim.C_tot.flatten(),CmNP) 
-    Cm = ((m.sim.WLP.flatten()*CmP+(1-m.sim.WLP.flatten())*CmNP).reshape((par.simN,par.simT)))#m.sim.C_tot-Cw#
-    Cm[m.sim.couple==0]=np.nan 
-    
-    #Home good consumption
-    Q=m.sim.C_tot-Cm-Cw
+    #Women individual consumption 
+    Cw = m.sim.Cw#  (m.sim.WLP.flatten()*CwP+(1-m.sim.WLP.flatten())*CwNP).reshape((par.simN,par.simT))  
+    Cm = m.sim.Cm#((m.sim.WLP.flatten()*CmP+(1-m.sim.WLP.flatten())*CmNP).reshape((par.simN,par.simT)))#m.sim.C_tot-Cw#
+    Q=m.sim.xw#m.sim.C_tot-Cm-Cw
 
   
     #Log consumption growth for wife, husband and share of wife's expenses
@@ -124,9 +111,6 @@ def selection(m,par,name):
     #Change in WLP
     ΔWLP=m.sim.WLP[:,b+1:e+1]-m.sim.WLP[:,b:e]
      
-
-    #TODO  understand while women shocks are small to negative
-    #problem: np.mean(np.diff(MB.sol.Vm_remain_couple,axis=3)>0)
     
     ##################################
     #Compute and store pass-through   
