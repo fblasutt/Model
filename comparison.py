@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import Bargaining_numba as brg
-
+import pandas as pd
 
 # plot style
 linestyles = ['-','--','-.',':',':']
@@ -17,6 +17,7 @@ plt.rcParams.update({'figure.max_open_warning': 0,'text.usetex': False})
 # settings for models to solve
 
 xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.48123509])
+xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.5])
 
 specs = {'model 1':{'latexname':'EGM2', 'par':{'θ':xc[0],'meet':1.0,'σL0':xc[1],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
 root='C:/Users/32489/Dropbox/Family Risk Sharing'
@@ -112,6 +113,11 @@ for i in range(M.par.T):lov[:,i]=M.par.grid_love[i][M.sim.love[:,i]]
 rel=M.sim.incw/M.sim.incm
 
 
+
+ΔYm  =np.log(M.sim.incm)  -np.log(np.roll(M.sim.incm,-1,axis=0))
+ΔYw  =np.log(M.sim.incw)  -np.log(np.roll(M.sim.incw,-1,axis=0))
+
+
 Sw=M.sim.Vcw-M.sim.Vsw
 Sm=M.sim.Vcm-M.sim.Vsm
      
@@ -121,7 +127,7 @@ Sm=M.sim.Vcm-M.sim.Vsm
 
 
 
-def heatmap(x,y,z,bins_x,bins_y,tick_density,Xlabel,Ylabel,Zlabel,fig_name):
+def heatmap(x,y,z,bins_x,bins_y,tick_density,Xlabel,Ylabel,Zlabel,fig_name,vmax=1.0):
 
     # Create 2D histogram (binning x and y, aggregating z as mean)
     heatmap, xedges, yedges = np.histogram2d(x, y, bins=[bins_x, bins_y], weights=z)
@@ -141,6 +147,7 @@ def heatmap(x,y,z,bins_x,bins_y,tick_density,Xlabel,Ylabel,Zlabel,fig_name):
         xticklabels=np.round(xedges[:-1], 1),  # Use bin edges as labels
         yticklabels=yticks,  # Reversed y-tick labels for correct ordering
         cmap='viridis',  # Customize color palette
+        vmax=vmax,
         cbar_kws={'label': Zlabel}  # Add color bar label
     )
     
@@ -152,14 +159,19 @@ def heatmap(x,y,z,bins_x,bins_y,tick_density,Xlabel,Ylabel,Zlabel,fig_name):
     plt.xlabel(Xlabel)
     plt.ylabel(Ylabel)
     
+    #Add the overall average
+    meanz=z.mean()
+    plt.text(-0.9, -0.9,  f'Avg. is {meanz:.4f}', size=10)
+    
     #Save the picture
     plt.savefig(fig_name, format='eps', bbox_inches="tight")  
     # Show the plot
     plt.show()
     
+#Relative earnings, match quality, divorces and renegotiations
 heatmap(lov[sampl],#x axis
         rel[sampl],#y axis
-        M.sim.power[sampl]!=M.sim.power_lag[sampl],#Z axis   
+        (M.sim.power[sampl]!=M.sim.power_lag[sampl]),#Z axis   
         np.linspace(-0.35, 0.35, 20),#X bins
         np.linspace(0.0, 2, 20),#Y bins
         4,#1/(ticks density)
@@ -167,52 +179,116 @@ heatmap(lov[sampl],#x axis
         root+'/Model/results/match_earn_ren_div.eps')
 
 
+#Men, women's earnings and renegotiations
+heatmap(ΔYm[sampl2],#x axis
+        ΔYw[sampl2],#y axis
+        (M.sim.power[sampl2]!=M.sim.power_lag[sampl2]),#Z axis   
+        np.linspace(0, 3, 15),#X bins
+        np.linspace(0, 3, 15),#X bins
+        4,#1/(ticks density)
+        'M income shock','W income shock','Share renegotiation or divorced',
+        root+'/Model/results/shocks_ren_div.eps',
+        vmax=0.1)#max value displayed
 
+heatmap(ΔYm[sampl],#x axis
+        ΔYw[sampl],#y axis
+        (M.sim.power[sampl]<0),#Z axis   
+        np.linspace(0, 3, 15),#X bins
+        np.linspace(0, 3, 15),#X bins
+        4,#1/(ticks density)
+        'M income shock','W income shock','Share divorces',
+        root+'/Model/results/shocks_div.eps',
+        vmax=0.1)#max value displayed)
+
+heatmap(ΔYm[sampl2],#x axis
+        ΔYw[sampl2],#y axis
+        (M.sim.power[sampl2]>M.sim.power_lag[sampl2]) & (M.sim.power[sampl2]>0),#Z axis   
+        np.linspace(0, 3, 15),#X bins
+        np.linspace(0, 3, 15),#X bins
+        4,#1/(ticks density)
+        'M income shock','W income shock','Share renegotiation by W',
+        root+'/Model/results/shocks_ren_w.eps',
+        vmax=0.1)#max value displayed
+
+
+heatmap(ΔYm[sampl2],#x axis
+        ΔYw[sampl2],#y axis
+        (M.sim.power[sampl2]<M.sim.power_lag[sampl2]) & (M.sim.power[sampl2]>0),#Z axis   
+        np.linspace(0, 3, 15),#X bins
+        np.linspace(0, 3, 15),#X bins
+        4,#1/(ticks density)
+        'M income shock','W income shock','Share renegotiation by M',
+        root+'/Model/results/shocks_ren_m.eps',
+        vmax=0.1)#max value displayed
+
+
+
+
+
+#Men, women's surplus and renegotiations
 heatmap(np.roll(Sw,1)[sampl],#x axis
         np.roll(Sm,1)[sampl],#y axis
         M.sim.power[sampl]!=M.sim.power_lag[sampl],#Z axis   
-        np.linspace(-1.0, 3, 100),  # 10 bins for X
-        np.linspace(-1.0, 3, 100),  # 10 bins for Y
+        np.linspace(0, 3, 100),  # 10 bins for X
+        np.linspace(0, 3, 100),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share renegotiations or divorces',
-        root+'/Model/results/surp_ren_div.eps')
+        root+'/Model/results/surp_ren_div.eps',
+        vmax=0.4)#max value displayed
 
 heatmap(np.roll(Sw,1)[sampl],#x axis
         np.roll(Sm,1)[sampl],#y axis
-        M.sim.power[sampl]==-1,#Z axis   
-        np.linspace(-1.0, 3, 100),  # 10 bins for X
-        np.linspace(-1.0, 3, 100),  # 10 bins for Y
+        M.sim.power[sampl]<0,#Z axis   
+        np.linspace(0.0, 3, 100),  # 10 bins for X
+        np.linspace(0.0, 3, 100),  # 10 bins for Y
         6,#1/(ticks density)
-        'Surplus W','Surplus M','Share renegotiations or divorces',
-        root+'/Model/results/surp_div.eps')
+        'Surplus W','Surplus M','Share divorces',
+        root+'/Model/results/surp_div.eps',
+        vmax=0.4)#max value displayed
 
 
-heatmap(np.roll(Sw,1)[sampl2],#x axis
-        np.roll(Sm,1)[sampl2],#y axis
-        M.sim.power[sampl2]<M.sim.power_lag[sampl2],#Z axis   
-        np.linspace(-1.0, 3, 100),  # 10 bins for X
-        np.linspace(-1.0, 3, 100),  # 10 bins for Y
+heatmap(np.roll(Sw,1)[sampl],#x axis
+        np.roll(Sm,1)[sampl],#y axis
+        (M.sim.power[sampl]>M.sim.power_lag[sampl]) & (M.sim.power[sampl]>0),#Z axis   
+        np.linspace(0.0, 3, 100),  # 10 bins for X
+        np.linspace(0.0, 3, 100),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share renegotiations triggered by w',
-        root+'/Model/results/match_renw.eps')
+        root+'/Model/results/surp_renw.eps',
+        vmax=0.4)#max value displayed
 
-heatmap(np.roll(Sw,1)[sampl2],#x axis
-        np.roll(Sm,1)[sampl2],#y axis
-        M.sim.power[sampl2]>M.sim.power_lag[sampl2],#Z axis   
-        np.linspace(-1.0, 3, 100),  # 10 bins for X
-        np.linspace(-1.0, 3, 100),  # 10 bins for Y
+heatmap(np.roll(Sw,1)[sampl],#x axis
+        np.roll(Sm,1)[sampl],#y axis
+        (M.sim.power[sampl]<M.sim.power_lag[sampl]) & (M.sim.power[sampl]>0),#Z axis  
+        np.linspace(0.0, 3, 100),  # 10 bins for X
+        np.linspace(0.0, 3, 100),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share renegotiations triggered by m',
-        root+'/Model/results/match_renm.eps')
+        root+'/Model/results/surp_renm.eps',
+        vmax=0.4)#max value displayed
 
 
 #Distribution of marital surplus
 fig, axs = plt.subplots(nrows=1, ncols=1)
-axs.hist2d(Sw[sampl], Sm[sampl], bins=30,
-           range=[[0.0,5.0], [0.0, 5]])
+axs.hist2d(Sw[sampl], Sm[sampl], bins=20,
+           range=[[0.0,3.0], [0.0, 3]],vmax=np.sum(Sw[sampl]>=0)/200,vmin=0.0)
 axs.set(xlabel='Surplus, w',ylabel='Surplus, m')
 fig.tight_layout()
 plt.savefig(root+'/Model/results/surplus_dist.eps', format='eps', bbox_inches="tight")    
+plt.show()
+
+#Distribution of marital surplus
+sns.histplot(1e-2+Sw[:,:M.par.Tr].flatten(),log_scale=True,  stat='percent', label='Wife surplus',color='red')
+sns.histplot(1e-2+Sm[:,:M.par.Tr].flatten(),log_scale=True,  stat='percent', label='Husband surplus',color='blue')
+plt.legend()
+plt.savefig(root+'/Model/results/surplus_dist_2d.eps', format='eps', bbox_inches="tight")  
+plt.show()
+
+
+sns.histplot(Sm[(M.sim.couple_lag==0)].flatten(), log_scale=True , stat='percent',  label='Husband surplus',color='blue')
+sns.histplot(Sw[(M.sim.couple_lag==0)].flatten(), log_scale=True,  stat='percent',  label='Wife surplus',color='red')
+plt.legend()
+plt.savefig(root+'/Model/results/surplus_dist_i_2d.eps', format='eps', bbox_inches="tight")  
 plt.show()
 
 
@@ -295,7 +371,8 @@ table=r'Mean          & '+p33(mean['A'])+' & '+p33(mean['E'])+' & '+p33(mean['Cw
 with open(root+'/Model/results/sum_stat.tex', 'w') as f: f.write(table); f.close() 
 
     
-
-
+plt.plot(np.var(np.log(M.sim.incw),axis=0))
+plt.plot(np.var(np.log(M.sim.incm),axis=0))
+plt.plot(np.array([par.σ0m**2+par.σϵm**2+t*par.σpm**2 for t in range(par.T)]))
 
 

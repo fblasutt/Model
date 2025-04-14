@@ -110,7 +110,22 @@ def selection(m,par,name):
     
     #Change in WLP
     ΔWLP=m.sim.WLP[:,b+1:e+1]-m.sim.WLP[:,b:e]
+    
+    
      
+    #Multinomial regression using men and women income shocks
+    intercept=np.ones(ΔCm[smw].flatten().shape)
+    X=np.hstack((intercept[:,None],ΔYm[smw].flatten()[:,None],ΔYw[smw].flatten()[:,None]))#explicative variables    
+    βcm= np.linalg.inv(X.T @ X) @ (X.T @ ΔCm[smw].flatten()) 
+    βcw= np.linalg.inv(X.T @ X) @ (X.T @ ΔCw[smw].flatten()) 
+    
+    print("Cm insruance with mult reg: Ym {}, Yw {}, univ reg:  Ym {}, Yw {}".format(βcm[1],βcm[2],
+                                                                                     np.cov(ΔYm[smw],ΔCm[smw])[0,1]/np.var(ΔYm[smw]),
+                                                                                     np.cov(ΔYw[smw],ΔCm[smw])[0,1]/np.var(ΔYw[smw])))
+    
+    print("Cw insruance with mult reg: Ym {}, Yw {}, univ reg:  Ym {}, Yw {}".format(βcw[1],βcw[2],
+                                                                                     np.cov(ΔYm[smw],ΔCw[smw])[0,1]/np.var(ΔYm[smw]),
+                                                                                     np.cov(ΔYw[smw],ΔCw[smw])[0,1]/np.var(ΔYw[smw])))
     
     ##################################
     #Compute and store pass-through   

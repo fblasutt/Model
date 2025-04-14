@@ -18,7 +18,8 @@
 \usepackage[normalem]{ulem}
 
 %opening
-\title{Family Risk Sharing}
+\title{`Family Risk Sharing'\\`When the Shock Hits the Knot: Individual Consumption Insurance Among Spouses'\\`When the Shock Hits the Knot: bargaining and family risk sharing'}
+
 \author{B-C-V}
 
 \begin{document}
@@ -121,12 +122,6 @@
 	\label{fig:surp_ren}
 \end{figure}
 
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{surplus_dist.eps} 
-	\caption{Marital surplus distribution (value of staying married - value of divorce)}
-	\label{fig:surplus dist}
-\end{figure}
 
 % distribution of marital surplus
 \begin{figure}[H]
@@ -136,6 +131,78 @@
 	\label{fig:surplus match earn}
 \end{figure}
 
+
+%Marital surplus and shocks to 
+
+\begin{figure}[H]
+	\centering
+	% First picture
+	\begin{subfigure}{0.49\textwidth} % Adjust width as needed
+		\centering
+		\includegraphics[width=\textwidth]{shocks_ren_div.eps} % Replace with your first pgf file name
+		\caption{Renegotiations and divorces}
+		\label{fig:picture1}
+	\end{subfigure}
+	% Second picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{shocks_div.eps} % Replace with your second pgf file name
+		\caption{Divorces}
+		\label{fig:picture2}
+	\end{subfigure}
+	% Third picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{shocks_ren_w.eps} % Replace with your third pgf file name
+		\caption{Renegotiations triggered by the wife}
+		\label{fig:picture3}
+	\end{subfigure}
+	% Third picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{shocks_ren_m.eps} % Replace with your third pgf file name
+		\caption{Renegotiation triggered by the husband}
+		\label{fig:picture3}
+	\end{subfigure}
+	
+	\caption{M and W income shocks, renegotiation and divorce}
+	\label{fig:surp_ren}
+\end{figure}
+
+%Distribution of marital surplus
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{surplus_dist.eps} 
+	\caption{Marital surplus distribution (value of staying married - value of divorce)}
+	\label{fig:surplus dist}
+\end{figure}
+
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{surplus_dist_2d.eps} 
+	\caption{Marital surplus distribution}
+	\label{fig:surplus dist_2d}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{surplus_dist_i_2d.eps} 
+	\caption{Marital surplus distribution at meeting}
+	\label{fig:surplus dist_i_2d}
+\end{figure}
+
+
+Something we have learned
+\begin{itemize}
+	\item The match surplus at meeting is higher for women (Figure \ref{fig:surplus dist_i_2d}): this is an implication of the (close to) symmetric nash bargaining (SNB) and women earning less than men. SNB allocates a higher share of the surplus to the spouse having lower earnings. 
+	\item Women are more likely to hit the participation constraint than men (Figure \ref{fig:surplus dist_2d}). Since, again, women's marginal utility is lower for women, the same shock implies a larger change in reservation utilities for women than for men.
+	\item If we impose a non-symmetric nash bargaining, the gender who get a higher weight will be less likely to hit participation constraints.
+	\item If we close the gender wage gap, the patterns in renegotiation and surplus share distribution become gender symmetric 
+\end{itemize}
 
 \section{Consumption insurance regressions}
 %%%%%%%%%%%%%%%%%%%%%%%%

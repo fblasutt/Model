@@ -40,7 +40,7 @@ class HouseholdModelClass(EconModelClass):
         par.tb = 0.191 #time spend on public goods by singles
         
         #Taste shock
-        par.σ = 0.02 #taste shock applied to working/not working
+        par.σ = 0.0002 #taste shock applied to working/not working
         
         par.γ=0.5#woemn's relative power during nash bargaining
         
@@ -64,36 +64,39 @@ class HouseholdModelClass(EconModelClass):
         #women's human capital states
         par.num_h = 2
         par.drift = 0.0#1.84 #1.44716#1.84 #human capital depreciation drift
-        par.pr_h_change = 2/46# 0.025 # probability that  human capital depreciates
+        par.pr_h_change = 0.0#2/46# 0.025 # probability that  human capital depreciates
 
         # love/match quality
-        par.num_love = 15
+        par.num_love = 7
         par.σL = 0.1; par.σL0 = 0.1
         
         # productivity of men and women: gridpoints
-        par.num_ϵw=2;par.num_ϵm=2#transitory
-        par.num_pw=5;par.num_pm=5#persistent
+        par.num_ϵw=3;par.num_ϵm=3#transitory
+        par.num_pw=3;par.num_pm=3#persistent
         par.num_zw=par.num_pw*par.num_ϵw;par.num_zm=par.num_pm*par.num_ϵw#total by gender
         par.num_z=par.num_zm*par.num_zw#total, couple
         
         # income of men and women: parameters of the age log-polynomial
         par.t0m=0.000;par.t1m=0.07095764 ;par.t2m= -0.00186095  ;par.t3m= 0.00000941  ;
         par.t0w=-0.728 ;par.t1w= 0.07851440  ;par.t2w=-0.00191743   ;par.t3w=0.00000941  ;
-    
+        #par.t0w=0.000;par.t1w=0.07095764 ;par.t2w= -0.00186095  ;par.t3w= 0.00000941  ;
         # productivity of men and women: sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks
         par.σpw=0.16435;par.σϵw=0.08*1.5;par.σ0w= 0.37913;
         par.σpm=0.14162;par.σϵm=0.08*1.5;par.σ0m=0.38338
+        par.σpw=0.14162;par.σϵw=0.08*1.5;par.σ0w=0.38338
+       
+        
         
 
         # pre-computation fo consumption
         par.num_Ctot = 150;par.max_Ctot = par.max_A*2
         
         par.meet = 0.4#probability of meeting a partner if single
-        par.relw = 1.125#ratio of men over women's assets at meeting
+        par.relw = 1.0#1.125#ratio of men over women's assets at meeting
         par.ϕ = 0.5-(par.relw-1)/(par.relw+1)#given relw, share of womens assets at meeting
         
         # simulation
-        par.seed = 9210;par.simT = par.T;par.simN = 20_000
+        par.seed = 9211;par.simT = par.T;par.simN = 100_000
        
         
     def setup_grids(self):
@@ -147,7 +150,7 @@ class HouseholdModelClass(EconModelClass):
         par.Π=[np.kron(par.Π_zw[t],par.Π_zm[t]) for t in range(par.T-1)] # couples trans matrix, possible to change this and make shocks correlated
 
         #Simulation
-        par.women =np.zeros(par.simN)#0: simumate men 1 women
+        par.women =np.ones(par.simN)#0: simumate men 1 women
         
     def allocate(self):
         par = self.par;sol = self.sol;sim = self.sim;self.setup_grids()
@@ -216,6 +219,7 @@ class HouseholdModelClass(EconModelClass):
         # shocks
         np.random.seed(par.seed)
         sim.shock_love = np.random.random_sample((par.simN,par.simT))#love
+        sim.shock_iz=np.random.random_sample((par.simN,2))           #initial income 
         sim.shock_z=np.random.random_sample((par.simN,par.simT))     #income
         sim.shock_taste=np.random.random_sample((par.simN,par.simT)) #taste shock
         sim.shock_h=np.random.random_sample((par.simN,par.simT))     #human capital
@@ -228,9 +232,9 @@ class HouseholdModelClass(EconModelClass):
         sim.Am[:,0] = (1.0 - par.div_A_share) * sim.A[:,0]              #m's assets
         sim.init_couple = np.zeros(par.simN,dtype=bool)                  #state (couple=1/single=0)
         sim.init_power =  0.11373989**np.ones(par.simN)                 #barg power 
-        sim.init_love = np.ones(par.simN,dtype=np.int_)**par.num_love//2#initial love
-        sim.init_zw = np.ones(par.simN,dtype=np.int_)*par.num_zw//2     #w's initial income 
-        sim.init_zm = np.ones(par.simN,dtype=np.int_)*par.num_zm//2     #m's initial income
+        sim.init_love = np.ones(par.simN,dtype=np.int_)**par.num_love//2#initial love    
+        sim.init_zw =np.array([usr.mc_simulate(par.num_zw//2,par.Π_zw0[0],sim.shock_iz[i,0]) for i in range(par.simN)])
+        sim.init_zm =np.array([usr.mc_simulate(par.num_zm//2,par.Π_zm0[0],sim.shock_iz[i,1]) for i in range(par.simN)])
         sim.init_z  = sim.init_zw*par.num_zm+sim.init_zm                #    initial income
         
            
@@ -691,7 +695,6 @@ def simulate_lifecycle(sim,sol,par):
 
             # indices and resources
             idx = (t,ih[i,t],iz[i,t],slice(None),love[i,t])
-            idx_s = (t,ih[i,t],iz[i,t],slice(None),love[i,t])
             incw[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Aw[i,t],women=True);incm[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Am[i,t],women=False)          
             M_resourcesNW,M_resourcesW, incmt,incwt = usr.resources_couple(par,t,ih[i,t],iz[i,t],A[i,t])
             
@@ -701,8 +704,7 @@ def simulate_lifecycle(sim,sol,par):
                 #Store before renegotiations utilities
                 Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
                 Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
-                Vcw[i,t]=interp2d(sol.Vw_remain_couple[idx],power_lag[i,t],A[i,t])
-                Vcm[i,t]=interp2d(sol.Vm_remain_couple[idx],power_lag[i,t],A[i,t])
+
 
                 # value of transitioning into singlehood
                 list_single = (Vsw[i,t],Vsm[i,t])
@@ -728,15 +730,24 @@ def simulate_lifecycle(sim,sol,par):
                     Vsw_ = linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
                     Vsm_ = linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
                        
-                    Vcw_ =  np.array([interp2d(sol.Vw_remain_couple[idx_s],powe,A[i,t]) for powe in par.grid_power])
-                    Vcm_ =  np.array([interp2d(sol.Vm_remain_couple[idx_s],powe,A[i,t]) for powe in par.grid_power])
+                    Vcw_ =  np.array([interp2d(sol.Vw_remain_couple[idx],powe,A[i,t]) for powe in par.grid_power])
+                    Vcm_ =  np.array([interp2d(sol.Vm_remain_couple[idx],powe,A[i,t]) for powe in par.grid_power])
                     
                     #Do Nash bargaining to decide whether to marry and eventually set initial Pareto wight
-                    _,_ ,power[i,t],couple[i,t] = marriage_mkt(par,Vcw_,Vcm_,Vsw_,Vsm_)
+                    vcwi,vcmi ,power[i,t],couple[i,t] = marriage_mkt(par,Vcw_,Vcm_,Vsw_,Vsm_)
+                    
+
 
             # update behavior
             if couple[i,t]:
-                              
+                
+                #Store before renegotiations utilities
+                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
+                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
+                Vcw[i,t]=interp2d(sol.Vw_remain_couple[idx],power[i,t],A[i,t])
+                Vcm[i,t]=interp2d(sol.Vm_remain_couple[idx],power[i,t],A[i,t])
+                
+
                 # first decide about labor participation (if not taste shocks this should be different) 
                 part_i=interp2d(sol.remain_WLP[idx],power[i,t],A[i,t])#
                 wlp[i,t]=(part_i>sim.shock_taste[i,t])

@@ -39,14 +39,14 @@ def resources_couple(par,t,ih,iz,assets):
     yw_w = par.grid_zw[t,izw,ih]*par.grid_wlp[1] 
     yw_n = par.grid_zw[t,izw,ih]*par.grid_wlp[0] 
      
-    tax_work =     (yh+yw_w+r*assets) -  .9817526*(yh+yw_w+r*assets)**(1-.0951248)
-    tax_not_work = (yh+yw_n+r*assets) -  .9817526*(yh+yw_n+r*assets)**(1-.0951248)
+    tax_work =     0#(yh+yw_w+r*assets) -  .9817526*(yh+yw_w+r*assets)**(1-.0951248)
+    tax_not_work = 0#(yh+yw_n+r*assets) -  .9817526*(yh+yw_n+r*assets)**(1-.0951248)
     
     
      
     #resources depending on employment  
-    res_not_work = par.R*assets + (yh +yw_n-tax_not_work-0*0.0765*(yh +yw_n)) 
-    res_work     = par.R*assets + (yh +yw_w-tax_work-0*0.0765*(yh +yw_w) ) 
+    res_not_work = par.R*assets + (yh +yw_n-tax_not_work)
+    res_work     = par.R*assets + (yh +yw_w-tax_work) 
       
     # change resources if retired: women should not work!   
     if t>=par.Tr: return res_work,     res_work,yh,yw_w 
