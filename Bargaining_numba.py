@@ -26,6 +26,8 @@ class HouseholdModelClass(EconModelClass):
         par.β = 0.98# Discount factor
         
         par.div_A_share = 0.5 # divorce share of wealth to wife
+        
+        par.full=False #dummy for full/limited commitment. if full commitment: renegotiation/divorce is illegal
 
         # Utility: CES aggregator or additively linear
         par.ρ = 2.0#        # CRRA      
@@ -83,7 +85,7 @@ class HouseholdModelClass(EconModelClass):
         # productivity of men and women: sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks
         par.σpw=0.16435;par.σϵw=0.08*1.5;par.σ0w= 0.37913;
         par.σpm=0.14162;par.σϵm=0.08*1.5;par.σ0m=0.38338
-        par.σpw=0.14162;par.σϵw=0.08*1.5;par.σ0w=0.38338
+        #par.σpw=0.14162;par.σϵw=0.08*1.5;par.σ0w=0.38338
        
         
         
@@ -592,13 +594,13 @@ def check_participation_constraints(par,solpower,gridpower,list_raw,list_single,
     max_Sw = np.max(Sw);max_Sm = np.max(Sm) 
 
     # if expect rebargaining, interpolate the surplus of each member at indifference points
-    if ~((min_Sw >= 0.0) & (min_Sm >= 0.0)) & ~((max_Sw < 0.0) | (max_Sm < 0.0)):             
+    #if ~((min_Sw >= 0.0) & (min_Sm >= 0.0)) & ~((max_Sw < 0.0) | (max_Sm < 0.0)):             
 
-        power_at_0_w = linear_interp.interp_1d(Sw      ,par.grid_power      ,0.0)   
-        power_at_0_m = linear_interp.interp_1d(Sm[::-1],par.grid_power[::-1],0.0)          
+    power_at_0_w = linear_interp.interp_1d(Sw      ,par.grid_power      ,0.0)   
+    power_at_0_m = linear_interp.interp_1d(Sm[::-1],par.grid_power[::-1],0.0)          
 
-        Sm_at_0_w = linear_interp.interp_1d(par.grid_power, Sm, power_at_0_w)   
-        Sw_at_0_m = linear_interp.interp_1d(par.grid_power, Sw, power_at_0_m)   
+    Sm_at_0_w = linear_interp.interp_1d(par.grid_power, Sm, power_at_0_w)   
+    Sw_at_0_m = linear_interp.interp_1d(par.grid_power, Sw, power_at_0_m)   
       
         
     ##################################################################
@@ -606,21 +608,22 @@ def check_participation_constraints(par,solpower,gridpower,list_raw,list_single,
     # Then, update power and (if no simulation) update value functions
     #################################################################
     for iP,power in enumerate(gridpower):
-        
+
+
         #1) all iP values are consistent with marriage
-        if (min_Sw >= 0.0) & (min_Sm >= 0.0): 
+        if ((min_Sw >= 0.0) & (min_Sm >= 0.0)) | (par.full): 
             solpower[idx[iP]] = power #update power, below update value function
             if nosim:no_power_change(list_couple,list_raw,idx,iP,power)
                      
         #2) no iP values consistent with marriage
-        elif (max_Sw < 0.0) | (max_Sm < 0.0): 
+        elif (max_Sw < 0.0) | (max_Sm < 0.0) : 
             solpower[idx[iP]] = -100.0 #update power, below update value function
             if nosim:divorce(list_couple,list_single,idx[iP])
                 
         #3) some iP are (invidivually) consistent with marriage: try rebargaining
         else:             
             # 3.1) woman wants to leave &  man happy to shift some bargaining power
-            if (power<power_at_0_w) & (Sm_at_0_w > 0): 
+            if (power<power_at_0_w) & (Sm_at_0_w > 0):  
                 solpower[idx[iP]] = power_at_0_w #update power, below update value function
                 if nosim:do_power_change(par,list_couple,list_raw,idx,iP,power_at_0_w)
                                                                           

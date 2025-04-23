@@ -79,6 +79,48 @@
 	\label{fig:all_pictures}
 \end{figure}
 
+\section{Log consumption and income growth}
+
+\begin{table}[h]\centering
+	
+	\caption{Moments of the log growth of the variables reported in the rows}
+	\label{table:log_growth_moments}
+	\begin{threeparttable}[t]\centering
+		\begin{tabular*}{\textwidth}{l@{\extracolsep{\textwidth minus \textwidth}}cccc}
+			\toprule
+			& Mean & Variance  & Skeweness & Kurtosis   \\[0.5ex]
+			\midrule		
+			\input{log_growth_moments}    
+			\\[-2.5ex] 
+		\end{tabular*}
+		\begin{tablenotes}[flushleft]
+			\footnotesize{\item \textsc{Notes}: sample of those who stay married over two consecutive periods.
+			}
+		\end{tablenotes}
+	\end{threeparttable}
+\end{table}
+
+
+%Life-cycle behavior
+\begin{figure}[H]
+	\centering
+	% First picture
+	\begin{subfigure}{0.49\textwidth} % Adjust width as needed
+		\centering
+		\includegraphics[width=\textwidth]{lifecycle_ineq1.eps} % Replace with your first pgf file name
+		\label{fig:picture1}
+	\end{subfigure}
+	% Second picture
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{lifecycle_ineq2.eps} % Replace with your second pgf file name
+		\label{fig:picture2}
+	\end{subfigure}
+
+	\caption{Variance of log earnings and consumption by age}
+	\label{fig:all_pictures}
+\end{figure}
+
 \section{Marital surplus, renegotiation and divorce}
 
 % distribution of marital surplus
@@ -199,9 +241,13 @@
 Something we have learned
 \begin{itemize}
 	\item The match surplus at meeting is higher for women (Figure \ref{fig:surplus dist_i_2d}): this is an implication of the (close to) symmetric nash bargaining (SNB) and women earning less than men. SNB allocates a higher share of the surplus to the spouse having lower earnings. 
-	\item Women are more likely to hit the participation constraint than men (Figure \ref{fig:surplus dist_2d}). Since, again, women's marginal utility is lower for women, the same shock implies a larger change in reservation utilities for women than for men.
-	\item If we impose a non-symmetric nash bargaining, the gender who get a higher weight will be less likely to hit participation constraints.
-	\item If we close the gender wage gap, the patterns in renegotiation and surplus share distribution become gender symmetric 
+	\item Women are more likely to hit the participation constraint than men (Figure \ref{fig:surplus dist_2d}). Since, again, women's marginal utility is higher than for men, the same shock implies a larger change in reservation utilities for women than for men.
+	\item If we impose a non-symmetric nash bargaining, the gender who gets a higher weight will be less likely to hit participation constraints.
+	\item If we close the gender wage gap, the patterns in renegotiation and surplus share distribution become gender symmetric
+	
+	\item To be checked with the policy experiment how labor supply is reacting. If, when outside option for women improve, labor supply goes down, our model cannot replicate it. 
+	
+	\item Excess kurtosis of women consumption seems to be driven by renegotiations 
 \end{itemize}
 
 \section{Consumption insurance regressions}

@@ -3,6 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import Bargaining_numba as brg
 import pandas as pd
+from scipy.stats import kurtosis,skew
 
 # plot style
 linestyles = ['-','--','-.',':',':']
@@ -113,9 +114,17 @@ for i in range(M.par.T):lov[:,i]=M.par.grid_love[i][M.sim.love[:,i]]
 rel=M.sim.incw/M.sim.incm
 
 
+#Income and consumption growth
 
-ΔYm  =np.log(M.sim.incm)  -np.log(np.roll(M.sim.incm,-1,axis=0))
-ΔYw  =np.log(M.sim.incw)  -np.log(np.roll(M.sim.incw,-1,axis=0))
+ΔYm  =np.log(M.sim.incm)  -np.log(np.roll(M.sim.incm,1,axis=1))
+ΔYw  =np.log(M.sim.incw)  -np.log(np.roll(M.sim.incw,1,axis=1))
+
+ΔCm  =np.log(M.sim.Cm)  -np.log(np.roll(M.sim.Cm,1,axis=1))
+ΔCw  =np.log(M.sim.Cw)  -np.log(np.roll(M.sim.Cw,1,axis=1))
+Δws =np.log(M.sim.Cw/(M.sim.Cm))  -np.log(np.roll(M.sim.Cw/(M.sim.Cm),1,axis=1))#poww[:,b+1:e+1]-poww[:,b:e]#np.log(Q[:,b+1:e+1]/(m.sim.C_tot[:,b+1:e+1]))  -np.log(Q[:,b:e]/(m.sim.C_tot[:,b:e]))#
+ΔC =np.log(M.sim.C_tot)  -np.log(np.roll(M.sim.C_tot,1,axis=1))
+ΔQ=np.log(M.sim.xw)  -np.log(np.roll(M.sim.xw,1,axis=1))
+    
 
 
 Sw=M.sim.Vcw-M.sim.Vsw
@@ -180,15 +189,15 @@ heatmap(lov[sampl],#x axis
 
 
 #Men, women's earnings and renegotiations
-heatmap(ΔYm[sampl2],#x axis
-        ΔYw[sampl2],#y axis
-        (M.sim.power[sampl2]!=M.sim.power_lag[sampl2]),#Z axis   
+heatmap(ΔYm[sampl],#x axis
+        ΔYw[sampl],#y axis
+        (M.sim.power[sampl]!=M.sim.power_lag[sampl]),#Z axis   
         np.linspace(0, 3, 15),#X bins
         np.linspace(0, 3, 15),#X bins
         4,#1/(ticks density)
         'M income shock','W income shock','Share renegotiation or divorced',
         root+'/Model/results/shocks_ren_div.eps',
-        vmax=0.1)#max value displayed
+        vmax=0.2)#max value displayed
 
 heatmap(ΔYm[sampl],#x axis
         ΔYw[sampl],#y axis
@@ -198,28 +207,28 @@ heatmap(ΔYm[sampl],#x axis
         4,#1/(ticks density)
         'M income shock','W income shock','Share divorces',
         root+'/Model/results/shocks_div.eps',
-        vmax=0.1)#max value displayed)
+        vmax=0.2)#max value displayed)
 
-heatmap(ΔYm[sampl2],#x axis
-        ΔYw[sampl2],#y axis
-        (M.sim.power[sampl2]>M.sim.power_lag[sampl2]) & (M.sim.power[sampl2]>0),#Z axis   
+heatmap(ΔYm[sampl],#x axis
+        ΔYw[sampl],#y axis
+        (M.sim.power[sampl]>M.sim.power_lag[sampl]) & (M.sim.power[sampl]>0),#Z axis   
         np.linspace(0, 3, 15),#X bins
         np.linspace(0, 3, 15),#X bins
         4,#1/(ticks density)
         'M income shock','W income shock','Share renegotiation by W',
         root+'/Model/results/shocks_ren_w.eps',
-        vmax=0.1)#max value displayed
+        vmax=0.2)#max value displayed
 
 
-heatmap(ΔYm[sampl2],#x axis
-        ΔYw[sampl2],#y axis
-        (M.sim.power[sampl2]<M.sim.power_lag[sampl2]) & (M.sim.power[sampl2]>0),#Z axis   
+heatmap(ΔYm[sampl],#x axis
+        ΔYw[sampl],#y axis
+        (M.sim.power[sampl]<M.sim.power_lag[sampl]) & (M.sim.power[sampl]>0),#Z axis   
         np.linspace(0, 3, 15),#X bins
         np.linspace(0, 3, 15),#X bins
         4,#1/(ticks density)
         'M income shock','W income shock','Share renegotiation by M',
         root+'/Model/results/shocks_ren_m.eps',
-        vmax=0.1)#max value displayed
+        vmax=0.2)#max value displayed
 
 
 
@@ -292,7 +301,74 @@ plt.savefig(root+'/Model/results/surplus_dist_i_2d.eps', format='eps', bbox_inch
 plt.show()
 
 
+###########################################
+#Distribution of log  consumption growth
+##########################################
+
+sns.displot(ΔCw[(M.sim.couple_lag==0)].flatten(),color='blue',kind="kde")
+sns.displot(ΔCm[(M.sim.couple_lag==0)].flatten(),color='red',kind="kde")
+#sns.histplot(ΔYm[(M.sim.couple_lag==0)].flatten(), scale='log', stat='percent',  label='Wife surplus',color='red')
+plt.legend()
+#plt.savefig(root+'/Model/results/surplus_dist_i_2d.eps', format='eps', bbox_inches="tight")  
+plt.show()
+
+
+def mom(d,o=1):
+    "Compute mean and higher order moments: mean (o=1), variance (o=2), skeweness (o=3), kurtosis (o=4)"
+
+    if o==1:  return np.mean(d)
+    elif o==2:return np.var(d)
+    elif o==3:return skew(d)
+    elif o==4:return kurtosis(d)
+    else:     return "Error!!!" 
+
+    
+
+MΔC=np.array([mom(ΔC[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔCw=np.array([mom(ΔCw[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔCm=np.array([mom(ΔCm[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔws=np.array([mom(Δws[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔQ=np.array([mom(ΔQ[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔYm=np.array([mom(ΔYm[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔYw=np.array([mom(ΔYw[sampl2].flatten(), o=i) for i in range(1,5)])
+
+
+#Table with the moments
+def p33(x): y=x;return str('%3.3f' % y)  
+table=r'Wife, private consumption          & '+p33(MΔCw[0])+' & '+p33(MΔCw[1])+' & '+p33(MΔCw[2])+' & '+p33(MΔCw[3])+'    \\\\ '+\
+      r'Husband, private consumption       & '+p33(MΔCm[0])+' & '+p33(MΔCm[1])+' & '+p33(MΔCm[2])+' & '+p33(MΔC[3])+'    \\\\ '+\
+      r'Wife share of private consumption  & '+p33(MΔws[0])+' & '+p33(MΔws[1])+' & '+p33(MΔws[2])+' & '+p33(MΔws[3])+'    \\\\ '+\
+      r'Home good expenditure              & '+p33(MΔQ[0])+' & '+p33(MΔQ[1])+' & '+p33(MΔQ[2])+' & '+p33(MΔQ[3])+'    \\\\ '+\
+      r'Total consumption                  & '+p33(MΔC[0])+' & '+p33(MΔC[1])+' & '+p33(MΔC[2])+' & '+p33(MΔC[3])+'    \\\\ '+\
+      r'Wife, earnings                     & '+p33(MΔYw[0])+' & '+p33(MΔYw[1])+' & '+p33(MΔYw[2])+' & '+p33(MΔYw[3])+'    \\\\ '+\
+      r'Husband, earnings                  & '+p33(MΔYm[0])+' & '+p33(MΔYm[1])+' & '+p33(MΔYm[2])+' & '+p33(MΔYm[3])+'    \\\\\\bottomrule'
+      
+with open(root+'/Model/results/log_growth_moments.tex', 'w') as f: f.write(table); f.close() 
+
+
+
+plt.plot(np.var(np.log(M.sim.incm[:,:par.Tr]),axis=0),label='Log men earnings')
+plt.plot(np.var(np.log(M.sim.C_tot[:,:par.Tr]),axis=0),label='Log total consumption')
+plt.plot(np.var(np.log(M.sim.xw[:,:par.Tr]),axis=0),label='Log hom good expenditures')
+plt.legend()
+plt.xlabel("Age")   
+plt.ylim(0, 2.5)   
+plt.savefig(root+'/Model/results/lifecycle_ineq1.eps', format='eps', bbox_inches="tight")                   
+plt.show()
+
+plt.plot(np.var(np.log(M.sim.incm[:,:par.Tr]),axis=0),label='Log men earnings')
+plt.plot(np.var(np.log(M.sim.Cw[:,:par.Tr]),axis=0),label='Log w private consumption')
+plt.plot(np.var(np.log(M.sim.Cm[:,:par.Tr]),axis=0),label='Log m private consumption')
+plt.legend()
+plt.xlabel("Age")   
+plt.ylim(0, 2.5)   
+plt.savefig(root+'/Model/results/lifecycle_ineq2.eps', format='eps', bbox_inches="tight")                   
+plt.show()
+
+
+########################
 #Life-cycle behavior
+######################
 
 #Aggregate
 keep=M.sim.couple<=1
@@ -371,8 +447,4 @@ table=r'Mean          & '+p33(mean['A'])+' & '+p33(mean['E'])+' & '+p33(mean['Cw
 with open(root+'/Model/results/sum_stat.tex', 'w') as f: f.write(table); f.close() 
 
     
-plt.plot(np.var(np.log(M.sim.incw),axis=0))
-plt.plot(np.var(np.log(M.sim.incm),axis=0))
-plt.plot(np.array([par.σ0m**2+par.σϵm**2+t*par.σpm**2 for t in range(par.T)]))
-
 
