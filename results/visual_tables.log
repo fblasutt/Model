@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2023.10.4)  23 APR 2025 15:59
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2023.10.4)  23 MAY 2025 19:33
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -663,11 +663,11 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 
 (./sum_stat.tex)
 Package epstopdf Info: Source file: <lifecycle_aggregate.eps>
-(epstopdf)                    date: 2025-04-23 15:49:22
-(epstopdf)                    size: 32058 bytes
+(epstopdf)                    date: 2025-05-22 18:46:57
+(epstopdf)                    size: 32124 bytes
 (epstopdf)             Output file: <lifecycle_aggregate-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:15
-(epstopdf)                    size: 16519 bytes
+(epstopdf)                    date: 2025-05-23 19:32:45
+(epstopdf)                    size: 16451 bytes
 (epstopdf)             Command: <repstopdf --outfile=lifecycle_aggregate-eps-co
 nverted-to.pdf lifecycle_aggregate.eps>
 (epstopdf)             \includegraphics on input line 59.
@@ -679,11 +679,11 @@ Package pdftex.def Info: lifecycle_aggregate-eps-converted-to.pdf  used on inpu
 t line 59.
 (pdftex.def)             Requested size: 245.2399pt x 170.88441pt.
 Package epstopdf Info: Source file: <lifecycle_married.eps>
-(epstopdf)                    date: 2025-04-23 15:49:22
-(epstopdf)                    size: 31274 bytes
+(epstopdf)                    date: 2025-05-22 18:46:58
+(epstopdf)                    size: 31453 bytes
 (epstopdf)             Output file: <lifecycle_married-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:16
-(epstopdf)                    size: 16077 bytes
+(epstopdf)                    date: 2025-05-23 19:32:47
+(epstopdf)                    size: 16052 bytes
 (epstopdf)             Command: <repstopdf --outfile=lifecycle_married-eps-conv
 erted-to.pdf lifecycle_married.eps>
 (epstopdf)             \includegraphics on input line 66.
@@ -695,11 +695,11 @@ Package pdftex.def Info: lifecycle_married-eps-converted-to.pdf  used on input
 line 66.
 (pdftex.def)             Requested size: 245.2399pt x 170.88441pt.
 Package epstopdf Info: Source file: <lifecycle_singlew.eps>
-(epstopdf)                    date: 2025-04-23 15:49:23
-(epstopdf)                    size: 28578 bytes
+(epstopdf)                    date: 2025-05-22 18:46:58
+(epstopdf)                    size: 28568 bytes
 (epstopdf)             Output file: <lifecycle_singlew-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:18
-(epstopdf)                    size: 15273 bytes
+(epstopdf)                    date: 2025-05-23 19:32:48
+(epstopdf)                    size: 15235 bytes
 (epstopdf)             Command: <repstopdf --outfile=lifecycle_singlew-eps-conv
 erted-to.pdf lifecycle_singlew.eps>
 (epstopdf)             \includegraphics on input line 73.
@@ -715,11 +715,11 @@ line 73.
 {c:/texlive/2023/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] (./log_growth_m
 oments.tex)
 Package epstopdf Info: Source file: <lifecycle_ineq1.eps>
-(epstopdf)                    date: 2025-04-23 15:54:22
-(epstopdf)                    size: 23594 bytes
+(epstopdf)                    date: 2025-05-22 18:46:56
+(epstopdf)                    size: 24502 bytes
 (epstopdf)             Output file: <lifecycle_ineq1-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:19
-(epstopdf)                    size: 13564 bytes
+(epstopdf)                    date: 2025-05-23 19:32:49
+(epstopdf)                    size: 13519 bytes
 (epstopdf)             Command: <repstopdf --outfile=lifecycle_ineq1-eps-conver
 ted-to.pdf lifecycle_ineq1.eps>
 (epstopdf)             \includegraphics on input line 110.
@@ -731,11 +731,11 @@ Package pdftex.def Info: lifecycle_ineq1-eps-converted-to.pdf  used on input li
 ne 110.
 (pdftex.def)             Requested size: 245.2399pt x 173.66127pt.
 Package epstopdf Info: Source file: <lifecycle_ineq2.eps>
-(epstopdf)                    date: 2025-04-23 15:54:22
-(epstopdf)                    size: 22868 bytes
+(epstopdf)                    date: 2025-05-22 18:46:57
+(epstopdf)                    size: 23721 bytes
 (epstopdf)             Output file: <lifecycle_ineq2-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:21
-(epstopdf)                    size: 12863 bytes
+(epstopdf)                    date: 2025-05-23 19:32:51
+(epstopdf)                    size: 12846 bytes
 (epstopdf)             Command: <repstopdf --outfile=lifecycle_ineq2-eps-conver
 ted-to.pdf lifecycle_ineq2.eps>
 (epstopdf)             \includegraphics on input line 116.
@@ -749,11 +749,11 @@ ne 116.
  [2 <./lifecycle_aggregate-eps-converted-to.pdf> <./lifecycle_married-eps-conve
 rted-to.pdf> <./lifecycle_singlew-eps-converted-to.pdf>]
 Package epstopdf Info: Source file: <surp_ren_div.eps>
-(epstopdf)                    date: 2025-04-23 15:48:56
-(epstopdf)                    size: 2450651 bytes
+(epstopdf)                    date: 2025-05-22 18:39:17
+(epstopdf)                    size: 2450650 bytes
 (epstopdf)             Output file: <surp_ren_div-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:22
-(epstopdf)                    size: 84092 bytes
+(epstopdf)                    date: 2025-05-23 19:32:52
+(epstopdf)                    size: 84723 bytes
 (epstopdf)             Command: <repstopdf --outfile=surp_ren_div-eps-converted
 -to.pdf surp_ren_div.eps>
 (epstopdf)             \includegraphics on input line 137.
@@ -765,11 +765,11 @@ Package pdftex.def Info: surp_ren_div-eps-converted-to.pdf  used on input line
 137.
 (pdftex.def)             Requested size: 245.2399pt x 177.77116pt.
 Package epstopdf Info: Source file: <surp_div.eps>
-(epstopdf)                    date: 2025-04-23 15:48:58
-(epstopdf)                    size: 2449495 bytes
+(epstopdf)                    date: 2025-05-22 18:39:19
+(epstopdf)                    size: 2449492 bytes
 (epstopdf)             Output file: <surp_div-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:23
-(epstopdf)                    size: 69566 bytes
+(epstopdf)                    date: 2025-05-23 19:32:54
+(epstopdf)                    size: 69745 bytes
 (epstopdf)             Command: <repstopdf --outfile=surp_div-eps-converted-to.
 pdf surp_div.eps>
 (epstopdf)             \includegraphics on input line 144.
@@ -781,11 +781,11 @@ Package pdftex.def Info: surp_div-eps-converted-to.pdf  used on input line 144.
 
 (pdftex.def)             Requested size: 245.2399pt x 177.77116pt.
 Package epstopdf Info: Source file: <surp_renw.eps>
-(epstopdf)                    date: 2025-04-23 15:48:59
-(epstopdf)                    size: 2451271 bytes
+(epstopdf)                    date: 2025-05-22 18:39:20
+(epstopdf)                    size: 2451270 bytes
 (epstopdf)             Output file: <surp_renw-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:25
-(epstopdf)                    size: 79358 bytes
+(epstopdf)                    date: 2025-05-23 19:32:56
+(epstopdf)                    size: 79270 bytes
 (epstopdf)             Command: <repstopdf --outfile=surp_renw-eps-converted-to
 .pdf surp_renw.eps>
 (epstopdf)             \includegraphics on input line 151.
@@ -797,11 +797,11 @@ Package pdftex.def Info: surp_renw-eps-converted-to.pdf  used on input line 151
 .
 (pdftex.def)             Requested size: 245.2399pt x 177.77116pt.
 Package epstopdf Info: Source file: <surp_renm.eps>
-(epstopdf)                    date: 2025-04-23 15:49:01
-(epstopdf)                    size: 2451717 bytes
+(epstopdf)                    date: 2025-05-22 18:39:21
+(epstopdf)                    size: 2451718 bytes
 (epstopdf)             Output file: <surp_renm-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:26
-(epstopdf)                    size: 67114 bytes
+(epstopdf)                    date: 2025-05-23 19:32:57
+(epstopdf)                    size: 65376 bytes
 (epstopdf)             Command: <repstopdf --outfile=surp_renm-eps-converted-to
 .pdf surp_renm.eps>
 (epstopdf)             \includegraphics on input line 158.
@@ -813,11 +813,11 @@ Package pdftex.def Info: surp_renm-eps-converted-to.pdf  used on input line 158
 .
 (pdftex.def)             Requested size: 245.2399pt x 177.77116pt.
 Package epstopdf Info: Source file: <match_earn_ren_div.eps>
-(epstopdf)                    date: 2025-04-23 15:48:51
-(epstopdf)                    size: 447400 bytes
+(epstopdf)                    date: 2025-05-22 18:39:13
+(epstopdf)                    size: 446410 bytes
 (epstopdf)             Output file: <match_earn_ren_div-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:28
-(epstopdf)                    size: 26233 bytes
+(epstopdf)                    date: 2025-05-23 19:32:59
+(epstopdf)                    size: 25182 bytes
 (epstopdf)             Command: <repstopdf --outfile=match_earn_ren_div-eps-con
 verted-to.pdf match_earn_ren_div.eps>
 (epstopdf)             \includegraphics on input line 171.
@@ -832,11 +832,11 @@ Package pdftex.def Info: match_earn_ren_div-eps-converted-to.pdf  used on input
 o.pdf> <./surp_ren_div-eps-converted-to.pdf> <./surp_div-eps-converted-to.pdf> 
 <./surp_renw-eps-converted-to.pdf> <./surp_renm-eps-converted-to.pdf>]
 Package epstopdf Info: Source file: <shocks_ren_div.eps>
-(epstopdf)                    date: 2025-04-23 15:48:53
-(epstopdf)                    size: 399850 bytes
+(epstopdf)                    date: 2025-05-22 18:39:14
+(epstopdf)                    size: 400003 bytes
 (epstopdf)             Output file: <shocks_ren_div-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:29
-(epstopdf)                    size: 16441 bytes
+(epstopdf)                    date: 2025-05-23 19:33:00
+(epstopdf)                    size: 17023 bytes
 (epstopdf)             Command: <repstopdf --outfile=shocks_ren_div-eps-convert
 ed-to.pdf shocks_ren_div.eps>
 (epstopdf)             \includegraphics on input line 184.
@@ -848,11 +848,11 @@ Package pdftex.def Info: shocks_ren_div-eps-converted-to.pdf  used on input lin
 e 184.
 (pdftex.def)             Requested size: 245.2399pt x 180.70334pt.
 Package epstopdf Info: Source file: <shocks_div.eps>
-(epstopdf)                    date: 2025-04-23 15:48:54
-(epstopdf)                    size: 400125 bytes
+(epstopdf)                    date: 2025-05-22 18:39:15
+(epstopdf)                    size: 398247 bytes
 (epstopdf)             Output file: <shocks_div-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:30
-(epstopdf)                    size: 17042 bytes
+(epstopdf)                    date: 2025-05-23 19:33:02
+(epstopdf)                    size: 16237 bytes
 (epstopdf)             Command: <repstopdf --outfile=shocks_div-eps-converted-t
 o.pdf shocks_div.eps>
 (epstopdf)             \includegraphics on input line 191.
@@ -864,11 +864,11 @@ Package pdftex.def Info: shocks_div-eps-converted-to.pdf  used on input line 19
 1.
 (pdftex.def)             Requested size: 245.2399pt x 180.70334pt.
 Package epstopdf Info: Source file: <shocks_ren_w.eps>
-(epstopdf)                    date: 2025-04-23 15:48:54
-(epstopdf)                    size: 400771 bytes
+(epstopdf)                    date: 2025-05-22 18:39:15
+(epstopdf)                    size: 398895 bytes
 (epstopdf)             Output file: <shocks_ren_w-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:32
-(epstopdf)                    size: 17250 bytes
+(epstopdf)                    date: 2025-05-23 19:33:03
+(epstopdf)                    size: 16518 bytes
 (epstopdf)             Command: <repstopdf --outfile=shocks_ren_w-eps-converted
 -to.pdf shocks_ren_w.eps>
 (epstopdf)             \includegraphics on input line 198.
@@ -880,11 +880,11 @@ Package pdftex.def Info: shocks_ren_w-eps-converted-to.pdf  used on input line
 198.
 (pdftex.def)             Requested size: 245.2399pt x 180.70334pt.
 Package epstopdf Info: Source file: <shocks_ren_m.eps>
-(epstopdf)                    date: 2025-04-23 15:48:55
-(epstopdf)                    size: 400197 bytes
+(epstopdf)                    date: 2025-05-22 18:39:16
+(epstopdf)                    size: 399892 bytes
 (epstopdf)             Output file: <shocks_ren_m-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:33
-(epstopdf)                    size: 17101 bytes
+(epstopdf)                    date: 2025-05-23 19:33:05
+(epstopdf)                    size: 17061 bytes
 (epstopdf)             Command: <repstopdf --outfile=shocks_ren_m-eps-converted
 -to.pdf shocks_ren_m.eps>
 (epstopdf)             \includegraphics on input line 205.
@@ -898,16 +898,16 @@ Package pdftex.def Info: shocks_ren_m-eps-converted-to.pdf  used on input line
 
 [4 <./match_earn_ren_div-eps-converted-to.pdf>]
 Package epstopdf Info: Source file: <surplus_dist.eps>
-(epstopdf)                    date: 2025-04-23 15:49:01
+(epstopdf)                    date: 2025-05-22 18:39:22
 (epstopdf)                    size: 88850 bytes
 (epstopdf)             Output file: <surplus_dist-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:34
-(epstopdf)                    size: 12302 bytes
+(epstopdf)                    date: 2025-05-23 19:33:06
+(epstopdf)                    size: 12268 bytes
 (epstopdf)             Command: <repstopdf --outfile=surplus_dist-eps-converted
 -to.pdf surplus_dist.eps>
 (epstopdf)             \includegraphics on input line 218.
 Package epstopdf Info: Output file is already uptodate.
-<surplus_dist-eps-converted-to.pdf, id=404, 431.6125pt x 287.0725pt>
+<surplus_dist-eps-converted-to.pdf, id=402, 431.6125pt x 287.0725pt>
 File: surplus_dist-eps-converted-to.pdf Graphic file (type pdf)
 <use surplus_dist-eps-converted-to.pdf>
 Package pdftex.def Info: surplus_dist-eps-converted-to.pdf  used on input line 
@@ -916,16 +916,16 @@ Package pdftex.def Info: surplus_dist-eps-converted-to.pdf  used on input line
  [5 <./shocks_ren_div-eps-converted-to.pdf> <./shocks_div-eps-converted-to.pdf>
  <./shocks_ren_w-eps-converted-to.pdf> <./shocks_ren_m-eps-converted-to.pdf>]
 Package epstopdf Info: Source file: <surplus_dist_2d.eps>
-(epstopdf)                    date: 2025-04-23 15:49:08
-(epstopdf)                    size: 173239 bytes
+(epstopdf)                    date: 2025-05-22 18:39:26
+(epstopdf)                    size: 169851 bytes
 (epstopdf)             Output file: <surplus_dist_2d-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:36
-(epstopdf)                    size: 21873 bytes
+(epstopdf)                    date: 2025-05-23 19:33:08
+(epstopdf)                    size: 21047 bytes
 (epstopdf)             Command: <repstopdf --outfile=surplus_dist_2d-eps-conver
 ted-to.pdf surplus_dist_2d.eps>
 (epstopdf)             \includegraphics on input line 227.
 Package epstopdf Info: Output file is already uptodate.
-<surplus_dist_2d-eps-converted-to.pdf, id=545, 383.4325pt x 248.93pt>
+<surplus_dist_2d-eps-converted-to.pdf, id=543, 383.4325pt x 248.93pt>
 File: surplus_dist_2d-eps-converted-to.pdf Graphic file (type pdf)
 <use surplus_dist_2d-eps-converted-to.pdf>
 Package pdftex.def Info: surplus_dist_2d-eps-converted-to.pdf  used on input li
@@ -933,16 +933,16 @@ ne 227.
 (pdftex.def)             Requested size: 500.484pt x 324.94217pt.
  [6 <./surplus_dist-eps-converted-to.pdf>]
 Package epstopdf Info: Source file: <surplus_dist_i_2d.eps>
-(epstopdf)                    date: 2025-04-23 15:49:11
-(epstopdf)                    size: 121476 bytes
+(epstopdf)                    date: 2025-05-22 18:39:30
+(epstopdf)                    size: 131001 bytes
 (epstopdf)             Output file: <surplus_dist_i_2d-eps-converted-to.pdf>
-(epstopdf)                    date: 2025-04-23 15:56:37
-(epstopdf)                    size: 20000 bytes
+(epstopdf)                    date: 2025-05-23 19:33:09
+(epstopdf)                    size: 20348 bytes
 (epstopdf)             Command: <repstopdf --outfile=surplus_dist_i_2d-eps-conv
 erted-to.pdf surplus_dist_i_2d.eps>
 (epstopdf)             \includegraphics on input line 235.
 Package epstopdf Info: Output file is already uptodate.
-<surplus_dist_i_2d-eps-converted-to.pdf, id=569, 375.4025pt x 248.93pt>
+<surplus_dist_i_2d-eps-converted-to.pdf, id=567, 375.4025pt x 248.93pt>
 File: surplus_dist_i_2d-eps-converted-to.pdf Graphic file (type pdf)
 <use surplus_dist_i_2d-eps-converted-to.pdf>
 Package pdftex.def Info: surplus_dist_i_2d-eps-converted-to.pdf  used on input 
@@ -1008,9 +1008,9 @@ texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb><c:/texlive/2023/texmf-dist/
 fonts/type1/public/amsfonts/cm/cmsy6.pfb><c:/texlive/2023/texmf-dist/fonts/type
 1/public/amsfonts/cm/cmti8.pfb><c:/texlive/2023/texmf-dist/fonts/type1/public/c
 m-super/sfrm1000.pfb>
-Output written on visual_tables.pdf (10 pages, 640861 bytes).
+Output written on visual_tables.pdf (10 pages, 637012 bytes).
 PDF statistics:
- 714 PDF objects out of 1000 (max. 8388607)
+ 710 PDF objects out of 1000 (max. 8388607)
  138 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  98 words of extra memory for PDF output out of 10000 (max. 10000000)

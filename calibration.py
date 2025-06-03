@@ -21,13 +21,13 @@ N=10_000#sample size
 
 
 # POints: [θ,σL0,σL,α2,γ]
-xc=np.array([0.59711125, 0.08309608, 0.07246665, 0.75837416, 0.50298593])
+xc=np.array([0.49552882, 0.05758893, 0.10326143, 0.77329494, 0.46355014])
 xl=np.array([0.20,0.004,0.0001,0.50,0.3]) 
-xu=np.array([0.95,0.5,0.15,0.85,0.65]) 
+xu=np.array([0.95,0.9,0.35,0.85,0.85]) 
+
 
 #Parametrize the model 
-par = {'simN':N,
-       'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]} 
+par = {'simN':N,'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]} 
 model = brg.HouseholdModelClass(par=par)  
 
  
@@ -54,49 +54,26 @@ def q(pt):
         M.simulate() 
          
        
-        #################################
-        #Consumption  below
-        ##################################
-    
-        #Women individual consumption
-        poww=np.fmax(np.fmin(M.sim.power,0.999),0.001)
-        CwP,CwNP,Cw=np.zeros((3,M.par.simT*M.par.simN))  
-        linear_interp.interp_2d_vec(M.par.grid_power,M.par.grid_Ctot,M.sol.pre_Ctot_Cw_priv[1],poww.flatten(),M.sim.C_tot.flatten(),CwP)  
-        linear_interp.interp_2d_vec(M.par.grid_power,M.par.grid_Ctot,M.sol.pre_Ctot_Cw_priv[0],poww.flatten(),M.sim.C_tot.flatten(),CwNP)  
-        Cw = (M.sim.WLP.flatten()*CwP+(1-M.sim.WLP.flatten())*CwNP).reshape((M.par.simN,M.par.simT))  
-        Cw[M.sim.couple==0]=np.nan 
-    
-        #Men individual consumption
-        CmP,CmNP,Cm=np.zeros((3,M.par.simT*M.par.simN)) 
-        linear_interp.interp_2d_vec(M.par.grid_power,M.par.grid_Ctot,M.sol.pre_Ctot_Cm_priv[1],poww.flatten(),M.sim.C_tot.flatten(),CmP) 
-        linear_interp.interp_2d_vec(M.par.grid_power,M.par.grid_Ctot,M.sol.pre_Ctot_Cm_priv[0],poww.flatten(),M.sim.C_tot.flatten(),CmNP) 
-        Cm = ((M.sim.WLP.flatten()*CmP+(1-M.sim.WLP.flatten())*CmNP).reshape((M.par.simN,M.par.simT)))#m.sim.C_tot-Cw#
-        Cm[M.sim.couple==0]=np.nan 
-        
-        #Home good consumption
-        Q=M.sim.C_tot-Cm-Cw
-        
-        
          
         ######################################
         #Moments here
         ######################################
-        age=40
-        WLP = np.mean(M.sim.WLP[:,age])     
-        share_m = np.mean(np.cumsum(M.sim.couple==1,axis=1)[:,age]>0) 
-        share_d = np.mean(np.cumsum((M.sim.couple_lag==1) & (M.sim.couple==0),axis=1)[:,age]>0) 
-        MQ=np.mean((Q/M.sim.C_tot)[M.sim.couple==1])
-        MCw=np.mean((Cw/M.sim.C_tot)[M.sim.couple==1])
+        wife_empl = np.mean(M.sim.WLP[:,7:M.par.Tr][M.sim.couple[:,7:M.par.Tr]==1])
+        share_wife_earnings=M.sim.incw[:,7:M.par.Tr][M.sim.WLP[:,7:M.par.Tr]==1].mean()/M.sim.incm[:,7:M.par.Tr].mean()
         
-       
+        ever_married = np.mean(np.cumsum(M.sim.couple[:,7:M.par.Tr]==1,axis=1)[:,14]>0) 
+        ever_divorced = np.mean(np.cumsum((M.sim.couple_lag[:,7:M.par.Tr]==1) & (M.sim.couple[:,7:M.par.Tr]==0),axis=1)[:,14]>0) 
         
+ 
+        expenditure_wife_share=np.mean((M.sim.Cw/(M.sim.Cw+M.sim.Cm))[:,7:M.par.Tr][M.sim.couple[:,7:M.par.Tr]==1])
+        expenditure_x_share=np.mean((M.sim.xw/M.sim.C_tot)[:,7:M.par.Tr][M.sim.couple[:,7:M.par.Tr]==1])
     
                         
-        fit =((WLP-.5956))**2+((share_m-0.92965754))**2+((share_d-.3936217))**2+((MQ-0.80))**2+((MCw-0.065))**2
+        fit =((wife_empl-0.596 )/.596)**2+((ever_married-.718)/.718)**2+((ever_divorced-.0836427)/.0836427)**2+((expenditure_wife_share-0.347/.347))**2+((expenditure_x_share-0.785)/.785)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
-        print('Simulated moments are {}'.format([WLP,share_m,share_d,MQ,MCw]))
+        print('Simulated moments are {}'.format([wife_empl,ever_married,ever_divorced,expenditure_wife_share,expenditure_x_share,share_wife_earnings]))
       
-        return [((WLP-.5956)),((share_m-0.92965754)),((share_d-.3936217)),((MQ-0.80)),((MCw-0.065))]   
+        return [((wife_empl-.596)/.596),((ever_married-.718)/.718),((ever_divorced-.0836427)/.0836427),((expenditure_wife_share-0.347)/0.347),((expenditure_x_share-0.785)/0.785)]   
      
     except:
 

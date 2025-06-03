@@ -22,7 +22,7 @@ class HouseholdModelClass(EconModelClass):
     def setup(self):
         par = self.par
         
-        par.R = 1.03
+        par.R = 1.03068
         par.β = 0.98# Discount factor
         
         par.div_A_share = 0.5 # divorce share of wealth to wife
@@ -30,7 +30,7 @@ class HouseholdModelClass(EconModelClass):
         par.full=False #dummy for full/limited commitment. if full commitment: renegotiation/divorce is illegal
 
         # Utility: CES aggregator or additively linear
-        par.ρ = 2.0#        # CRRA      
+        par.ρ = 1.873#        # CRRA      
         par.α1 = 0.65
         par.α2 = 0.35
         par.ϕ1 = 0.43
@@ -39,7 +39,7 @@ class HouseholdModelClass(EconModelClass):
         # production of home good
         par.θ = 0.21 #weight on money vs. time to produce home good
         par.λ = 0.19 #elasticity betwen money and time in public good
-        par.tb = 0.191 #time spend on public goods by singles
+        par.tb = 0.326 #time spend on public goods by singles
         
         #Taste shock
         par.σ = 0.0002 #taste shock applied to working/not working
@@ -52,8 +52,8 @@ class HouseholdModelClass(EconModelClass):
         # state variables
         #####################
         
-        par.T = 62 # terminal age
-        par.Tr = 46 # age at retirement
+        par.T = 63+5 # terminal age: https://www.mortality.org/File/GetDocument/hmd.v6/JPN/STATS/fltper_1x1.txt 
+        par.Tr = 40+5 # age at retirement
         
         # wealth
         par.num_A = 15;par.max_A = 75.0
@@ -65,8 +65,8 @@ class HouseholdModelClass(EconModelClass):
         
         #women's human capital states
         par.num_h = 2
-        par.drift = 0.0#1.84 #1.44716#1.84 #human capital depreciation drift
-        par.pr_h_change = 0.0#2/46# 0.025 # probability that  human capital depreciates
+        par.drift = 1.195#1.44716#1.84 #human capital depreciation drift
+        par.pr_h_change = 1.0/45.0 # probability that  human capital depreciates
 
         # love/match quality
         par.num_love = 7
@@ -79,23 +79,34 @@ class HouseholdModelClass(EconModelClass):
         par.num_z=par.num_zm*par.num_zw#total, couple
         
         # income of men and women: parameters of the age log-polynomial
-        par.t0m=0.000;par.t1m=0.07095764 ;par.t2m= -0.00186095  ;par.t3m= 0.00000941  ;
-        par.t0w=-0.728 ;par.t1w= 0.07851440  ;par.t2w=-0.00191743   ;par.t3w=0.00000941  ;
-        #par.t0w=0.000;par.t1w=0.07095764 ;par.t2w= -0.00186095  ;par.t3w= 0.00000941  ;
+        par.t0m= -0.224;       par.t1m=0.046   ;par.t2m=-0.00075858 
+        par.t0w=-0.591  ;par.t1w=0.046   ;par.t2w=-0.00075858 
+ 
+        
         # productivity of men and women: sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks
-        par.σpw=0.16435;par.σϵw=0.08*1.5;par.σ0w= 0.37913;
-        par.σpm=0.14162;par.σϵm=0.08*1.5;par.σ0m=0.38338
-        #par.σpw=0.14162;par.σϵw=0.08*1.5;par.σ0w=0.38338
+        par.σpm=0.0082 **0.5;par.σϵm= 0.0125**0.5;par.σ0m=  0.0338**0.5;
+        par.σpw= 0.00978 **0.5;par.σϵw=0.0137**0.5;par.σ0w= 0.1198**0.5;
+        par.σϵwm=0.00289 #correlation of transitory shocks
        
         
-        
+                 
 
         # pre-computation fo consumption
         par.num_Ctot = 150;par.max_Ctot = par.max_A*2
         
-        par.meet = 0.4#probability of meeting a partner if single
-        par.relw = 1.0#1.125#ratio of men over women's assets at meeting
-        par.ϕ = 0.5-(par.relw-1)/(par.relw+1)#given relw, share of womens assets at meeting
+        par.meet = 1.0#probability of meeting a partner if single
+        par.ϕ = 0.48#share of womens assets at meeting
+        par.relw = par.ϕ/(1.0-par.ϕ)#ratio of men to woman assets at meeting
+        
+        
+        # taxation parameters
+        par.Λ=0.92 #inverse tax level
+        par.τ=0.08 #tax progressivity        
+        par.d0=0.172;par.d1=0.0132;par.d2=-0.56;par.CredLim=0.61
+        
+        #pension parameters
+        par.p_b=0.3578 #basic pension
+        par.κ=0.219   #proportional part of pension
         
         # simulation
         par.seed = 9211;par.simT = par.T;par.simN = 100_000
@@ -143,16 +154,19 @@ class HouseholdModelClass(EconModelClass):
         par.grid_marg_u_s = np.nan + np.ones(par.num_Ctot)# singles
    
         # income shocks grids: singles and couples
-        par.grid_zw,par.grid_ϵw,par.grid_pw,par.Π_zw, par.Π_zw0 =\
-            usr.labor_income(par.t0w,par.t1w,par.t2w,par.t3w,par.T,par.Tr,par.σpw,par.σϵw,par.σ0w,par.num_pw,par.num_ϵw,par.grid_h,women=True) 
+        par.grid_zw,par.grid_ϵw,par.grid_pw,par.Π_zw0, \
+            par.grid_zm,par.grid_ϵm,par.grid_pm,par.Π_zm0, \
+                                        par.Π=usr.labor_income(par) 
+                                        
+                                        
+        # income shocks grids: singles and couples
+        par.grid_zw,par.grid_ϵw,par.grid_pw,par.Π_zw0, \
+            par.grid_zm,par.grid_ϵm,par.grid_pm,par.Π_zm0, \
+                                                par.Πs=usr.labor_income(par,single=True) 
         
-        par.grid_zm,par.grid_ϵm,par.grid_pm,par.Π_zm, par.Π_zm0=\
-            usr.labor_income(par.t0m,par.t1m,par.t2m,par.t3m,par.T,par.Tr,par.σpm,par.σϵw,par.σ0m,par.num_pm,par.num_ϵw,par.grid_h,women=False)
         
-        par.Π=[np.kron(par.Π_zw[t],par.Π_zm[t]) for t in range(par.T-1)] # couples trans matrix, possible to change this and make shocks correlated
-
         #Simulation
-        par.women =np.ones(par.simN)#0: simumate men 1 women
+        par.women =np.ones(par.simN)#0: simumate men, 1 women
         
     def allocate(self):
         par = self.par;sol = self.sol;sim = self.sim;self.setup_grids()
@@ -237,7 +251,7 @@ class HouseholdModelClass(EconModelClass):
         sim.init_love = np.ones(par.simN,dtype=np.int_)**par.num_love//2#initial love    
         sim.init_zw =np.array([usr.mc_simulate(par.num_zw//2,par.Π_zw0[0],sim.shock_iz[i,0]) for i in range(par.simN)])
         sim.init_zm =np.array([usr.mc_simulate(par.num_zm//2,par.Π_zm0[0],sim.shock_iz[i,1]) for i in range(par.simN)])
-        sim.init_z  = sim.init_zw*par.num_zm+sim.init_zm                #    initial income
+        sim.init_z  = sim.init_zw*par.num_zm+sim.init_zw                #    initial income
         
            
             
@@ -336,11 +350,11 @@ def integrate_single(sol,par,t):
             for ih in range(par.num_h):
                 for jz in range(par.num_z):
                                       
-                    Ew_nomeet[ih,iz,iA] += sol.Vw_single[t+1,:,jz,iA] @ par.Πh_p[t][:,ih] * par.Π[t][jz,iz]
-                    Em_nomeet[ih,iz,iA] += sol.Vm_single[t+1,:,jz,iA] @ par.Πh_p[t][:,ih] * par.Π[t][jz,iz]                    
+                    Ew_nomeet[ih,iz,iA] += sol.Vw_single[t+1,:,jz,iA] @ par.Πh_p[t][:,ih] * par.Πs[t][jz,iz]
+                    Em_nomeet[ih,iz,iA] += sol.Vm_single[t+1,:,jz,iA] @ par.Πh_p[t][:,ih] * par.Πs[t][jz,iz]                    
                     
     # 2. Expected value if meeting a partner: Π=kroneker product of love, wage, HC risk.
-    Π=usr.rescale_matrix(np.kron(np.kron(par.Πh_p[t],par.Π[t]),par.Πl0[t])) 
+    Π=usr.rescale_matrix(np.kron(np.kron(par.Πh_p[t],par.Πs[t]),par.Πl0[t])) 
     for iA in prange(par.num_A):
         for jz in range(par.num_z):
             for jh in range(par.num_h):
@@ -690,8 +704,9 @@ def simulate_lifecycle(sim,sol,par):
             Π = [par.Πh_p[t],par.Πh_n[t]][1- wlp[i,t-1]]                             if t>0  else par.Πh_p[t]
             ih[i,t] = usr.mc_simulate(ih[i,t-1],Π,sim.shock_h[i,t])                  if t>0 else sim.init_ih[i]            
             couple_lag[i,t] = couple[i,t-1]                                          if t>0 else sim.init_couple[i]
-            power_lag[i,t] = power[i,t-1]                                            if t>0 else sim.init_power[i]           
-            iz[i,t] = usr.mc_simulate(iz[i,t-1],par.Π[t-1],sim.shock_z[i,t])         if t>0 else sim.init_z[i]
+            power_lag[i,t] = power[i,t-1]                                            if t>0 else sim.init_power[i]      
+            Πz=par.Π[t-1]                                                            if (couple[i,t-1]==1) else par.Π[t-1]
+            iz[i,t] = usr.mc_simulate(iz[i,t-1],Πz,sim.shock_z[i,t])                 if t>0 else sim.init_z[i]
             love[i,t] = usr.mc_simulate(love[i,t-1],par.Πl[t-1],shock_love[i,t])     if t>0 else sim.init_love[i]
            
 

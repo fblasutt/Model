@@ -20,7 +20,9 @@ plt.rcParams.update({'figure.max_open_warning': 0,'text.usetex': False})
 xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.48123509])
 xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.5])
 
-specs = {'model 1':{'latexname':'EGM2', 'par':{'θ':xc[0],'meet':1.0,'σL0':xc[1],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
+xc=np.array([0.5565212,  0.03702139, 0.15589682, 0.7510139,  0.57784815])
+
+specs = {'model 1':{'latexname':'EGM2', 'par':{'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
 root='C:/Users/32489/Dropbox/Family Risk Sharing'
 
 

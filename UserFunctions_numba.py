@@ -5,6 +5,7 @@ from numba import config
 from consav import linear_interp
 from consav.grids import nonlinspace
 from consav.markov import rouwenhorst
+from scipy.stats import multivariate_normal
 from scipy.integrate import quad
 
 import setup
@@ -30,17 +31,25 @@ def util(c_priv,c_pub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=0.0,ishom=0.0)
 @njit(cache=cache)  
 def resources_couple(par,t,ih,iz,assets):      
       
- 
-    
+   
     izw=iz//par.num_zm;izm=iz%par.num_zw  
-    r=par.R-1.0 
-      
-    yh =   par.grid_zm[t,izm,ih]  
+
+    #women earnings
     yw_w = par.grid_zw[t,izw,ih]*par.grid_wlp[1] 
     yw_n = par.grid_zw[t,izw,ih]*par.grid_wlp[0] 
-     
-    tax_work =     0#(yh+yw_w+r*assets) -  .9817526*(yh+yw_w+r*assets)**(1-.0951248)
-    tax_not_work = 0#(yh+yw_n+r*assets) -  .9817526*(yh+yw_n+r*assets)**(1-.0951248)
+    
+    #spousal deduction based on womens earnings
+    SpDed_w=np.maximum(par.d0+par.d1*yw_w+par.d2*yw_w**2,0.0)#spousal deduction if women works
+    SpDed_n=np.maximum(par.d0+par.d1*yw_n+par.d2*yw_n**2,0.0)#spousal deduction if women does not work
+    
+    #men income and taxable income
+    yh = par.grid_zm[t,izm,ih]
+    yh_taxable_w =   yh -SpDed_w
+    yh_taxable_n =   yh -SpDed_n
+    
+    #nota that taxation is individual 
+    tax_work =     yh_taxable_w+yw_w -  par.Λ*(yh_taxable_w)**(1-par.τ)- par.Λ*(yw_w)**(1-par.τ)
+    tax_not_work = yh_taxable_n+yw_n -  par.Λ*(yh_taxable_n)**(1-par.τ)- par.Λ*(yw_n)**(1-par.τ)
     
     
      
@@ -58,20 +67,14 @@ def income_single(par,t,ih,iz,assets,women=True):
      
     
     iz_i=iz//par.num_zm if women else iz%par.num_zw 
-    r=par.R-1.0 
+    
      
     labor_income =  par.grid_zw[t,iz_i,ih] if women else par.grid_zm[t,iz_i,ih]#without HC! 
    
-    tax_income_m = 0.0#(labor_income+r*assets) -.9215397*(labor_income+r*assets)**(1-.079307)#taxes(labor_income,s=True)# 
-    tax_income_w = 0.0#(labor_income+r*assets) -.9438169*(labor_income+r*assets)**(1-.0558105)#taxes(labor_income,s=True)# 
-    
-
-    #tax_income_m = (labor_income) -.8647291*(labor_income)**(1-.146648) 
-    #tax_income_w = (labor_income) -.8804861*(labor_income)**(1-.1165) 
+    tax_income = (labor_income) -par.Λ*(labor_income)**(1-par.τ)#taxes(labor_income,s=True)# 
+  
      
-     
-    if women: return (labor_income-tax_income_w-0*0.0765*labor_income) 
-    else:     return (labor_income-tax_income_m-0*0.0765*labor_income) 
+    return labor_income-tax_income
     
     
 @njit(cache=cache)
@@ -141,65 +144,107 @@ def intraperiod_allocation_single(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
     
     return C_priv,C_tot - C_priv#=C_pub
 
-def labor_income(t0,t1,t2,t3,T,Tr,sigma_p,sigma_ϵ,sigma_init,n_p,n_ϵ,grid_h,women=True): 
+def labor_income(par,single=False): 
      
     ###################
     # Grids here
     ##################
     
+    
     # Persistent shocks
-    P, PiP, Pi0P =rouw_nonst(T,sigma_p,sigma_init,n_p) 
+    Pw, PiPw, Pi0Pw =rouw_nonst(par.T,par.σpw,par.σ0w,par.num_pw) 
+    Pm, PiPm, Pi0Pm =rouw_nonst(par.T,par.σpm,par.σ0m,par.num_pm) 
     
     # Transitory shocks
-    grid,trans,_,_,_=rouwenhorst(0.0,0.0,sigma_ϵ,n=n_ϵ)
-
-
-
-    #Store here all the components of earnings
-    XX,XP,XT,XH,XD=np.zeros((5,T,n_p*n_ϵ,len(grid_h)))
+    ρ=par.σϵwm/(par.σϵw*par.σϵm)#correlation between trasitory shocks
     
-    for t in range(T):
-        for i in range(len(grid_h)):
+    gridw,transw,_,_,_=rouwenhorst(0.0,0.0,par.σϵw,n=par.num_ϵw)
+    gridm,transm,_,_,_=rouwenhorst(0.0,0.0,par.σϵm,n=par.num_ϵm)
+        
+    if ((ρ<1e-6) | (single)): #uncorrelated shocks
+        Πϵ=np.kron(transw.T,transm.T)
+    else:#correlated shocks        
+        gridw,gridm,Πϵ=var_discretization(0.0,0.0,par.σϵw,par.σϵm, 0.0,par.num_ϵw,par.num_ϵm)
+
+    
+    #Store here all the components of earnings
+    XXw,XPw,XTw,XHw,XDw=np.zeros((5,par.T,par.num_pw*par.num_ϵw,len(par.grid_h)))
+    XXm,XPm,XTm,XHm,XDm=np.zeros((5,par.T,par.num_pm*par.num_ϵm,len(par.grid_h)))
+    
+    for t in range(par.T):
+        for i in range(len(par.grid_h)):
             
-            XT[t,:,i]=(np.zeros(P[t].shape)[:,None]+grid[None,:]).flatten()
-            XP[t,:,i]=(P[t][:,None]+np.zeros(grid.shape)[None,:]).flatten()
-            XH[t,:,i] = grid_h[i] if women else 0.0
-            XD[t,:,i] = t0+t1*t+t2*t**2+t3*t**3
+            XTw[t,:,i]=(np.zeros(Pw[t].shape)[:,None]+gridw[None,:]).flatten()
+            XPw[t,:,i]=(Pw[t][:,None]+np.zeros(gridw.shape)[None,:]).flatten()
+            XHw[t,:,i] = par.grid_h[i] 
+            XDw[t,:,i] = par.t0w+par.t1w*t+par.t2w*t**2
+            
+            XTm[t,:,i]=(np.zeros(Pm[t].shape)[:,None]+gridm[None,:]).flatten()
+            XPm[t,:,i]=(Pm[t][:,None]+np.zeros(gridm.shape)[None,:]).flatten()
+            XHm[t,:,i] =  0.0
+            XDm[t,:,i] = par.t0m+par.t1m*t+par.t2m*t**2
             
 
-    XX=np.exp(XT+XP+XH+XD)
-    for t in range(Tr,T):
-        for i in range(len(grid_h)):
-            XX[t,:,i]=pens(XX[Tr-1,:,i])
+    XXw=np.exp(XTw+XPw+XHw+XDw)
+    XXm=np.exp(XTm+XPm+XHm+XDm)
+    
+    for t in range(par.Tr,par.T):
+        for i in range(len(par.grid_h)):
+            XXw[t,:,i]=pens(XXw[par.Tr-1,:,i],par.p_b,par.κ)
+            XXm[t,:,i]=pens(XXm[par.Tr-1,:,i],par.p_b,par.κ)
     
     #####################
     # Transition matrices
     ####################
-    Pi =[np.kron(PiP[t],trans.T) for t in range(T-1)]
-    Pi0=[np.kron(Pi0P[t],trans.T) for t in range(T-1)]
-    for t in range(Tr-1,T-1): Pi[t][:]=np.eye(n_p*n_ϵ) 
+
+    #Joint transition matrix by gender, initial period
+    Pi0w=[np.kron(Pi0Pw[t],transw.T) for t in range(par.T-1)]
+    Pi0m=[np.kron(Pi0Pm[t],transm.T) for t in range(par.T-1)]
+    
+    #Create the joint transition matrix, first using the kroneker product and then reshaping
+    Π=[np.kron(np.kron(PiPw[t],PiPm[t]),Πϵ) for t in range(par.T-1)] 
+    
+    n_total=par.num_ϵw*par.num_ϵm*par.num_pw*par.num_pm
+    for t in range(par.T-1):
+        Π[t]=Π[t].reshape(par.num_pw,par.num_pm,par.num_ϵw,par.num_ϵm,par.num_pw,par.num_pm,par.num_ϵw,par.num_ϵm)\
+            .transpose(0,2,1,3,4,6,5,7).reshape(n_total, n_total)
+        
+        
+    #No more income shocks after retirement
+    for t in range(par.Tr-1,par.T-1): Π[t][:]=np.eye(par.num_pm*par.num_ϵm*par.num_pw*par.num_ϵw) 
     
  
-    return XX, XT,XP, Pi, Pi0
+    return XXw, XTw,XPw, Pi0w,XXm, XTm,XPm, Pi0m,Π
+
+def build_directly(Pia, Pib, Pic, Pid):
+    """
+    Use einsum to directly construct the ordering you would obtain by running
+        
+        Pi1_orig = np.kron(Pia, Pib)
+        Pi2_orig = np.kron(Pic, Pid)
+        Pi_original = np.kron(Pi1_orig, Pi2_orig)
+        
+
+    """
+    result_tensor = np.einsum('ai,bj,ck,dl->abcdijkl', Pia, Pib, Pic, Pid)
+    
+    # Reshape to matrix: (a,b,c,d) x (a,b,c,d) ordering
+    n_a, n_b, n_c, n_d = Pia.shape[0], Pib.shape[0], Pic.shape[0], Pid.shape[0]
+    total_states = n_a * n_b * n_c * n_d
+
+    
+    return result_tensor.reshape(total_states, total_states)
+
    
 #function to compute pension
-def pens(value):
+def pens(value,p_b,κ):
     
-    #Bend points: 1989, https://www.ssa.gov/oact/cola/bendpoints.html
-    
+ 
     #Matters only income below threshold 
     valuef=value.copy()
 
-    deflator=1.3782117944263717
-    normalization=18414.542781866283
-    thresh1=339*12*deflator/normalization
-    thresh2=2044*12*deflator/normalization
     
-    inc1=np.minimum(valuef,thresh1)
-    inc2=np.maximum(np.minimum(valuef,thresh2)-thresh1,0)
-    inc3=np.maximum(valuef-thresh2,0)
-    
-    return inc1*0.9+inc2*0.32+inc3*0.15 
+    return p_b+κ*valuef
 
 
 ###########################
@@ -356,6 +401,126 @@ def rescale_matrix(Π,tol=1e-4):
         Π[:,i] = Π[:,i] / np.sum(Π[:,i])
         
     return Π 
+
+def var_discretization(rho1, rho2, sigma1, sigma2, rho12, n1, n2):
+    
+    """
+     Discretize bivariate correlated AR(1) processes using VAR approach.
+     
+     Creates independent grids for each process using Rouwenhorst spacing, then computes 
+     joint transition probabilities using multivariate normal densities for the innovations.
+     Correlation is captured through the joint distribution of innovations rather than 
+     through grid construction.
+     
+     Parameters:
+     -----------
+     rho1 : float
+         Persistence parameter for first AR(1) process, |rho1| < 1
+     rho2 : float  
+         Persistence parameter for second AR(1) process, |rho2| < 1
+     sigma1 : float
+         Standard deviation of innovations for first process, sigma1 > 0
+     sigma2 : float
+         Standard deviation of innovations for second process, sigma2 > 0
+     rho12 : float
+         Correlation between innovations, -1 < rho12 < 1
+     n1 : int
+         Number of grid points for first process
+     n2 : int
+         Number of grid points for second process
+         
+     Returns:
+     --------
+     x1_grid : ndarray, shape (n1,)
+         Grid points for first process, spanning ±σ₁/(1-ρ₁²)^0.5 approximately
+     x2_grid : ndarray, shape (n2,)  
+         Grid points for second process, spanning ±σ₂/(1-ρ₂²)^0.5 approximately
+     P : ndarray, shape (n1*n2, n1*n2)
+         Transition probability matrix. P[i,j] = probability of transitioning from 
+         state i to state j, where states are ordered as (i1*n2 + i2) for 
+         grid indices (i1, i2).
+     """
+    
+    # Innovation covariance matrix
+    Sigma_eps = np.array([[sigma1**2, sigma1*sigma2*rho12],
+                          [sigma1*sigma2*rho12, sigma2**2]])
+    
+   
+    ###############################################################
+    #Step 1: Create Individual Grids Using Rouwenhorst Spacing
+    #############################################################
+    sigma1_unc = sigma1 / np.sqrt(1 - rho1**2)
+    sigma2_unc = sigma2 / np.sqrt(1 - rho2**2)
+    
+    # Create grids
+    x1_grid = sigma1_unc * np.sqrt(n1 - 1) * np.linspace(-1, 1, n1)
+    x2_grid = sigma2_unc * np.sqrt(n2 - 1) * np.linspace(-1, 1, n2)
+    
+
+    ##############################################################################
+    #Step 2: Compute Joint Transition Probabilities acccounting for correlation
+    #
+    # What this does:
+    #
+    #    -Loops over all possible transitions from current state to next state
+    #    -Each "state" is a point (x₁, x₂) in the 2D grid
+    #    
+    ###########################################################################
+    
+    n_states = n1 * n2
+    P = np.zeros((n_states, n_states))
+    
+    # For each current state (i, j)
+    for i in range(n1):
+        for j in range(n2):
+            current_state = i * n2 + j
+            current_x1 = x1_grid[i]
+            current_x2 = x2_grid[j]
+            
+            # Required innovations for this specific transition
+            for i_next in range(n1):
+                for j_next in range(n2):
+                    next_state = i_next * n2 + j_next
+                    next_x1 = x1_grid[i_next]
+                    next_x2 = x2_grid[j_next]
+                    
+                    # Expected innovations
+                    eps1_expected = next_x1 - rho1 * current_x1
+                    eps2_expected = next_x2 - rho2 * current_x2
+                    
+                    # What's the probability of getting exactly these innovations?
+                    eps_vector = np.array([eps1_expected, eps2_expected])
+
+
+                    try:
+                        prob_density = multivariate_normal.pdf(eps_vector, mean=[0, 0], cov=Sigma_eps)
+                        """
+                        Explain the line above:
+                            
+                        Given where we are (x₁, x₂) and where we want to go (x₁', x₂')
+                        We can calculate exactly what innovations we'd need:
+
+                            ε₁ = x₁' - ρ₁x₁ (innovation needed for process 1)
+                            ε₂ = x₂' - ρ₂x₂ (innovation needed for process 2)
+                               
+                        The probability of this transition = probability of getting exactly those innovations
+                        Since innovations are bivariate normal with covariance Σ, we use multivariate_normal.pdf()
+                        """
+                    except:
+                        prob_density = 1e-10
+                    
+                    P[current_state, next_state] = prob_density
+    
+    # Normalize rows (this is approximate but necessary)
+    row_sums = P.sum(axis=1)
+    for i in range(n_states):
+        if row_sums[i] > 1e-10:
+            P[i, :] /= row_sums[i]
+        else:
+            # If all probabilities are essentially zero, make it uniform
+            P[i, :] = 1.0 / n_states
+    
+    return x1_grid, x2_grid, P.T
 
 ##########################
 # Other routines below
