@@ -18,7 +18,7 @@ woman=setup.woman;man=setup.man
 # User-specified functions #
 ############################
 @njit(cache=cache)
-def home_good(x,θ,λ,tb,couple=0.0,ishom=0.0):
+def home_good(x,θ,λ,tb,couple,ishom):
     home_time=(2*tb+ishom*(1-tb)) if couple else tb
     return (θ*x**λ+(1.0-θ)*home_time**λ)**(1.0/λ)
 
@@ -35,31 +35,25 @@ def resources_couple(par,t,ih,iz,assets):
     izw=iz//par.num_zm;izm=iz%par.num_zw  
 
     #women earnings
-    yw_w = par.grid_zw[t,izw,ih]*par.grid_wlp[1] 
-    yw_n = par.grid_zw[t,izw,ih]*par.grid_wlp[0] 
+    yw= [par.grid_zw[t,izw,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)]
     
     #spousal deduction based on womens earnings
-    SpDed_w=np.maximum(par.d0+par.d1*yw_w+par.d2*yw_w**2,0.0)#spousal deduction if women works
-    SpDed_n=np.maximum(par.d0+par.d1*yw_n+par.d2*yw_n**2,0.0)#spousal deduction if women does not work
+    SpDed=[np.maximum(par.d0+par.d1*yw[wlp]+par.d2*yw[wlp]**2,0.0) for wlp in range(par.num_wlp)]
     
     #men income and taxable income
     yh = par.grid_zm[t,izm,ih]
-    yh_taxable_w =   yh -SpDed_w
-    yh_taxable_n =   yh -SpDed_n
+    yh_taxable =   [yh -SpDed[wlp] for wlp in range(par.num_wlp)]
     
     #nota that taxation is individual 
-    tax_work =     yh_taxable_w+yw_w -  par.Λ*(yh_taxable_w)**(1-par.τ)- par.Λ*(yw_w)**(1-par.τ)
-    tax_not_work = yh_taxable_n+yw_n -  par.Λ*(yh_taxable_n)**(1-par.τ)- par.Λ*(yw_n)**(1-par.τ)
+    tax = [yh_taxable[wlp]+yw[wlp] -  par.Λ*(yh_taxable[wlp])**(1-par.τ)- par.Λ*(yw[wlp])**(1-par.τ) for wlp in range(par.num_wlp)]
     
-    
-     
+         
     #resources depending on employment  
-    res_not_work = par.R*assets + (yh +yw_n-tax_not_work)
-    res_work     = par.R*assets + (yh +yw_w-tax_work) 
+    if t>=par.Tr: resources = [par.R*assets + (yh +yw[-1]-tax[-1])   for wlp in range(par.num_wlp)]
+    else:         resources = [par.R*assets + (yh +yw[wlp]-tax[wlp]) for wlp in range(par.num_wlp)]
       
-    # change resources if retired: women should not work!   
-    if t>=par.Tr: return res_work,     res_work,yh,yw_w 
-    else:         return res_not_work, res_work,yh,yw_w 
+    
+    return resources, yh, yw
 
 
 @njit(cache=cache)  
@@ -109,15 +103,15 @@ def marg_util(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
     
     
 @njit(cache=cache)
-def couple_time_utility(Ctot,par,sol,iP,part,love,pars2):
+def couple_time_utility(Ctot,par,sol,iP,wls,love,pars2):
     """
         Couple's utility given total consumption Ctot (float)
     """    
-    p_Cw_priv, p_Cm_priv, p_C_pub =\
-        intraperiod_allocation(Ctot,par.grid_Ctot,sol.pre_Ctot_Cw_priv[part,iP],sol.pre_Ctot_Cm_priv[part,iP]) 
+    Cw_priv, Cm_priv, C_pub =\
+        intraperiod_allocation(Ctot,par.grid_Ctot,sol.pre_Ctot_Cw_priv[wls,iP],sol.pre_Ctot_Cm_priv[wls,iP]) 
         
-    vw_new = util(p_Cw_priv,p_C_pub,*pars2,love,True,1.0-par.grid_wlp[part])                       
-    vm_new = util(p_Cm_priv,p_C_pub,*pars2,love,True,1.0-par.grid_wlp[part])
+    vw_new = util(Cw_priv,C_pub,*pars2,love,True,1.0-par.grid_wlp[wls])                       
+    vm_new = util(Cm_priv,C_pub,*pars2,love,True,1.0-par.grid_wlp[wls])
      
     return vw_new, vm_new
 
@@ -525,6 +519,41 @@ def var_discretization(rho1, rho2, sigma1, sigma2, rho12, n1, n2):
 ##########################
 # Other routines below
 ##########################
+
+@njit
+def binary_search_event(prob, shock):
+    """
+    Given vector or event probabilities "prob" and the draw "shock", computes
+    the realized event using binary search
+    
+    
+    Inputs:
+        
+        prob: a one-dimension vector where entries are probabilities that
+              even is realized
+             
+        shock: a float in [0,1] drawn from a uniform distribution
+
+    """
+    cumsum = np.cumsum(prob)
+    left = 0
+    right = len(cumsum) - 1
+    
+    # Handle edge cases
+    if shock <= cumsum[0]:
+        return 0
+    if shock > cumsum[right]:
+        return right
+    
+    # Binary search
+    while left < right:
+        mid = (left + right) // 2
+        if shock <= cumsum[mid]:
+            right = mid
+        else:
+            left = mid + 1
+    
+    return left
 
 @njit
 def deriv(x,f,ϵ=1e-8):

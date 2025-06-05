@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib
+import numpy as np
 import matplotlib.pyplot as plt
 import Bargaining_numba as brg
 import pandas as pd
@@ -46,11 +46,11 @@ cmaps = ('viridis','gray')
 model_list = ('model 1',)
 
 #Points to consider
-t = 0; iz=0; ih=0
+t = 0; iz=0; ih=0;wls=1
 
 par = models['model 1'].par
 for iL in (par.num_love//2,): 
-    for var in ('p_Vw_remain_couple','n_C_tot_remain_couple','power','remain_WLP'):
+    for var in ('i_Vw_remain_couple','i_C_tot_remain_couple','remain_WLP'):
 
         fig = plt.figure();ax = plt.axes(projection='3d')
                 
@@ -59,7 +59,7 @@ for iL in (par.num_love//2,):
             par = models[name].par
             X, Y = np.meshgrid(par.grid_power, par.grid_A,indexing='ij')
             
-            Z = getattr(model.sol,var)[t,ih,iz,:,iL,:]
+            Z = getattr(model.sol,var)[t,wls,ih,iz,:,iL,:]
             alpha = 0.2 if name=='model 1' else 0.5
             ax.plot_surface(X, Y, Z,cmap=cmaps[i],alpha=alpha);
             if var == 'power':  ax.set(zlim=[0.0,1.0])

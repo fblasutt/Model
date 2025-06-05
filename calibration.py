@@ -46,7 +46,7 @@ def q(pt):
         M.par.θ=pt[0] 
         M.par.meet=pt[1]
         M.par.λ_grid = np.ones(M.par.T)*pt[1] 
-        M.par.grid_love,M.par.Πl,M.par.Πl0= usr.addaco_nonst(M.par.T,pt[2],pt[2],M.par.num_love)    
+        M.par.grid_love,M.par.Πl,M.par.Πl0= usr.rouw_nonst(M.par.T,pt[2],pt[2],M.par.num_love)    
         M.par.α2=pt[3] 
         M.par.α1=1.0-pt[3]
         M.par.γ=pt[4]
