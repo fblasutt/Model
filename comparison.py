@@ -17,27 +17,25 @@ plt.rcParams.update({'figure.max_open_warning': 0,'text.usetex': False})
 
 # settings for models to solve
 
-xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.48123509])
-xc=np.array([0.59909138, 0.02361305, 0.03624229, 0.75706021, 0.5])
+#Initialize seed 
+np.random.seed(10) 
+ 
+#Create sample with replacement 
+N=10_000#sample size 
+xc=np.array([0.46874957, 0.05944867, 0.06511688, 0.78126218, 0.46638862])
 
-xc=np.array([0.5565212,  0.03702139, 0.15589682, 0.7510139,  0.57784815])
 
-specs = {'model 1':{'latexname':'EGM2', 'par':{'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
+par = {'simN':N,'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]} 
+model = brg.HouseholdModelClass(par=par)  
+
 root='C:/Users/32489/Dropbox/Family Risk Sharing'
 
 
 
 # solve different models (takes several minutes)
-models = {}
-for name,spec in specs.items():
-    print(f'solving {name}...')
-    
-    # setup model
-    models[name] = brg.HouseholdModelClass(name=name,par=spec['par'])
-    models[name].spec = spec
-    
-    # solve
-    models[name].solve()
+model = brg.HouseholdModelClass(par=par) 
+model.solve()
+model.simulate()
     
    
         
@@ -48,15 +46,14 @@ model_list = ('model 1',)
 #Points to consider
 t = 0; iz=0; ih=0;wls=1
 
-par = models['model 1'].par
+par = model.par
 for iL in (par.num_love//2,): 
     for var in ('i_Vw_remain_couple','i_C_tot_remain_couple','remain_WLP'):
 
         fig = plt.figure();ax = plt.axes(projection='3d')
                 
         for i,name in enumerate(model_list):
-            model = models[name]
-            par = models[name].par
+
             X, Y = np.meshgrid(par.grid_power, par.grid_A,indexing='ij')
             
             Z = getattr(model.sol,var)[t,wls,ih,iz,:,iL,:]
@@ -69,20 +66,13 @@ for iL in (par.num_love//2,):
 var_list = ('couple','A','power','love','WLP')
 model_list = ('model 1',)
 init_power=model.par.grid_power[0];init_love=par.num_love//2
-for i,name in enumerate(model_list):
-    model = models[name]
 
-    # show how starting of in a low bargaining power gradually improves
-    model.sim.init_power[:] = init_power
-    model.sim.init_love[:] = init_love 
-    model.simulate()
     
 for var in var_list:
 
     fig, ax = plt.subplots()
     
     for i,name in enumerate(model_list):
-        model = models[name]
 
         # pick out couples (if not the share of couples is plotted)
         if var == 'couple': nan = 0.0
@@ -93,7 +83,7 @@ for var in var_list:
 
         # pick relevant variable for couples
         y = getattr(model.sim,var);y = np.nanmean(y + nan,axis=0)
-        ax.plot(y,marker=markers[i],linestyle=linestyles[i],linewidth=linewidth,label=model.spec['latexname']);
+        ax.plot(y,marker=markers[i],linestyle=linestyles[i],linewidth=linewidth);
         ax.set(xlabel='age',ylabel=f'{var}');ax.set_title(f'pow_idx={init_power}, init_love={init_love}')
 
 

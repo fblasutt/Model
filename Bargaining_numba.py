@@ -69,7 +69,7 @@ class HouseholdModelClass(EconModelClass):
         par.pr_h_change = 1.0/45.0 # probability that  human capital depreciates
 
         # love/match quality
-        par.num_love = 7
+        par.num_love =7
         par.σL = 0.1; par.σL0 = 0.1
         
         # productivity of men and women: gridpoints
@@ -124,7 +124,7 @@ class HouseholdModelClass(EconModelClass):
         par.grid_Aw =  par.grid_A * par.ϕ; par.grid_Am =  par.grid_A*(1.0-par.ϕ)
 
         # grid for women's labor supply
-        par.grid_wlp=np.array([0.0,1.0]);par.num_wlp=len(par.grid_wlp)
+        par.grid_wlp=np.array([0.0,.6815,1.0]);par.num_wlp=len(par.grid_wlp)
         
         # women's human capital grid plus transition matrices for working full time (Πh_pt) and not working (Πh_pt)       
         par.grid_h = np.flip(np.linspace(-par.num_h*par.drift,0.0,par.num_h))#0 position is best
@@ -139,7 +139,7 @@ class HouseholdModelClass(EconModelClass):
         par.grid_power = usr.grid_fat_tails(par.power_min,par.power_max,par.num_power)
 
         # love grid and shock    
-        par.grid_love,par.Πl,par.Πl0= usr.addaco_nonst(par.T,par.σL,par.σL0,par.num_love)
+        par.grid_love,par.Πl,par.Πl0= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_love)
         
          
         # pre-computation of total consumption
@@ -597,8 +597,8 @@ def before_taste_shock(par,i_Vc,i_Vw,i_Vm,idx,wls,Vw,Vm):
     # get the probabilit of employment type in wls, based on couple utility choices
     i_idx=(slice(None),*idx)
     c=np.array([np.max(i_Vc[*i_idx[:-1],iA])/par.σ for iA in range(par.num_A)])# constant to avoid overflow
-    v_couple=par.σ*(c+np.log(np.sum(np.exp(i_Vc[i_idx]/par.σ-c),axis=0)))
-    wls[i_idx]=np.exp(i_Vc[i_idx]/par.σ-v_couple/par.σ) 
+    v_couple=par.σ*np.euler_gamma+par.σ*(c+np.log(np.sum(np.exp(i_Vc[i_idx]/par.σ-c),axis=0)))
+    wls[i_idx]=np.exp(i_Vc[i_idx]/par.σ-(v_couple-par.σ*np.euler_gamma)/par.σ) 
     
     # now the value of making the choice: see Shepard (2019), page 11
     Vw[idx]=v_couple+(1.0-par.grid_power[idx[2]])*np.sum(wls[i_idx]*(i_Vw[i_idx]-i_Vm[i_idx]),axis=0)
@@ -698,11 +698,8 @@ def simulate_lifecycle(sim,sol,par):
     love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;
     xw=sim.xw;xm=sim.xm;Cw=sim.Cw;Cm=sim.Cm;
     Vsm=sim.Vsm;Vsw=sim.Vsw;Vcm=sim.Vcm;Vcw=sim.Vcw;
-    
-    interp2d = lambda a,b,c : linear_interp.interp_2d(par.grid_power,par.grid_A,a,b,c)
-    interp1d = lambda a,b   : linear_interp.interp_1d(par.grid_A,               a,b) 
-    
-    for i in range(par.simN):
+
+    for i in prange(par.simN):
         for t in range(par.simT):
               
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation)   
@@ -732,8 +729,8 @@ def simulate_lifecycle(sim,sol,par):
                 # value of transitioning into singlehood
                 list_single = (Vsw[i,t],Vsm[i,t])
 
-                list_raw    = (np.array([interp1d(sol.Vw_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]),
-                               np.array([interp1d(sol.Vm_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]))
+                list_raw    = (np.array([linear_interp.interp_1d(par.grid_A,sol.Vw_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]),
+                                np.array([linear_interp.interp_1d(par.grid_A,sol.Vm_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]))
 
                 check_participation_constraints(par,power,np.array([power_lag[i,t]]),list_raw,list_single,[(i,t)],nosim=False)
                 
@@ -753,8 +750,8 @@ def simulate_lifecycle(sim,sol,par):
                     Vsw_ = linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
                     Vsm_ = linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
                        
-                    Vcw_ =  np.array([interp2d(sol.Vw_remain_couple[idx],powe,A[i,t]) for powe in par.grid_power])
-                    Vcm_ =  np.array([interp2d(sol.Vm_remain_couple[idx],powe,A[i,t]) for powe in par.grid_power])
+                    Vcw_ =  np.array([linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vw_remain_couple[idx],powe,A[i,t]) for powe in par.grid_power])
+                    Vcm_ =  np.array([linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vm_remain_couple[idx],powe,A[i,t]) for powe in par.grid_power])
                     
                     #Do Nash bargaining to decide whether to marry and eventually set initial Pareto wight
                     vcwi,vcmi ,power[i,t],couple[i,t] = marriage_mkt(par,Vcw_,Vcm_,Vsw_,Vsm_)
@@ -767,18 +764,18 @@ def simulate_lifecycle(sim,sol,par):
                 #Store before renegotiations utilities
                 Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
                 Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
-                Vcw[i,t]=interp2d(sol.Vw_remain_couple[idx],power[i,t],A[i,t])
-                Vcm[i,t]=interp2d(sol.Vm_remain_couple[idx],power[i,t],A[i,t])
+                Vcw[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vw_remain_couple[idx],power[i,t],A[i,t])
+                Vcm[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vm_remain_couple[idx],power[i,t],A[i,t])
                 
 
                 # first decide about labor participation, given employment probabilities part_i and draw from [0,1] uniform shock_taste
-                part_i=np.array([interp2d(sol.remain_WLP[t,wls,*idx[1:]],power[i,t],A[i,t]) for wls in range(par.num_wlp)])
+                part_i=np.array([linear_interp.interp_2d(par.grid_power,par.grid_A,sol.remain_WLP[t,wls,*idx[1:]],power[i,t],A[i,t]) for wls in range(par.num_wlp)])
                 wlp[i,t]=usr.binary_search_event(part_i, sim.shock_taste[i,t])
                 
              
                 # optimal consumption allocation if couple (note use of the updated index)
                 sol_C_tot = sol.i_C_tot_remain_couple[t,wlp[i,t],*idx[1:]]
-                C_tot[i,t] = interp2d(sol_C_tot,power[i,t],A[i,t])
+                C_tot[i,t] = linear_interp.interp_2d(par.grid_power,par.grid_A,sol_C_tot,power[i,t],A[i,t])
 
                 # update end-of-period states
                 M_resources= M_resources_raw[wlp[i,t]] 
@@ -807,7 +804,7 @@ def simulate_lifecycle(sim,sol,par):
                 Cm[i,t],xw[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.ϕ1,par.ϕ2,par.α1,par.α2,par.θ,par.λ,par.tb)
 
                 #Labor supply
-                #wlp[i,t]=par.num_wlp-1 if t<par.Tr else 0
+                wlp[i,t]=par.num_wlp-1 if t<par.Tr else 0
                 
                 # update end-of-period states
                 Mw = par.R*Aw[i,t] + incw[i,t] # total resources woman

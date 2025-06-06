@@ -248,22 +248,22 @@ def selection(m,par,name):
 ##################################################
 #Solve and simulate the benchmark model
 ##################################################
-xc=np.array([0.62304791, 0.02951767, 0.03566191, 0.74445101, 0.49170177])
-xc=np.array([0.59711125, 0.08309608, 0.07246665, 0.75837416, 0.50298593])
+
+#Initialize seed 
+np.random.seed(10) 
+ 
+#Create sample with replacement 
+N=10_000#sample size 
+
+xc=np.array([0.46874957, 0.05944867, 0.06511688, 0.78126218, 0.46638862])
 
 
-specs = {'model 1':{'latexname':'EGM2', 'par':{'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]}}}
-MB = brg.HouseholdModelClass(name='model 1',par=specs['model 1']['par'])
-MB.spec = specs['model 1']
-MB.par.θ=xc[0] 
-MB.par.meet=xc[1]
-MB.par.λ_grid = np.ones(MB.par.T)*xc[1] 
-MB.par.grid_love,MB.par.Πl,MB.par.Πl0= usr.addaco_nonst(MB.par.T,xc[2],xc[2],MB.par.num_love)    
-MB.par.α2=xc[3] 
-MB.par.α1=1.0-xc[3]
-MB.par.γ=xc[4]
+par = {'simN':N,'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]} 
+MB = brg.HouseholdModelClass(par=par)  
 MB.solve()
 MB.simulate()
+
+
 
 
 
