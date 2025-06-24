@@ -9,7 +9,7 @@ import numpy as np
 import Bargaining_numba as brg  
 import UserFunctions_numba as usr 
 import dfols 
-
+import pandas as pd
  
 #Initialize seed 
 np.random.seed(10) 
@@ -20,19 +20,29 @@ N=10_000#sample size
 #Root
 root='C:/Users/32489/Dropbox/Family Risk Sharing'
 
+
+baseline_sample=np.array(pd.read_excel(root+'/Output files/data_sample.csv'))
+
+pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
+indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
+final_sample= baseline_sample[:,1:][indexes] 
+
+age_initial=final_sample[:,0]
+age_final=final_sample[:,1]
+married_initial=final_sample[:,2]
+
 # POints: [θ,λ,σL,α2,γ]
 xc=np.array([0.46874957, 0.05944867, 0.06511688, 0.78126218, 0.46638862])
-xl=np.array([0.20,0.004,0.0001,0.50,0.3]) 
-xu=np.array([0.95,0.9,0.35,0.85,0.85]) 
+xc=np.array([0.29749257, 0.11708597, 0.35,       0.85,       0.3 ])
+xc=np.array([0.4264216 , 0.09909561, 0.18060578, 0.96689822, 0.23019184])
+xl=np.array([0.20,0.004,0.0001,0.50,0.1]) 
+xu=np.array([0.95,0.9,0.99,0.99,0.85]) 
 
 
 #Parametrize the model 
 par = {'simN':N,'θ': xc[0], 'meet':xc[1],'σL0':xc[2],'σL':xc[2],'α2':xc[3],'α1':1.0-xc[3],'γ':xc[4]} 
 model = brg.HouseholdModelClass(par=par)  
 
-model.solve()
-model.simulate()
-M=model
  
 #Function to minimize 
 def q(pt,tables=False): 
@@ -56,34 +66,52 @@ def q(pt,tables=False):
         M.solve() 
         M.simulate() 
          
-       
+
+        ######################################
+        #Sample selection
+        ######################################
+        
+        Sage_initial=(np.arange(M.par.simN),age_initial)
+        Sage_final=(np.arange(M.par.simN),age_final)
+        
+        age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh 
+        wasmarried=np.repeat(M.sim.couple[Sage_initial][:,None],M.par.T,axis=1)
+        
+        sample = (wasmarried==married_initial[:,None]) & (age>=age_initial[:,None]) & (age<=age_final[:,None])
+        
          
         ######################################
         #Moments here
         ######################################
-        wife_empl = np.mean(M.sim.WLP[:,7:M.par.Tr][M.sim.couple[:,7:M.par.Tr]==1]>0)        
-        ever_married = np.mean(np.cumsum(M.sim.couple[:,7:M.par.Tr]==1,axis=1)[:,14]>0) 
-        ever_divorced = np.mean(np.cumsum((M.sim.couple_lag[:,7:M.par.Tr]==1) & (M.sim.couple[:,7:M.par.Tr]==0),axis=1)[:,14]>0) 
-        expenditure_wife_share=np.mean((M.sim.Cw/(M.sim.Cw+M.sim.Cm))[:,7:M.par.Tr][M.sim.couple[:,7:M.par.Tr]==1])
-        expenditure_x_share=np.mean((M.sim.xw/M.sim.C_tot)[:,7:M.par.Tr][M.sim.couple[:,7:M.par.Tr]==1])
+        wife_empl = np.mean(M.sim.WLP[sample][M.sim.couple[sample]==1]>0)        
+        
+        
+        ismarried,isdivorced=np.zeros((2,M.par.simN,M.par.T),dtype=bool)
+        ismarried[sample]=M.sim.couple[sample]
+        isdivorced[sample]=(M.sim.couple[sample]==0) & (M.sim.couple_lag[sample]==1)
+        
+        ever_married = (np.cumsum(M.sim.couple,axis=1)>0)[Sage_final].mean()       
+        ever_divorced = (np.cumsum(isdivorced,axis=1))[Sage_final].mean()      
+        expenditure_wife_share=np.mean((M.sim.Cw/(M.sim.Cw+M.sim.Cm))[sample][M.sim.couple[sample]==1])
+        expenditure_x_share=np.mean((M.sim.xw/M.sim.C_tot)[sample][M.sim.couple[sample]==1])
     
  
                         
-        fit =((wife_empl-0.596 )/.596)**2+((ever_married-.718)/.718)**2+((ever_divorced-.0836427)/.0836427)**2+((expenditure_wife_share-0.347/.347))**2+((expenditure_x_share-0.785)/.785)**2
+        fit =((wife_empl-0.596 )/.596)**2+((ever_married-.768)/.768)**2+((ever_divorced-.0976)/.0976)**2+((expenditure_wife_share-0.347/.347))**2+((expenditure_x_share-0.785)/.785)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
         print('Simulated moments are {}'.format([wife_empl,ever_married,ever_divorced,expenditure_wife_share,expenditure_x_share]))
         
         ###################################
         # Non-targeted moments
         ###################################
-        gender_gap_earnings=((M.par.grid_wlp[M.sim.WLP[:,7:M.par.Tr]]*M.sim.incw[:,7:M.par.Tr])[M.sim.WLP[:,7:M.par.Tr]>0]).mean()/M.sim.incm[:,7:M.par.Tr].mean()
-        share_full_time=(M.sim.WLP[:,7:M.par.Tr][(M.sim.WLP[:,7:M.par.Tr]>0) & (M.sim.couple[:,7:M.par.Tr]==1)]==(M.par.num_wlp-1)).mean()
+        gender_gap_earnings=((M.par.grid_wlp[M.sim.WLP[sample]]*M.sim.incw[sample])[M.sim.WLP[sample]>0]).mean()/M.sim.incm[sample].mean()
+        share_full_time=(M.sim.WLP[sample][(M.sim.WLP[sample]>0) & (M.sim.couple[sample]==1)]==(M.par.num_wlp-1)).mean()
         
         print('Simulated moments are {}'.format([gender_gap_earnings,share_full_time]))
         
         if tables:tables(pt,root,ever_divorced,ever_married,expenditure_x_share,wife_empl,expenditure_wife_share,gender_gap_earnings,share_full_time)
       
-        return [((wife_empl-.596)/.596),((ever_married-.718)/.718),((ever_divorced-.0836427)/.0836427),((expenditure_wife_share-0.347)/0.347),((expenditure_x_share-0.785)/0.785)]   
+        return [((wife_empl-.596)/.596),((ever_married-.768)/.768),((ever_divorced-.0976)/.0976),((expenditure_wife_share-0.347)/0.347),((expenditure_x_share-0.785)/0.785)]   
      
     except:
 

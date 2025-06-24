@@ -25,7 +25,8 @@ def home_good(x,θ,λ,tb,couple,ishom):
 @njit(cache=cache)
 def util(c_priv,c_pub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=0.0,ishom=0.0):
     homegood=home_good(c_pub,θ,λ,tb,couple=couple,ishom=ishom)
-    return ((α1*c_priv**ϕ1 + α2*homegood**ϕ1)**ϕ2)/(1.0-ρ)+love
+    #return ((α1*c_priv**ϕ1 + α2*homegood**ϕ1)**ϕ2)/(1.0-ρ)+love
+    return ((α1*c_priv**(1-ϕ1)/(1-ϕ1) + α2*homegood**(1-ϕ2)/(1-ϕ2)))+love
 
  
 @njit(cache=cache)  
@@ -68,7 +69,7 @@ def income_single(par,t,ih,iz,assets,women=True):
     tax_income = (labor_income) -par.Λ*(labor_income)**(1-par.τ)#taxes(labor_income,s=True)# 
   
      
-    return labor_income-tax_income
+    return labor_income-tax_income,labor_income
     
     
 @njit(cache=cache)
@@ -137,6 +138,18 @@ def intraperiod_allocation_single(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
     C_priv = optimizer(lambda x,y,args:-util(x,y-x,*args),1.0e-6, C_tot - 1.0e-6,args=(C_tot,args))[0]
     
     return C_priv,C_tot - C_priv#=C_pub
+
+
+@njit 
+def couple_root(x,m,powe,ϕ1,ϕ2,α1,α2,θ,λ,tb,ishom): 
+     
+   
+    Ω = (powe**(1/ϕ1)+(1-powe)**(1/ϕ1))**ϕ1 
+    home_time = (2*tb+ishom*(1-tb)) 
+    #return α1*Ω*(m-x)**(-ϕ1) -α2*θ*(θ*x**λ+(1.0-θ)*home_time**λ)**((1-ϕ2-λ)/λ)*x**(λ-1) 
+    return α1*Ω*(m*(1-x))**(-ϕ1)*m -α2*θ*m*(θ*(m*x)**λ+(1.0-θ)*home_time**λ)**((1-ϕ2-λ)/λ)*x**(λ-1) 
+ 
+ 
 
 def labor_income(par,single=False): 
      

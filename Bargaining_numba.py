@@ -6,7 +6,7 @@ from numba import njit,prange,config
 import UserFunctions_numba as usr
 from quantecon.optimize.nelder_mead import nelder_mead
 import setup
-
+from quantecon.optimize.root_finding import bisect 
 
 upper_envelope=usr.create(usr.couple_time_utility)
 upp_env_single = upperenvelope.create(usr.single_time_util)
@@ -25,16 +25,16 @@ class HouseholdModelClass(EconModelClass):
         par.R = 1.03068
         par.β = 0.98# Discount factor
         
-        par.div_A_share = 0.5 # divorce share of wealth to wife
+        par.div_A_share = 0.5#0.5 # divorce share of wealth to wife
         
         par.full=False #dummy for full/limited commitment. if full commitment: renegotiation/divorce is illegal
 
         # Utility: CES aggregator or additively linear
-        par.ρ = 1.873#        # CRRA      
+        par.ρ = 1.873#873#        # CRRA      
         par.α1 = 0.65
         par.α2 = 0.35
-        par.ϕ1 = 0.43
-        par.ϕ2 = (1.0-par.ρ)/par.ϕ1
+        par.ϕ1 = 1.873#0.6#0.43
+        par.ϕ2 = 4.873#873#(1.0-par.ρ)/par.ϕ1
         
         # production of home good
         par.θ = 0.21 #weight on money vs. time to produce home good
@@ -42,7 +42,7 @@ class HouseholdModelClass(EconModelClass):
         par.tb = 0.326 #time spend on public goods by singles
         
         #Taste shock
-        par.σ = 0.0002 #taste shock applied to working/not working
+        par.σ = 0.00015 #taste shock applied to working/not working
         
         par.γ=0.5#woemn's relative power during nash bargaining
         
@@ -84,10 +84,12 @@ class HouseholdModelClass(EconModelClass):
  
         
         # productivity of men and women: sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks
-        par.σpm=0.0082 **0.5;par.σϵm= 0.0125**0.5;par.σ0m=  0.0338**0.5;
-        par.σpw= 0.00978 **0.5;par.σϵw=0.0137**0.5;par.σ0w= 0.1198**0.5;
-        par.σϵwm=0.00289 #correlation of transitory shocks
-       
+        par.σpm=0.0082**0.5;par.σϵm= 0.0125**0.5;par.σ0m=  0.0338**0.5;
+        par.σpw= 0.00978**0.5;par.σϵw=0.0137**0.5;par.σ0w= 0.1198**0.5;
+        par.σϵwm=0.0#0.00289 #correlation of transitory shocks
+        
+        
+     
         
                  
 
@@ -114,6 +116,7 @@ class HouseholdModelClass(EconModelClass):
         
     def setup_grids(self):
         par = self.par
+        
         
         #Grid for the pr. of meeting a partner in each t
         par.λ_grid = np.ones(par.T)*par.meet
@@ -229,6 +232,8 @@ class HouseholdModelClass(EconModelClass):
         sim.love = np.ones(shape_sim,dtype=np.int_)     # love
         sim.incw = np.nan + np.ones(shape_sim)          # w's income
         sim.incm = np.nan + np.ones(shape_sim)          # m's income
+        sim.incwg = np.nan + np.ones(shape_sim)          # w's gross income
+        sim.incmg = np.nan + np.ones(shape_sim)          # m's gross income
         sim.WLP = np.ones(shape_sim,dtype=np.int_)      # w's labor participation
         sim.ih = np.ones(shape_sim,dtype=np.int_)       # w's human capital
 
@@ -314,27 +319,58 @@ def solve_intraperiod(sol,par):
         grid_marg_u_s[i] = (forward - backward)/(2*ϵ)
   
     ################ Couples part ##########################   
-    icon=np.array([0.33,0.33])#initial condition, to be overwritten 
-    for iP in prange(par.num_power):      
-        for iwlp,wlp in enumerate(par.grid_wlp): 
-            for i,C_tot in enumerate(par.grid_Ctot): 
+    # icon=np.array([0.33,0.33])#initial condition, to be overwritten 
+    # for iP in prange(par.num_power):      
+    #     for iwlp,wlp in enumerate(par.grid_wlp): 
+    #         for i,C_tot in enumerate(par.grid_Ctot): 
                  
-                # initialize bounds and bargaining power 
-                bounds=np.array([[0.0,C_tot],[0.0,C_tot]]);power=par.grid_power[iP] 
+    #             # initialize bounds and bargaining power 
+    #             bounds=np.array([[0.0,C_tot],[0.0,C_tot]]);power=par.grid_power[iP] 
                  
-                # estimate optima private and public cons, unpack, update initial condition
-                res = nelder_mead(lambda c,p:usr.couple_util(c,*p)[0],icon*C_tot,bounds=bounds,args=((C_tot,power,1.0-wlp,*pars),)) 
-                Cw_priv[iwlp,iP,i]= res.x[0];Cm_priv[iwlp,iP,i]= res.x[1];C_pub[iwlp,iP,i] = C_tot - res.x.sum()             
-                icon=res.x/C_tot if i<par.num_Ctot-1 else np.array([0.33,0.33]) 
+    #             # estimate optima private and public cons, unpack, update initial condition
+    #             res = nelder_mead(lambda c,p:usr.couple_util(c,*p)[0],icon*C_tot,bounds=bounds,args=((C_tot,power,1.0-wlp,*pars),)) 
+    #             Cw_priv[iwlp,iP,i]= res.x[0];Cm_priv[iwlp,iP,i]= res.x[1];C_pub[iwlp,iP,i] = C_tot - res.x.sum()             
+    #             icon=res.x/C_tot if i<par.num_Ctot-1 else np.array([0.33,0.33]) 
        
-                # numerical derivative of util wrt total consumption C_tot, using envelope thm 
-                _,forw_w,forw_m = usr.couple_util(res.x/(C_tot)*(C_tot+ϵ),C_tot+ϵ,power,1.0-wlp,*pars) 
-                _,bakw_w,bakw_m = usr.couple_util(res.x/(C_tot)*(C_tot-ϵ),C_tot-ϵ,power,1.0-wlp,*pars) 
-                grid_marg_uw[iwlp,iP,i] = (forw_w - bakw_w)/(2*ϵ);grid_marg_um[iwlp,iP,i] = (forw_m - bakw_m)/(2*ϵ)
+    #             # numerical derivative of util wrt total consumption C_tot, using envelope thm 
+    #             _,forw_w,forw_m = usr.couple_util(res.x/(C_tot)*(C_tot+ϵ),C_tot+ϵ,power,1.0-wlp,*pars) 
+    #             _,bakw_w,bakw_m = usr.couple_util(res.x/(C_tot)*(C_tot-ϵ),C_tot-ϵ,power,1.0-wlp,*pars) 
+    #             grid_marg_uw[iwlp,iP,i] = (forw_w - bakw_w)/(2*ϵ);grid_marg_um[iwlp,iP,i] = (forw_m - bakw_m)/(2*ϵ)
                                   
-            #Create grid of couple's marginal util and inverse marginal utility  
-            grid_marg_u[iwlp,iP,:] = power*grid_marg_uw[iwlp,iP,:]+(1.0-power)*grid_marg_um[iwlp,iP,:] 
+    #         #Create grid of couple's marginal util and inverse marginal utility  
+    #         grid_marg_u[iwlp,iP,:] = power*grid_marg_uw[iwlp,iP,:]+(1.0-power)*grid_marg_um[iwlp,iP,:] 
+    #         grid_marg_u_for_inv[iwlp,iP,:]=np.flip(par.grid_marg_u[iwlp,iP,:])   
+            
+            
+    for iP in prange(par.num_power):       
+        for iwlp,wlp in enumerate(par.grid_wlp):  
+            for i,C_tot in enumerate(par.grid_Ctot):  
+                  
+                 
+                # initialize bounds and bargaining power  
+                power=par.grid_power[iP]  
+                mult = power**(1/par.ϕ1)/(power**(1/par.ϕ1)+(1-power)**(1/par.ϕ1)) 
+                 
+                parss=(par.ϕ1,par.ϕ2,par.α1,par.α2,par.θ,par.λ,par.tb)# (1.5, 1.5, 0.82797369, 0.17202631, 0.21, 0.19, 0.2)#
+               # usr.couple_root(0.01,10,power,*parss,1-wlp) 
+                 
+                ress=bisect(usr.couple_root,1e-18,1.0-1e-18, args=(C_tot,power,*parss,1-wlp))[0] 
+                C_pub[iwlp,iP,i]  = C_tot*ress 
+                 
+                Cw_priv[iwlp,iP,i] = (C_tot-C_pub[iwlp,iP,i])*mult 
+                Cm_priv[iwlp,iP,i] =  C_tot-C_pub[iwlp,iP,i]-Cw_priv[iwlp,iP,i] 
+                res = np.array([Cw_priv[iwlp,iP,i],Cm_priv[iwlp,iP,i]]) 
+ 
+                # numerical derivative of util wrt total consumption C_tot, using envelope thm  
+                _,forw_w,forw_m = usr.couple_util(res/(C_tot)*(C_tot+ϵ),C_tot+ϵ,power,1.0-wlp,*pars)  
+                _,bakw_w,bakw_m = usr.couple_util(res/(C_tot)*(C_tot-ϵ),C_tot-ϵ,power,1.0-wlp,*pars)  
+                grid_marg_uw[iwlp,iP,i] = (forw_w - bakw_w)/(2*ϵ);grid_marg_um[iwlp,iP,i] = (forw_m - bakw_m)/(2*ϵ) 
+                                   
+            #Create grid of couple's marginal util and inverse marginal utility   
+            grid_marg_u[iwlp,iP,:] = power*grid_marg_uw[iwlp,iP,:]+(1.0-power)*grid_marg_um[iwlp,iP,:]  
             grid_marg_u_for_inv[iwlp,iP,:]=np.flip(par.grid_marg_u[iwlp,iP,:])   
+            
+   
         
 #######################
 # SOLUTIONS - SINGLES #
@@ -424,7 +460,7 @@ def solve_single_egm(sol,par,t):
         for iz in prange(par.num_z):
             for ih in range(par.num_h):
 
-                resi = par.R*grid_Ai+usr.income_single(par,t,ih,iz,grid_Ai,women)
+                resi = par.R*grid_Ai+usr.income_single(par,t,ih,iz,grid_Ai,women)[0]
                 
                 if t==(par.T-1): 
                     
@@ -695,13 +731,14 @@ def simulate_lifecycle(sim,sol,par):
     
     # unpacking some values to help numba optimize
     A=sim.A;Aw=sim.Aw;Am=sim.Am;couple=sim.couple;power=sim.power;C_tot=sim.C_tot;Cm_tot=sim.Cm_tot;Cw_tot=sim.Cw_tot;couple_lag=sim.couple_lag;power_lag=sim.power_lag
-    love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;
+    love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;incwg=sim.incwg;incmg=sim.incmg
     xw=sim.xw;xm=sim.xm;Cw=sim.Cw;Cm=sim.Cm;
     Vsm=sim.Vsm;Vsw=sim.Vsw;Vcm=sim.Vcm;Vcw=sim.Vcw;
 
     for i in prange(par.simN):
         for t in range(par.simT):
-              
+ 
+        
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation)   
             Π = par.Πh[t][wlp[i,t-1]]                                                if t>0 else par.Πh[t][-1]
             ih[i,t] = usr.mc_simulate(ih[i,t-1],Π,sim.shock_h[i,t])                  if t>0 else sim.init_ih[i]            
@@ -715,7 +752,7 @@ def simulate_lifecycle(sim,sol,par):
 
             # indices and resources
             idx = (t,ih[i,t],iz[i,t],slice(None),love[i,t])
-            incw[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Aw[i,t],women=True);incm[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Am[i,t],women=False)          
+            incw[i,t],incwg[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Aw[i,t],women=True);incm[i,t],incmg[i,t]=usr.income_single(par,t,ih[i,t],iz[i,t],Am[i,t],women=False)          
             M_resources_raw, incmt,incwt = usr.resources_couple(par,t,ih[i,t],iz[i,t],A[i,t])
             
             # first check if they want to remain together and what the bargaining power will be if they do.
