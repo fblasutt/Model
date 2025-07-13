@@ -18,149 +18,177 @@ woman=setup.woman;man=setup.man
 # User-specified functions #
 ############################
 @njit(cache=cache)
-def home_good(x,θ,λ,tb,couple,ishom):
-    home_time=(2*tb+ishom*(1-tb)) if couple else tb
-    return (θ*x**λ+(1.0-θ)*home_time**λ)**(1.0/λ)
+def home_good(x,ν,ϕ,wedge,couple,ishom):
+    """"
+    Home goods Q production
+    """
+    home_time=(2*ϕ+ishom*(1-ϕ)) if couple else ϕ#!!! this should be ϕ*P^g_t 
+    return home_time**(1-ν)*x**ν
 
 @njit(cache=cache)
-def util(c_priv,c_pub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=0.0,ishom=0.0):
-    homegood=home_good(c_pub,θ,λ,tb,couple=couple,ishom=ishom)
-    #return ((α1*c_priv**ϕ1 + α2*homegood**ϕ1)**ϕ2)/(1.0-ρ)+love
-    return ((α1*c_priv**(1-ϕ1)/(1-ϕ1) + α2*homegood**(1-ϕ2)/(1-ϕ2)))+love
+def util(c_priv,d_pub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=0.0,ishom=0.0):
+    """
+    Intra-temporal utility function
+    """
+    Q=home_good(d_pub,ν,ϕ,wedge,couple=couple,ishom=ishom)
+
+    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge
 
  
 @njit(cache=cache)  
 def resources_couple(par,t,ih,iz,assets):      
-      
+    """
+    "This gives the cash in hand available to couple, resources, plus gross and net labor income
+    """
    
     izw=iz//par.num_zm;izm=iz%par.num_zw  
 
     #women earnings
-    yw= [par.grid_zw[t,izw,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)]
+    yw= np.array([par.grid_zw[t,izw,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)])
     
     #spousal deduction based on womens earnings
-    SpDed=[np.maximum(par.d0+par.d1*yw[wlp]+par.d2*yw[wlp]**2,0.0) for wlp in range(par.num_wlp)]
+    SpDed=np.array([np.maximum(par.d0+par.d1*yw[wlp]+par.d2*yw[wlp]**2,0.0) for wlp in range(par.num_wlp)])
     
-    #men income and taxable income
-    yh = par.grid_zm[t,izm,ih]
-    yh_taxable =   [yh -SpDed[wlp] for wlp in range(par.num_wlp)]
     
-    #nota that taxation is individual 
-    tax = [yh_taxable[wlp]+yw[wlp] -  par.Λ*(yh_taxable[wlp])**(1-par.τ)- par.Λ*(yw[wlp])**(1-par.τ) for wlp in range(par.num_wlp)]
-    
+    if t<par.Tr:
+        
+        #men income and taxable income
+        yh = par.grid_zm[t,izm,ih]
+        yh_taxable =   np.array([yh -SpDed[wlp] for wlp in range(par.num_wlp)])
+        
+        #nota that taxation is individual 
+        taxw=np.array([        yw[wlp] -  (par.Λ)*        (yw[wlp])**(1-par.τ) for wlp in range(par.num_wlp)])
+        taxm=np.array([yh_taxable[wlp] -  (par.Λ)*(yh_taxable[wlp])**(1-par.τ) for wlp in range(par.num_wlp)])
+        
+    else:
+        
+        #men income and taxable income
+        yh = par.grid_zm[t,izm,ih]
+        yh_taxable =   np.array([yh -SpDed[-1] for wlp in range(par.num_wlp)])
+        
+        #nota that taxation is individual 
+        taxw=np.array([        yw[-1] -  (par.Λ)*        (yw[-1])**(1-par.τ) for wlp in range(par.num_wlp)])
+        taxm=np.array([yh_taxable[-1] -  (par.Λ)*(yh_taxable[-1])**(1-par.τ) for wlp in range(par.num_wlp)])
+        
+        
+        
+    tax = taxw+taxm
+    resources = [par.R*assets + (yh +yw[wlp]-tax[wlp]) for wlp in range(par.num_wlp)]
          
-    #resources depending on employment  
-    if t>=par.Tr: resources = [par.R*assets + (yh +yw[-1]-tax[-1])   for wlp in range(par.num_wlp)]
-    else:         resources = [par.R*assets + (yh +yw[wlp]-tax[wlp]) for wlp in range(par.num_wlp)]
-      
-    
-    return resources, yh, yw
+    return resources,yh-taxm,yw-taxw,yh, yw,tax
 
 
 @njit(cache=cache)  
 def income_single(par,t,ih,iz,assets,women=True): 
-     
+    """"
+    This gives gross and net labor income of singles income
+    """ 
     
     iz_i=iz//par.num_zm if women else iz%par.num_zw 
     
      
-    labor_income =  par.grid_zw[t,iz_i,ih] if women else par.grid_zm[t,iz_i,ih]#without HC! 
+    labor_income =  par.grid_zw[t,iz_i,ih]*par.grid_wlp[-1] if women else par.grid_zm[t,iz_i,ih]#without HC! 
    
     tax_income = (labor_income) -par.Λ*(labor_income)**(1-par.τ)#taxes(labor_income,s=True)# 
   
-     
-    return labor_income-tax_income,labor_income
+    
+    
+    if women: return labor_income-tax_income+par.alimony,labor_income+par.alimony,tax_income
+    else:    return  labor_income-tax_income-par.alimony,labor_income-par.alimony,tax_income
     
     
 @njit(cache=cache)
-def couple_util(Cpriv,Ctot,power,ishom,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):#function to minimize
+def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,ϕ,wedge):#function to minimize
     """
         Couple's utility given private (Cpriv np.array(float,float)) 
         and total consumption Ctot (float). Note that love does
         not matter here, as this fun is used for intra-period 
         allocation of private and home consumption
     """
-    Cpub=Ctot-np.sum(Cpriv) if Ctot>np.sum(Cpriv) else 1e-15
-    Vw=util(Cpriv[0],Cpub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=True,ishom=ishom)
-    Vm=util(Cpriv[1],Cpub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=True,ishom=ishom)
+    Cpub=Ctot-np.sum(Cpriv) #if Ctot>np.sum(Cpriv) else 1e-15
+    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=True,ishom=ishom)
+    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=True,ishom=ishom)
     
     return np.array([power*Vw +(1.0-power)*Vm, Vw, Vm])
 
 @njit(cache=cache) 
-def single_time_util(Ctot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love=0.0,couple=0.0,ishom=0.0,γ=0.0): 
+def single_time_util(Ctot,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=0.0,ishom=0.0,γ=0.0): 
+    """
+    Single utility given resources Ctot allocated to consumption
+    """
      
-    c_priv,c_pub = intraperiod_allocation_single(Ctot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb) 
+    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,ϕ,wedge) 
      
-    return util(c_priv,c_pub,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb,love,couple,ishom) 
+    return util(c_priv,d_pub,ρ,χ,α,ν,ϕ,wedge,love,couple,ishom) 
      
 
-@njit(cache=cache)
-def marg_util(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
-    
-    share = 1.0/(1.0 + (α2/α1)**(1.0/(1.0-ϕ1)))
-    constant = α1*share**ϕ1+α2*(1.0-share)**ϕ1
-    return ϕ1*C_tot**((1.0-ρ)*ϕ1 -1.0)*constant**(1.0 - ρ)
-    
-    
-    
+
 @njit(cache=cache)
 def couple_time_utility(Ctot,par,sol,iP,wls,love,pars2):
     """
-        Couple's utility given total consumption Ctot (float)
+    Couple's utility given total consumption Ctot (float)
     """    
-    Cw_priv, Cm_priv, C_pub =\
-        intraperiod_allocation(Ctot,par.grid_Ctot,sol.pre_Ctot_Cw_priv[wls,iP],sol.pre_Ctot_Cm_priv[wls,iP]) 
+    Cw_priv, Cm_priv, d_pub =\
+        intraperiod_allocation(Ctot,par.grid_Ctot,sol.pre_Cw_priv[wls,iP],sol.pre_Cm_priv[wls,iP]) 
         
-    vw_new = util(Cw_priv,C_pub,*pars2,love,True,1.0-par.grid_wlp[wls])                       
-    vm_new = util(Cm_priv,C_pub,*pars2,love,True,1.0-par.grid_wlp[wls])
+    vw_new = util(Cw_priv,d_pub,*pars2,love,True,1.0-par.grid_wlp[wls])                       
+    vm_new = util(Cm_priv,d_pub,*pars2,love,True,1.0-par.grid_wlp[wls])
      
     return vw_new, vm_new
 
 
     
 @njit(cache=cache)
-def intraperiod_allocation(C_tot,grid_Ctot,pre_Ctot_Cw_priv,pre_Ctot_Cm_priv):
+def intraperiod_allocation(C_tot,grid_Ctot,pre_Cw_priv,pre_Cm_priv):
+    """
+    Given C_tot, find allocation in private and home goods expenditures
+    """
  
     #if vector: # interpolate pre-computed solution if C_tot is vector      
     lenn=1 if np.isscalar(C_tot) else len(C_tot)
     Cw_priv,Cm_priv=np.ones((2,lenn))    
-    linear_interp.interp_1d_vec(grid_Ctot,pre_Ctot_Cw_priv,C_tot,Cw_priv)
-    linear_interp.interp_1d_vec(grid_Ctot,pre_Ctot_Cm_priv,C_tot,Cm_priv)
+    linear_interp.interp_1d_vec(grid_Ctot,pre_Cw_priv,C_tot,Cw_priv)
+    linear_interp.interp_1d_vec(grid_Ctot,pre_Cm_priv,C_tot,Cm_priv)
 
     return Cw_priv, Cm_priv, C_tot - Cw_priv - Cm_priv #returns numpy arrays
         
 
 @njit(cache=cache)
-def intraperiod_allocation_single(C_tot,ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb):
+def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,ϕ,wedge):
     
-    #find private and public expenditure to max util
-    args=(ρ,ϕ1,ϕ2,α1,α2,θ,λ,tb)
+    """
+    Finds private and public expenditure to max util for singles
+    """
+    args=(ρ,χ,α,ν,ϕ,wedge)
     C_priv = optimizer(lambda x,y,args:-util(x,y-x,*args),1.0e-6, C_tot - 1.0e-6,args=(C_tot,args))[0]
     
-    return C_priv,C_tot - C_priv#=C_pub
+    return C_priv,C_tot - C_priv#=d_pub
 
 
 @njit 
-def couple_root(x,m,powe,ϕ1,ϕ2,α1,α2,θ,λ,tb,ishom): 
-     
-   
-    Ω = (powe**(1/ϕ1)+(1-powe)**(1/ϕ1))**ϕ1 
-    home_time = (2*tb+ishom*(1-tb)) 
-    #return α1*Ω*(m-x)**(-ϕ1) -α2*θ*(θ*x**λ+(1.0-θ)*home_time**λ)**((1-ϕ2-λ)/λ)*x**(λ-1) 
-    return α1*Ω*(m*(1-x))**(-ϕ1)*m -α2*θ*m*(θ*(m*x)**λ+(1.0-θ)*home_time**λ)**((1-ϕ2-λ)/λ)*x**(λ-1) 
+def couple_root(x,c,powe,ρ,χ,α,ν,ϕ,wedge,ishom): 
+    """
+    Finds the roote of the intra-period problem for couples
+
+    """
+    
+    m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))      
+    home_time = (2*ϕ+ishom*(1-ϕ)) 
+
+    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*home_time**((1-ν)*(1-χ))*x**(ν-ν*χ-1)
  
  
 
 def labor_income(par,single=False): 
-     
-    ###################
-    # Grids here
-    ##################
+    """
+    Construct grids and transition matrices for labor incomen using trends,
+    transitory and persistent shocks, and human capital shocks
+    """
     
     
     # Persistent shocks
-    Pw, PiPw, Pi0Pw =rouw_nonst(par.T,par.σpw,par.σ0w,par.num_pw) 
-    Pm, PiPm, Pi0Pm =rouw_nonst(par.T,par.σpm,par.σ0m,par.num_pm) 
+    Pw, PiPw, Pi0Pw =rouw_nonst(par.T,par.σzw,par.σ0w,par.num_pw) 
+    Pm, PiPm, Pi0Pm =rouw_nonst(par.T,par.σzm,par.σ0m,par.num_pm) 
     
     # Transitory shocks
     ρ=par.σϵwm/(par.σϵw*par.σϵm)#correlation between trasitory shocks
@@ -184,12 +212,12 @@ def labor_income(par,single=False):
             XTw[t,:,i]=(np.zeros(Pw[t].shape)[:,None]+gridw[None,:]).flatten()
             XPw[t,:,i]=(Pw[t][:,None]+np.zeros(gridw.shape)[None,:]).flatten()
             XHw[t,:,i] = par.grid_h[i] 
-            XDw[t,:,i] = par.t0w+par.t1w*t+par.t2w*t**2
+            XDw[t,:,i] = par.ι0w+par.ι1w*t+par.ι2w*t**2
             
             XTm[t,:,i]=(np.zeros(Pm[t].shape)[:,None]+gridm[None,:]).flatten()
             XPm[t,:,i]=(Pm[t][:,None]+np.zeros(gridm.shape)[None,:]).flatten()
             XHm[t,:,i] =  0.0
-            XDm[t,:,i] = par.t0m+par.t1m*t+par.t2m*t**2
+            XDm[t,:,i] = par.ι0m+par.ι1m*t+par.ι2m*t**2
             
 
     XXw=np.exp(XTw+XPw+XHw+XDw)
@@ -243,15 +271,11 @@ def build_directly(Pia, Pib, Pic, Pid):
     return result_tensor.reshape(total_states, total_states)
 
    
-#function to compute pension
 def pens(value,p_b,κ):
-    
- 
-    #Matters only income below threshold 
-    valuef=value.copy()
-
-    
-    return p_b+κ*valuef
+    """
+    "Returns pernsion given pre retirement earnings value
+    """
+    return p_b+κ*value
 
 
 ###########################
@@ -286,6 +310,11 @@ def normcdf_ppf(z): return norm.ppf(z,0.0,1.0)
         
 def addaco_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=50,mean=np.array([0.0],)):
   
+    """
+    Creates the grid and transiton matrices of a non-stationary AR(1) process using
+    the Adda and Cooper methodology
+    """
+     
     if mean.shape[0]!=T-1:mean=np.zeros(T-1) 
     # start with creating list of points
     sd_z = sd_rw(T,sigma_persistent,sigma_init)
@@ -338,6 +367,9 @@ def addaco_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=50,mean=np.array
     return X, Pi, Pi0   
 
 def rouw_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=10): 
+    """
+    This generates one-period Rouwenhorst transition matrix and grid
+    """
     
     sd_z = sd_rw(T,sigma_persistent,sigma_init) 
     sd_z0 = np.array([np.sqrt(sd_z[t]**2-sigma_init**2) for t in range(T)]) 
@@ -355,8 +387,11 @@ def rouw_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=10):
 
 
 def rouw_nonst_one(sd0,sd1,npts):
-   
-    # this generates one-period Rouwenhorst transition matrix
+    
+    """
+    This generates one-period Rouwenhorst transition matrix
+    """
+    
     assert(npts>=2)
     pi0 = 0.5*(1+(sd0/sd1))
     Pi = np.array([[pi0,1-pi0],[1-pi0,pi0]])

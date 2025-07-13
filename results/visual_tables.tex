@@ -17,6 +17,7 @@
 \DeclareUnicodeCharacter{20AC}{\EUR{}}
 \usepackage[normalem]{ulem}
 
+
 %opening
 \title{`Family Risk Sharing'\\`When the Shock Hits the Knot: Individual Consumption Insurance Among Spouses'\\`When the Shock Hits the Knot: bargaining and family risk sharing'}
 
@@ -436,21 +437,90 @@ Something we have learned
 	\caption{Earnings to consumption pass-through, using...}
 	\label{table:persinc}
 	\begin{threeparttable}[t]\centering
-		\begin{tabular*}{\textwidth}{l@{\extracolsep{\textwidth minus \textwidth}}cccc}
+		\begin{tabular*}{\textwidth}{l@{\extracolsep{\textwidth minus \textwidth}}ccccc}
 			\toprule
-			& Husband Exp & Wife Exp & Wife share  \\[0.5ex]
-			&  (1)& (2) & (3)   \\[0.5ex]
-			\midrule		
-			
+			& Husband Exp & Wife Exp & Common Exp & Wife share   \\[0.5ex]
+			&  (1)& (2) & (3) & (4)    \\[0.5ex]
+			\midrule					
 		\input{elasticity_BPP_model_vs_data} 
-			
-			
-			
-			
 			\\[-2.5ex] 
 		\end{tabular*}
-		
+				\begin{tablenotes}[flushleft]
+			{\item \textsc{Notes}: Simulations: \textbf{bold}; data: \textcolor{red}{red}. 
+			}
+		\end{tablenotes}
 	\end{threeparttable}
 \end{table}
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%BPP vs real shocks
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{BPP_true.eps} 
+	\caption{Pass-throughs: BPP vs. model-implied values. Circles (triangles) represent persistent (transitory) shocks. The outer (inner) color indicates the gender of the individual receiving the shock; the inner color corresponds to the individual whose consumption response is being measured.}
+	\label{fig:BPP_true}
+\end{figure}
+
+	
+
+
+
+	
+\begin{table}[htbp]
+	\centering
+	\caption{Individual Husband Consumption Insurance to Husband Persistent Shocks, decomposition}
+	\begin{tabularx}{\textwidth}{l *{7}{>{\centering\arraybackslash}X}}
+		\toprule
+		& \multicolumn{4}{c}{\textit{Household} consumption insurance} & & & \\
+		\cmidrule(lr){2-5}
+		& \multicolumn{2}{c}{Wife labor supply} & & &  &  & \\
+		\cmidrule(lr){2-3}
+		& Passive & Active & Tax & Savings & Private Exp. share & Reneg. & Total Insurance \\
+		\midrule
+		\addlinespace
+		\input{Baselineexp}\\
+		\input{Alimony1exp}\\
+		\input{Alimony2exp}\\
+		\addlinespace
+		\bottomrule
+	\end{tabularx}
+	\label{table:insurance_decomposition_alimony}
+\end{table}
+
+	
+		
+	\begin{table}[htbp]
+		\centering
+		\caption{Individual Husband Consumption Insurance to Husband Persistent Shocks, decomposition}
+		\begin{tabularx}{\textwidth}{l *{7}{>{\centering\arraybackslash}X}}
+			\toprule
+			& \multicolumn{4}{c}{\textit{Household} consumption insurance} & & & \\
+			\cmidrule(lr){2-5}
+			& \multicolumn{2}{c}{Wife labor supply} & & &  &  & \\
+			\cmidrule(lr){2-3}
+			& Passive & Active & Tax & Savings & Private Exp. share & Reneg. & Total Insurance \\
+			\midrule
+			\addlinespace
+			 \multicolumn{8}{l}{\textit{A. Limited Commitment}}\\[1.5ex]
+			\input{Baselineexp}\\
+			\input{LowGG1exp}\\
+			\input{LowGG2exp}\\[3.5ex]
+			
+			 \multicolumn{8}{l}{\textit{B. Full Commitment}}\\[1.5ex]
+			\input{Baselinefullexp}\\
+			\input{LowGG1fullexp}\\
+			\input{LowGG2fullexp}\\
+			\addlinespace
+			\bottomrule
+		\end{tabularx}
+		\label{tabble:insurance_decomposition_gwg}
+							\begin{tablenotes}[flushleft]
+			{\item \textsc{Notes}: GWG = gender wage gap. 
+			}
+		\end{tablenotes}
+	\end{table}
+	
 \end{document}
+
