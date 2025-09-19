@@ -333,25 +333,68 @@ def solve_intraperiod(sol,par):
 # SOLUTIONS - SINGLES #
 #######################
 
-@njit(parallel=parallel)
-def integrate_single(sol,par,t):
-    Ew_nomeet,Em_nomeet=np.zeros((2,par.num_h,par.num_z,par.num_A)) 
+# @njit(parallel=parallel)
+# def integrate_single(sol,par,t):
+#     Ew_nomeet,Em_nomeet=np.zeros((2,par.num_h,par.num_z,par.num_A)) 
      
-    # 1. Expected value if not meeting a partner
-    for iA in prange(par.num_A):
-        for iz in range(par.num_z):
-            for ih in range(par.num_h):
-                for jz in range(par.num_z):
+#     # 1. Expected value if not meeting a partner
+#     for iA in prange(par.num_A):
+#         for iz in range(par.num_z):
+#             for ih in range(par.num_h):
+#                 for jz in range(par.num_z):
                                       
-                    Ew_nomeet[ih,iz,iA] += sol.Vw_single[t+1,:,jz,iA] @ par.Πh[t][-1,:,ih] * par.Πs[t][jz,iz]
-                    Em_nomeet[ih,iz,iA] += sol.Vm_single[t+1,:,jz,iA] @ par.Πh[t][-1,:,ih] * par.Πs[t][jz,iz]                    
+#                     Ew_nomeet[ih,iz,iA] += sol.Vw_single[t+1,:,jz,iA] @ par.Πh[t][-1,:,ih] * par.Πs[t][jz,iz]
+#                     Em_nomeet[ih,iz,iA] += sol.Vm_single[t+1,:,jz,iA] @ par.Πh[t][-1,:,ih] * par.Πs[t][jz,iz]                    
        
-    # 2. If we ever add probaility of meeting partners, it should be here
+#     # 2. If we ever add probaility of meeting partners, it should be here
                             
-    # 3. Return expected value given meeting probabilities                                              
-    return Ew_nomeet,Em_nomeet
+#     # 3. Return expected value given meeting probabilities                                              
+#     return Ew_nomeet,Em_nomeet
 
+@njit(parallel=parallel)
+def integrate_single(sol, par, t):
+    """
+    Compute the expected values of being single, 
+    by integrating over all possible next-period states.
 
+    Original version looped over all (iA, iz, ih, jz) and performed
+    non-contiguous 1D dot products in the innermost loop.  
+    This version restructures the computation to:
+        - Remove the jz loop from the hot path.
+        - Use contiguous arrays for BLAS-friendly GEMV operations, where 
+        BLAS is Basic Linear Algebra Subprograms and GEMV stands for GEneral Matrix–Vector multiplication
+        - Minimize creation of temporaries inside loops.
+    """
+    
+    # Output arrays: Ew_nomeet[ih, iz, iA] and Em_nomeet[ih, iz, iA]
+    Ew_nomeet  = np.zeros((par.num_h, par.num_z, par.num_A))
+    Em_nomeet  = np.zeros((par.num_h, par.num_z, par.num_A))
+
+    # -------------------------
+    # Precompute contiguous versions of Πh and Πs for fast column access
+    # -------------------------
+
+    # Make column access fast once per call (Fortran-order = contiguous columns)
+    H = np.asfortranarray(par.Πh[t][-1, :, :])   # (2, 2)
+    S = np.asfortranarray(par.Πs[t])             # (81, 81)
+
+    # Parallelize across iA
+    for iA in prange(par.num_A):
+        # Ensure fast row access for V* (C-order = contiguous rows)
+        Vw = np.ascontiguousarray(sol.Vw_single[t+1, :, :, iA])  # (2, 81)
+        Vm = np.ascontiguousarray(sol.Vm_single[t+1, :, :, iA])  # (2, 81)
+
+        # Step (a): collapse h (2) -> produce per-z vectors for each ih in one go
+        # V*.T: (81, 2) @ H: (2, 2) -> Uw/Um: (81, 2)
+        Uw = Vw.T @ H
+        Um = Vm.T @ H
+
+        # Step (b): collapse z with one GEMM
+        # Uw.T: (2, 81) @ S: (81, 81) -> (2, 81)
+        Ew_nomeet[:, :, iA] = Uw.T @ S
+        Em_nomeet[:, :, iA] = Um.T @ S
+
+    return Ew_nomeet, Em_nomeet
     
 #@njit(parallel=parallel)
 def solve_single_egm(sol,par,t):

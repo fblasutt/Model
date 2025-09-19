@@ -4,6 +4,12 @@ Created on Fri Feb 23 15:31:56 2024
  
 @author: 32489 
 """ 
+
+
+# Notes on changes to the file:
+# - Updated imports to include getpass for user identification. Choose the root directory based on the user.
+# - I get the value error "sim.init_z has dtype int32, should be int64" when running the code. 
+#   Changed the dtype of indexes and izm, izw to int64 to avoid this error.
  
 import numpy as np 
 import Bargaining_numba as brg  
@@ -11,12 +17,21 @@ import UserFunctions_numba as usr
 import pandas as pd
 from reg_cons_insurance import insurance
 import matplotlib.pyplot as plt
- 
+import getpass
+
 #Initialize seed 
 np.random.seed(10) 
  
 #Root
-root='C:/Users/32489/Dropbox/Family Risk Sharing'
+# root='C:/Users/32489/Dropbox/Family Risk Sharing'
+
+user = getpass.getuser()
+if user == "sara":
+      root = '/Users/sara/Dropbox/Family Risk Sharing'
+elif user == "32489":
+      root = '/Users/32489/Dropbox/Family Risk Sharing'
+else:
+      raise RuntimeError(f"Unknown user: {user}")
 
 
 #Create sample with replacement 
@@ -27,7 +42,8 @@ N=10_000#sample size
 baseline_sample=np.array(pd.read_excel(root+'/Output files/data_sample.csv'))
 
 pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
-indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
+# indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
+indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int64)-1
 final_sample= baseline_sample[:,1:][indexes] 
 
 age_initial=final_sample[:,0]
@@ -58,9 +74,14 @@ param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
 model.sim.init_power=param/(1.0+param)
 
 #Set the initial income gridpoints for income, the closest to our value
-izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+# izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+# izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
+# izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+# izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
+# model.sim.init_z=izm*model.par.num_zm+izw
+izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int64)
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
-izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int64)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
 model.sim.init_z=izm*model.par.num_zm+izw
 

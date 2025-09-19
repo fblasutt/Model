@@ -115,6 +115,7 @@ def budget(x,i):
 #Find the level of Λ so that goivernment surplus is the same than at baseline
 gridΛ=np.array([optimize.bisect(budget,0.87,1.03,args=(i,),xtol=0.001) for i in range(1,len(gridτ))])
 gridΛ=np.append(M.par.Λ,gridΛ)
+#array([0.92    , 0.946875, 0.964375])
 ############################################################################
 #                        BALANCE THE BUDGET
 ########################################################################

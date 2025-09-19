@@ -13,17 +13,16 @@ from reg_cons_insurance import insurance
 import dfols 
 import getpass
 
+ 
 #Initialize seed 
 np.random.seed(10) 
  
 #Root
-# root='C:/Users/32489/Dropbox/Family Risk Sharing'
-
 user = getpass.getuser()
 if user == "sara":
-      root = '/Users/sara/Dropbox/Family Risk Sharing'
+      root = '/Users/sara/Dropbox/Family Risk Sharing/Model'
 elif user == "32489":
-      root = '/Users/32489/Dropbox/Family Risk Sharing'
+      root = 'C:/Users/32489/Dropbox/Family Risk Sharing'
 else:
       raise RuntimeError(f"Unknown user: {user}")
 
@@ -112,9 +111,8 @@ def q(pt,table=False):
         
         # This sample will be used for pass throughs (if sample, BPP persistent will not work)
         sample_reg= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) 
-        sample_reg_1= np.roll(sample_reg,1,axis=1)
         
-        sm   = (M.sim.couple[sample_reg_1]==1) & (M.sim.couple[sample_reg]==1)
+         
         ######################################
         #Moments here
         ######################################       
@@ -124,10 +122,10 @@ def q(pt,table=False):
         expenditure_x_share=np.mean((M.sim.dw/M.sim.C_tot)[sample_c])
         
         #construct regression of changes in consumption to changes in 
-        ΔC =np.log(M.sim.C_tot[sample_reg_1])  -np.log(M.sim.C_tot[sample_reg])
-        Δd=np.log(M.sim.dw[sample_reg_1])  -np.log(M.sim.dw[sample_reg])
+        ΔC =np.log(M.sim.C_tot[sample_c1])  -np.log(M.sim.C_tot[sample_c])
+        Δd=np.log(M.sim.dw[sample_c1])  -np.log(M.sim.dw[sample_c])
         
-        βdC=np.cov(ΔC[sm],Δd[sm])[0,1]/np.var(ΔC[sm])#np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
+        βdC=np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
     
      
                         
@@ -169,8 +167,8 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
         
     
         #Pass-throughs when the shock hits the husband (pass_husband) or wife (pass_wife)
-        pass_husband={'tot':numbers[0],'com':numbers[1],'hus':numbers[2],'wif':numbers[3],'wif_rel':numbers[4]}
-        pass_wife   ={'tot':numbers[5],'com':numbers[6],'hus':numbers[7],'wif':numbers[8],'wif_rel':numbers[9]}
+        pass_husband={'tot':numbers[0],'com':numbers[1],'child':numbers[2],'hus':numbers[3],'wif':numbers[4],'wif_rel':numbers[5]}
+        pass_wife   ={'tot':numbers[6],'com':numbers[7],'child':numbers[8],'hus':numbers[9],'wif':numbers[10],'wif_rel':numbers[11]}
         
         return pass_husband,pass_wife
 
@@ -235,9 +233,9 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
     
     
     # Compares passthroughs in the data and in the model
-    PHp,PWp=simple_extract(root+'/Empirical analysis/Tables/elasticity_persistent_earnings.txt')
-    PHt,PWt=simple_extract(root+'/Empirical analysis/Tables/elasticity_transitory_earnings.txt')
-    PHa,PWa=simple_extract(root+'/Empirical analysis/Tables/elasticity_all_earnings.txt')
+    PHp,PWp=simple_extract(root+'/Tables/elasticity_persistent_earnings.txt')
+    PHt,PWt=simple_extract(root+'/Tables/elasticity_transitory_earnings.txt')
+    PHa,PWa=simple_extract(root+'/Tables/elasticity_all_earnings.txt')
     
     # Table with pass throughs in the data and in the model
     table=r'...any husband shocks & \textbf{'+p33(B['indc']['all_m_m'])+'}/\\textcolor{red}{'+PHa['hus']+'} & \\textbf{'+p33(B['indc']['all_m_w'])+'}/\\textcolor{red}{'+PHa['wif']+'} & \\textbf{'+p33(B['dins']['all_m'])+'}/\\textcolor{red}{'+PHa['com']+'}  & \\textbf{'+p33(B['w_sh']['all_m'])+'}/\\textcolor{red}{'+PHa['wif_rel']+'} \\\\ '+\
@@ -260,7 +258,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
           r'Estimated Parameters &  & Value & Target Moment  \\ '+\
           r' \midrule '+\
           r'Match quality shock, St. dev.         & $\sigma_{\psi}$   & '+p42(pt[1])+' & Divorce rate, all women'+' \\\\'+\
-          r'Single-Couple wedge                     & $Wedge$          & '+p42(pt[4])+' & Divorce rate, younger women'+'  \\\\'+\
+          r'Singl-Couple wedge                     & $Wedge$          & '+p42(pt[4])+' & Divorce rate, younger women'+'  \\\\'+\
           r'Home goods utility curvature                      & $\chi$         & '+p42(pt[3])+' & Consumption to home goods pass-through'+' \\\\'+\
           r'Weight on home goods                              & $\alpha$          & '+p42(pt[2])+' & Women employment rate'+'  \\\\'+\
           r'Home input weight            & $\nu$            & '+p42(pt[0])+' &  Expenditure share on common goods'+' \\\\'+\
@@ -269,7 +267,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
           r'\end{table}'
     
     #Write table to tex file 
-    with open(root+'/Empirical analysis/Tables/params.tex', 'w') as f: 
+    with open(root+'/Tables/params.tex', 'w') as f: 
         f.write(table) 
         f.close() 
 
@@ -281,7 +279,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
         r'Target Moments & Data  & Model  \\ \midrule '+\
         r'Divorce rate, all women              & '+p43(0.0101)+' & '+p43(divorce_rate)+'  \\\\'+\
         r'Divorce rate, younger women               & '+p43(0.0115)+' & '+p43(divorce_rate_young)+' \\\\'+\
-        r'Total to public cons pass-through        & '+p43(0.895)+' & '+p43(βdC)+' \\\\'+\
+        r'Priv. cons. share to hus. income pass-through        & '+p43(0.895)+' & '+p43(βdC)+' \\\\'+\
         r'Women employment rate                   & '+p43(0.567)+' & '+p43(wife_empl)+'  \\\\'+\
         r'Expenditure share on common goods                & '+p43(0.782)+' & '+p43(expenditure_x_share)+'  \\\\'+\
         r'\midrule '+\
@@ -297,13 +295,11 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
         #r'Share of household income going to working women               &  0.33  & '+p42(share_iw)+' \\\\'+\
     
     #Write table to tex file 
-    with open(root+'/Empirical analysis/Tables/fit.tex', 'w') as f: 
+    with open(root+'/Tables/fit.tex', 'w') as f: 
         f.write(table) 
         f.close() 
             
         
- 
-import numpy as np 
  
  
 if __name__ == '__main__': 
