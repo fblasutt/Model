@@ -12,6 +12,7 @@ import pandas as pd
 from reg_cons_insurance import insurance
 import dfols 
 import getpass
+import time
 
 #Initialize seed 
 np.random.seed(10) 
@@ -49,9 +50,8 @@ age_marriage=final_sample[:,5]
 # Guess of internal parameters: [ν,σL,α,χ,wedge]
 xc=np.array([0.35870364, 0.00596541, 0.89223739, 0.96875457, 0.71759143])
 
-
 # Lower and higher bounds of parameters
-xl=np.array([0.02,0.0001,0.1,0.8,0.5]) 
+xl=np.array([0.02,0.0001,0.1,0.4,0.5]) 
 xu=np.array([0.8,0.2,0.99,2.0,1.2]) 
 
 #Parametrize the model 
@@ -86,6 +86,7 @@ def q(pt,table=False):
     #######################################################################################################################################
     try:  
            
+        tic=time.time()
         # Set up the model with the input parameters pt
         M = model.copy(name='numba_new_copy')    
         M.par.ν=pt[0] 
@@ -97,37 +98,39 @@ def q(pt,table=False):
         # Solve and simulate the model
         M.solve() 
         M.simulate() 
+        
+        toc=time.time()
+        print('Time elapsed for model solution is {}'.format(toc-tic))
          
         #############################################
         #Sample selection in accordance with the data
         ############################################
         age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh  
                
-        # Sample used for divorce moments
-        sample =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) 
+        # Sample used for divorce moments and employment/expenditures moments
+        sample_div =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) 
+        sample_empl =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) 
 
-        # Sample for all the other moments
-        sample_c =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) & (M.sim.couple==1)  
-        sample_c1=np.roll(sample_c,1,axis=1)
+        # Sample to be used for pass through from total to public good expenditures
+        sample_pass= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M.sim.couple_lag==1) 
+        sample_pass_m1= np.roll(sample_pass,-1,axis=1)
         
-        # This sample will be used for pass throughs (if sample, BPP persistent will not work)
-        sample_reg= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) 
-        sample_reg_1= np.roll(sample_reg,1,axis=1)
-        
-        sm   = (M.sim.couple[sample_reg_1]==1) & (M.sim.couple[sample_reg]==1)
+        # This sample will be used for pass throughs regressions (if sample, BPP persistent will not work)
+        sample_reg= (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) & (M.sim.couple==1) 
+
         ######################################
         #Moments here
         ######################################       
-        wife_empl = np.mean(M.sim.WLP[sample_c]>0)        
-        divorce_rate=np.mean((M.sim.couple==0)[sample])
-        divorce_rate_young=np.mean((M.sim.couple==0)[(sample) & (age<=35)])
-        expenditure_x_share=np.mean((M.sim.dw/M.sim.C_tot)[sample_c])
+        wife_empl = np.mean(M.sim.WLP[sample_empl]>0)        
+        divorce_rate=np.mean((M.sim.couple==0)[sample_div])
+        divorce_rate_young=np.mean((M.sim.couple==0)[(sample_div) & (age<=35)])
+        expenditure_x_share=np.mean((M.sim.dw/M.sim.C_tot)[sample_empl])
         
-        #construct regression of changes in consumption to changes in 
-        ΔC =np.log(M.sim.C_tot[sample_reg_1])  -np.log(M.sim.C_tot[sample_reg])
-        Δd=np.log(M.sim.dw[sample_reg_1])  -np.log(M.sim.dw[sample_reg])
+
+        ΔC =np.log(M.sim.C_tot[sample_pass])  -np.log(M.sim.C_tot[sample_pass_m1])
+        Δd=np.log(M.sim.dw[sample_pass])  -np.log(M.sim.dw[sample_pass_m1])        
+        βdC=np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
         
-        βdC=np.cov(ΔC[sm],Δd[sm])[0,1]/np.var(ΔC[sm])#np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
     
      
                         
@@ -138,8 +141,8 @@ def q(pt,table=False):
         ###################################
         # Non-targeted moments
         ###################################
-        gender_gap_earnings=(M.sim.incwg[sample][M.sim.WLP[sample]>0]).mean()/M.sim.incmg[sample].mean()
-        share_full_time=(M.sim.WLP[sample][(M.sim.WLP[sample]>0) & (M.sim.couple[sample]==1)]==(M.par.num_wlp-1)).mean()
+        gender_gap_earnings=(M.sim.incwg[sample_empl][M.sim.WLP[sample_empl]>0]).mean()/M.sim.incmg[sample_empl].mean()
+        share_full_time=(M.sim.WLP[sample_empl][(M.sim.WLP[sample_empl]>0) & (M.sim.couple[sample_empl]==1)]==(M.par.num_wlp-1)).mean()
         
         print('Simulated moments are {}'.format([gender_gap_earnings,share_full_time]))
         
@@ -147,8 +150,10 @@ def q(pt,table=False):
         # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
         if table:tables(M,sample_reg,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,gender_gap_earnings,share_full_time)
       
-        return [((wife_empl-.567)/.567),((divorce_rate_young-.0115)/.0115),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.8956945)/.8956945)]   
-     
+        fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0115)/.0115),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.8956945)/.8956945)]   
+        if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0]     
+        return fitt
+    
     except:
 
         print("Global error! Point is {}".format(pt))
@@ -309,7 +314,7 @@ import numpy as np
 if __name__ == '__main__': 
      
     # Estimate the model
-    res=dfols.solve(q, xc, rhobeg = 0.05, rhoend=1e-3, maxfun=100, bounds=(xl,xu),  
+    res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
                 npt=len(xc)+5,scaling_within_bounds=True,   
                 user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
                               'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
