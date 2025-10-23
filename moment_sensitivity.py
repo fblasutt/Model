@@ -11,10 +11,10 @@ but this is not done here
 @author: sara
 """
 # %% 
-import os
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("NUMEXPR_MAX_THREADS", "1")
+# import os
+# os.environ.setdefault("OMP_NUM_THREADS", "1")
+# os.environ.setdefault("MKL_NUM_THREADS", "1")
+# os.environ.setdefault("NUMEXPR_MAX_THREADS", "1")
 
 # %%
 
