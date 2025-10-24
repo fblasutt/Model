@@ -49,10 +49,18 @@ age_marriage=final_sample[:,5]
 
 # Guess of internal parameters: [ν,σL,α,χ,wedge]
 xc=np.array([0.35870364, 0.00596541, 0.89223739, 0.96875457, 0.71759143])
+xc=np.array([0.35870364, 0.00596541, 0.89223739, 2.5, 0.71759143])
+
+
+xc=np.array([0.35870364, 0.006, 0.89223739, 4.5       , 2.25])
+
+xc=np.array([0.3, 0.006, 0.82, 4.5       , 3.0])
+
+xc=np.array([2.52748693e-01,8.25000000e-05,9.81698177e-01,4.7,5.2e+00])
 
 # Lower and higher bounds of parameters
-xl=np.array([0.02,0.0001,0.1,0.4,0.5]) 
-xu=np.array([0.8,0.2,0.99,2.0,1.2]) 
+xl=np.array([0.02,0.000082,0.1,1.5,0.5]) 
+xu=np.array([0.8,0.2,0.999,6.0,6.0]) 
 
 #Parametrize the model 
 par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
@@ -112,7 +120,7 @@ def q(pt,table=False):
         sample_empl =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) 
 
         # Sample to be used for pass through from total to public good expenditures
-        sample_pass= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M.sim.couple_lag==1) 
+        sample_pass= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M.sim.couple_lag==1)
         sample_pass_m1= np.roll(sample_pass,-1,axis=1)
         
         # This sample will be used for pass throughs regressions (if sample, BPP persistent will not work)
@@ -123,18 +131,42 @@ def q(pt,table=False):
         ######################################       
         wife_empl = np.mean(M.sim.WLP[sample_empl]>0)        
         divorce_rate=np.mean((M.sim.couple==0)[sample_div])
-        divorce_rate_young=np.mean((M.sim.couple==0)[(sample_div) & (age<=35)])
+        divorce_rate_young=np.mean((M.sim.couple==0)[(sample_div) & (age<=40)])
         expenditure_x_share=np.mean((M.sim.dw/M.sim.C_tot)[sample_empl])
         
 
         ΔC =np.log(M.sim.C_tot[sample_pass])  -np.log(M.sim.C_tot[sample_pass_m1])
-        Δd=np.log(M.sim.dw[sample_pass])  -np.log(M.sim.dw[sample_pass_m1])        
-        βdC=np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
+        Δd=np.log(M.sim.dw[sample_pass])  -np.log(M.sim.dw[sample_pass_m1])     
+        
+        samee=(M.sim.WLP[sample_pass]==M.sim.WLP[sample_pass_m1])
+        βdC=np.cov(ΔC[samee],Δd[samee])[0,1]/np.var(ΔC[samee])
+        
+        
+        # # Combine into a DataFrame
+        # import pandas as pd
+        # import statsmodels.api as sm
+        # from pyhdfe import create
+        
+        # ID=np.repeat(np.cumsum(np.ones(N))[:,None],M.par.T,axis=1)
+        
+        # df = pd.DataFrame({
+        #     "DC": ΔC,
+        #     "Dd": Δd,
+        #     "ID":ID[sample_pass],
+        #     "iz":M.sim.iz[sample_pass],
+        #     "izL":M.sim.iz[sample_pass_m1],
+        #     "wlp":M.sim.WLP[sample_pass],
+        #     "wlpL":M.sim.WLP[sample_pass_m1],
+        # })
+        
+      
+        # # # Save to CSV
+        # df.to_csv(root+"/Model/results/output.csv", index=False)
         
     
      
                         
-        fit =((wife_empl-.567 )/.567)**2+((divorce_rate_young-.0115)/.0115)**2+((divorce_rate-.0101)/.0101)**2+((expenditure_x_share-.782)/.782)**2+((βdC-.8956945)/.8956945)**2
+        fit =((wife_empl-.567 )/.567)**2+((divorce_rate_young-.0109)/.0109)**2+((divorce_rate-.0101)/.0101)**2+((expenditure_x_share-.782)/.782)**2+((βdC-.9)/.9)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
         print('Simulated moments are {}'.format([wife_empl,divorce_rate_young,divorce_rate,expenditure_x_share,βdC]))
         
@@ -150,7 +182,7 @@ def q(pt,table=False):
         # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
         if table:tables(M,sample_reg,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,gender_gap_earnings,share_full_time)
       
-        fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0115)/.0115),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.8956945)/.8956945)]   
+        fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
         if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0]     
         return fitt
     

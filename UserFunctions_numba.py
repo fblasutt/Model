@@ -17,6 +17,7 @@ woman=setup.woman;man=setup.man
 ############################
 # User-specified functions #
 ############################
+    
 @njit(cache=cache)
 def home_good(x,ν,ϕ,wedge,couple,ishom):
     """"
@@ -175,7 +176,7 @@ def couple_root(x,c,powe,ρ,χ,α,ν,ϕ,wedge,ishom):
     m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))      
     home_time = (2*ϕ+ishom*(1-ϕ)) 
 
-    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*home_time**((1-ν)*(1-χ))*x**(ν-ν*χ-1)
+    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*ν*home_time**((1-ν)*(1-χ))*x**(ν-ν*χ-1)
  
  
 

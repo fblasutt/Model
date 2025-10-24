@@ -113,7 +113,8 @@ class HouseholdModelClass(EconModelClass):
         par.grid_Aw =  par.grid_A * par.div_A_share; par.grid_Am =  par.grid_A*(1.0-par.div_A_share)
 
         # Women's labor supply grids
-        par.grid_wlp=np.array([0.0,0.561,0.823]);par.num_wlp=len(par.grid_wlp)
+        par.grid_wlp=np.array([0.0,0.561,0.823])
+        par.num_wlp=len(par.grid_wlp)
         
         # Match quality shock grid and transition matrices    
         par.grid_love,par.Πl,par.Πl0= usr.addaco_nonst(par.T,par.σL,par.σL0,par.num_love)
@@ -279,7 +280,7 @@ def solve_intraperiod(sol,par):
         sol.pre_d_pub, sol.pre_Cw_priv, sol.pre_Cm_priv, par.grid_marg_u, par.grid_marg_u_for_inv, par.grid_marg_u_s,\
         par.grid_cpriv_s, par.grid_marg_uw, par.grid_marg_um
         
-    pars=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge)  
+    pars=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge) 
     ϵ = 1e-8# delta increase in xs to compute numerical deratives
 
     ################ Singles part #####################
@@ -287,7 +288,7 @@ def solve_intraperiod(sol,par):
         for sex in range(2):
         
             home= 1-par.grid_wlp[-1] if sex==0 else 0.0
-            pars_sex=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,0.0,0.0,home)  
+            pars_sex=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,0.0,0.0,home)
             
             # optimize to get util from total consumption(m<->C_tot)=private cons(c)+public cons(m-c)
             grid_cpriv_s[i,sex] = usr.optimizer(lambda c,m,p:-usr.util(c,m-c,*p),ϵ,C_tot-ϵ,args=(C_tot,pars_sex))[0]
@@ -310,6 +311,7 @@ def solve_intraperiod(sol,par):
                 mult = power**(1/par.ρ)/(power**(1/par.ρ)+(1-power)**(1/par.ρ)) 
                  
                 parss=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge)
+               
                  
                 ress=bisect(usr.couple_root,1e-12,C_tot-1e-12, args=(C_tot,power,*parss,1-wlp))[0] 
                 d_pub[iwlp,iP,i]  = ress 
