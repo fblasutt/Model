@@ -398,7 +398,7 @@ def integrate_single(sol, par, t):
 
     return Ew_nomeet, Em_nomeet
     
-#@njit(parallel=parallel)
+@njit#(parallel=parallel)
 def solve_single_egm(sol,par,t):
 
     #Integrate to get continuation value unless if you are in the last period
@@ -684,11 +684,52 @@ def simulate_lifecycle(sim,sol,par):
     love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;incwg=sim.incwg;incmg=sim.incmg
     dw=sim.dw;dm=sim.dm;Cw=sim.Cw;Cm=sim.Cm;Vsm=sim.Vsm;Vsw=sim.Vsw;Vcm=sim.Vcm;Vcw=sim.Vcw;tax=sim.tax
 
+
+    #initial=sim.init_love.copy()
+    
     for i in prange(par.simN):
         for t in range(par.simT):
  
             #Decide whether to iterate or not
             if t<par.sample_init[i]:continue
+            
+            
+            # elif t==par.sample_init[i]:
+    
+            #     delete=np.ones(power.shape)
+                
+            #     #Store before renegotiations utilities
+            #     Vsw_=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,sim.init_ih[i],sim.init_z[i]],Aw[i,t])
+            #     Vsm_=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,sim.init_ih[i],sim.init_z[i]],Am[i,t])
+                
+            #     # value of transitioning into singlehood
+            #     list_single = (Vsw_,Vsm_)
+                
+            #     initial_love=par.num_love-1
+                              
+            #     for j in range(par.num_love):
+                    
+            #         idxx = (t,sim.init_ih[i],sim.init_z[i],slice(None),j)
+                    
+            
+            #         list_raw    = (np.array([linear_interp.interp_1d(par.grid_A,sol.Vw_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]),
+            #                        np.array([linear_interp.interp_1d(par.grid_A,sol.Vm_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]))
+            
+            #         check_participation_constraints(par,delete,np.array([sim.init_power[i]]),list_raw,list_single,[(i,t)],nosim=False)
+                    
+                    
+            #         if ((np.allclose(delete[i,t],sim.init_power[i])) & (delete[i,t] >= 0.0)):#delete[i,t] >= 0.0:#np.allclose(delete[i,t],sim.init_power[i]):
+            #             initial_love=j
+            #             break
+                    
+            #     #Now create the initial matrix
+            #     mat=par.Πl0[t].copy()
+               
+            #     mat[:initial_love,:]=0.0
+            #     mat=mat/mat.sum(axis=0)
+                    
+            #     initial[i]=usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])
+
             
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation)   
             Π = par.Πh[t][wlp[i,t-1]]                                                if t>0 else par.Πh[t][-1]
@@ -697,7 +738,7 @@ def simulate_lifecycle(sim,sol,par):
             power_lag[i,t] = power[i,t-1]                                            if t>par.sample_init[i] else sim.init_power[i]      
             Πz=par.Π[t-1]                                                            if (couple[i,t-1]==1) else par.Πs[t-1]
             iz[i,t] = usr.mc_simulate(iz[i,t-1],Πz,sim.shock_z[i,t])                 if t>par.sample_init[i] else sim.init_z[i]
-            love[i,t] = usr.mc_simulate(love[i,t-1],par.Πl[t-1],shock_love[i,t])     if t>par.sample_init[i] else sim.init_love[i]
+            love[i,t] = usr.mc_simulate(love[i,t-1],par.Πl[t-1],shock_love[i,t])     if t>par.sample_init[i] else sim.init_love[i]#initial[i]
            
             # Indices of resources
             idx = (t,ih[i,t],iz[i,t],slice(None),love[i,t])

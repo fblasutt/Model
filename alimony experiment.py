@@ -159,6 +159,6 @@ for i in range(len(gridτ)):
 # plt.ylabel("Δ Insurance")   
 # #plt.ylim(0, 20)    
 # plt.legend()                              
-# #plt.savefig(root+'/Model/results/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
+# #plt.savefig(root+'/Output files/model/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
 # plt.show()
 

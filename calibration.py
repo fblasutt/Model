@@ -48,12 +48,7 @@ w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
 # Guess of internal parameters: [ν,σL,α,χ,wedge]
-#xc=np.array([0.35870364, 0.00596541, 0.89223739, 0.96875457, 0.71759143])
-xc=np.array([0.35870364, 0.00596541, 0.89223739, 2.5, 2.0])
-
-#xc=np.array([0.35870364, 0.006, 0.89223739, 4.5       , 2.25])
-#xc=np.array([0.3, 0.006, 0.82, 4.5       , 3.0])
-#xc=np.array([2.52748693e-01,8.25000000e-05,9.81698177e-01,4.7,5.2e+00])
+xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
 
 # Lower and higher bounds of parameters
 xl=np.array([0.02,0.000082,0.1,1.5,0.5]) 
@@ -121,7 +116,7 @@ def q(pt,table=False):
         sample_pass_m1= np.roll(sample_pass,-1,axis=1)
         
         # This sample will be used for pass throughs regressions (if sample, BPP persistent will not work)
-        sample_reg= (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) & (M.sim.couple==1) 
+        sample_reg= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) #& (M.sim.couple==1) 
 
         ######################################
         #Moments here
@@ -232,43 +227,43 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
     table=r"...total income   & \textbf{"+p33(B['totc']['all'])+'} & '+p33(B['dins']['all'])+' & & &    \\\\ '+\
           r'...wife income    & '+p33(B['totc']['all_w'])+' & '+p33(B['dins']['all_w'])+'& '+' \\textbf{'+p33(B['indc']['all_w_m'])+'} &  \\textbf{'+p33(B['indc']['all_w_w'])+'} &  \\textbf{'+p33(B['w_sh']['all_w'])+'}    \\\\ '+\
           r'...husband income & '+p33(B['totc']['all_m'])+' &  '+p33(B['dins']['all_m'])+'& '+' \\textbf{'+p33(B['indc']['all_m_m'])+'} &  \\textbf{'+p33(B['indc']['all_m_w'])+'} &  \\textbf{'+p33(B['w_sh']['all_m'])+'}    \\\\\\bottomrule'
-    with open(root+'/Model/results/allinc.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/allinc.tex', 'w') as f: f.write(table); f.close() 
     
     #% changes in consumption out of a 1 % transitory change in income
     table=r"...total income   & \textbf{"+p33(B['totc']['tra'])+'} & '+p33(B['dins']['tra'])+' & & &    \\\\ '+\
           r'...wife income    & '+p33(B['totc']['tra_w'])+' & '+p33(B['dins']['tra_w'])+'& '+' \\textbf{'+p33(B['indc']['tra_w_m'])+'} &  \\textbf{'+p33(B['indc']['tra_w_w'])+'} &  \\textbf{'+p33(B['w_sh']['tra_w'])+'}    \\\\ '+\
           r'...husband income & '+p33(B['totc']['tra_m'])+' &  '+p33(B['dins']['tra_m'])+'& '+' \\textbf{'+p33(B['indc']['tra_m_m'])+'} &  \\textbf{'+p33(B['indc']['tra_m_w'])+'} &  \\textbf{'+p33(B['w_sh']['tra_m'])+'}    \\\\\\bottomrule'
-    with open(root+'/Model/results/trainc.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/trainc.tex', 'w') as f: f.write(table); f.close() 
     
     
     #% changes in consumption out of a 1 % persistent change in income
     table=r"...total income   & \textbf{"+p33(B['totc']['per'])+'} & '+p33(B['dins']['per'])+' & & &    \\\\ '+\
           r'...wife income    & '+p33(B['totc']['per_w'])+' & '+p33(B['dins']['per_w'])+'& '+' \\textbf{'+p33(B['indc']['per_w_m'])+'} &  \\textbf{'+p33(B['indc']['per_w_w'])+'} &  \\textbf{'+p33(B['w_sh']['per_w'])+'}    \\\\ '+\
           r'...husband income & '+p33(B['totc']['per_m'])+' &  '+p33(B['dins']['per_m'])+'& '+' \\textbf{'+p33(B['indc']['per_m_m'])+'} &  \\textbf{'+p33(B['indc']['per_m_w'])+'} &  \\textbf{'+p33(B['w_sh']['per_m'])+'}    \\\\\\bottomrule'
-    with open(root+'/Model/results/perinc.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/perinc.tex', 'w') as f: f.write(table); f.close() 
     
     
     #MPC tables
     table=r"...husband income & "+p33(B['BPP_MPC']['ym_tot'])+' & '+p33(B['BPP_MPC']['ym_d'])+' & '+p33(B['BPP_MPC']['ym_cm'])+' & '+p33(B['BPP_MPC']['ym_cw'])+'  \\\\ '+\
           r'...wife income    & '+p33(B['BPP_MPC']['yw_tot'])+' & '+p33(B['BPP_MPC']['yw_d'])+' & '+p33(B['BPP_MPC']['yw_cm'])+' & '+p33(B['BPP_MPC']['yw_cw'])+'  \\\\ '+\
           r'...total income   & '+p33(B['BPP_MPC']['al_tot'])+' & '+p33(B['BPP_MPC']['al_d'])+' & '+p33(B['BPP_MPC']['al_cm'])+' & '+p33(B['BPP_MPC']['al_cw'])+'  \\\\\\bottomrule'
-    with open(root+'/Model/results/BPP_MPC.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/BPP_MPC.tex', 'w') as f: f.write(table); f.close() 
     
     #BPP persistent tables
     table=r"...husband income & "+p33(B['BPP_PER']['ym_tot'])+' & '+p33(B['BPP_PER']['ym_d'])+' & '+p33(B['BPP_PER']['ym_cm'])+' & '+p33(B['BPP_PER']['ym_cw'])+'  \\\\ '+\
           r'...wife income    & '+p33(B['BPP_PER']['yw_tot'])+' & '+p33(B['BPP_PER']['yw_d'])+' & '+p33(B['BPP_PER']['yw_cm'])+' & '+p33(B['BPP_PER']['yw_cw'])+'  \\\\ '+\
           r'...total income   & '+p33(B['BPP_PER']['al_tot'])+' & '+p33(B['BPP_PER']['al_d'])+' & '+p33(B['BPP_PER']['al_cm'])+' & '+p33(B['BPP_PER']['al_cw'])+'  \\\\\\bottomrule '
-    with open(root+'/Model/results/BPP_PER.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/BPP_PER.tex', 'w') as f: f.write(table); f.close() 
     
     #labor supply	
     table=r'  '+p33(B['wlp']['tra_w'])+' & '+p33(B['wlp']['tra_m'])+' & '+p33(B['wlp']['per_w'])+' & '+p33(B['wlp']['per_m'])+' & '+p33(B['wlp']['all_w'])+' & '+p33(B['wlp']['all_m'])+'  \\\\\\bottomrule '
-    with open(root+'/Model/results/WLP.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/WLP.tex', 'w') as f: f.write(table); f.close() 
     
     #level changes in consumption out of a level change in all income
     table=r"...total income   & \textbf{"+p33(B['totc']['level_s'])+'} & '+p33(B['dins']['level_s'])+' & & &    \\\\ '+\
           r'...wife income    & '+p33(B['totc']['level_w'])+' & '+p33(B['dins']['level_w'])+'& '+' \\textbf{'+p33(B['level']['all_w_m'])+'} &  \\textbf{'+p33(B['level']['all_w_w'])+'} &  \\textbf{'+p33(B['w_sh']['level_w'])+'}    \\\\ '+\
           r'...husband income & '+p33(B['totc']['level_m'])+' &  '+p33(B['dins']['level_m'])+'& '+' \\textbf{'+p33(B['level']['all_m_m'])+'} &  \\textbf{'+p33(B['level']['all_m_w'])+'} &  \\textbf{'+p33(B['w_sh']['level_m'])+'}    \\\\\\bottomrule'
-    with open(root+'/Model/results/level.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/level.tex', 'w') as f: f.write(table); f.close() 
     
     
     # Compares passthroughs in the data and in the model
@@ -285,7 +280,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
           r'...transitory wife shocks    & \textbf{'+p33(B['BPP_MPC']['yw_cm'])+'}/\\textcolor{red}{'+PWt['hus']+'} & \\textbf{'+p33(B['BPP_MPC']['yw_cw'])+'}/\\textcolor{red}{'+PWt['wif']+'}   &   \\\\\\bottomrule '
     
     
-    with open(root+'/Model/results/elasticity_BPP_model_vs_data.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/elasticity_BPP_model_vs_data.tex', 'w') as f: f.write(table); f.close() 
     
     #############################
     # PARAMETERS
@@ -306,7 +301,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
           r'\end{table}'
     
     #Write table to tex file 
-    with open(root+'/Empirical analysis/Tables/params.tex', 'w') as f: 
+    with open(root+'/Output files/model/params.tex', 'w') as f: 
         f.write(table) 
         f.close() 
 
@@ -334,7 +329,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
         #r'Share of household income going to working women               &  0.33  & '+p42(share_iw)+' \\\\'+\
     
     #Write table to tex file 
-    with open(root+'/Empirical analysis/Tables/fit.tex', 'w') as f: 
+    with open(root+'/Output files/model/fit.tex', 'w') as f: 
         f.write(table) 
         f.close() 
             

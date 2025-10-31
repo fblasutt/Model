@@ -41,7 +41,8 @@ w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
 # POints: [ν,σL,α,χ,wedge]
-xc=np.array([0.37139106, 0.00931249, 0.90003228, 1.28494861, 0.81349789])
+xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
+
 
 #Parametrize the model 
 par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
@@ -73,10 +74,21 @@ model.sim.init_z=izm*model.par.num_zm+izw
 # solve different models (takes several minutes)
 model.solve()
 model.simulate()
+M=model
+
+
+#Sample Restrictions
+age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh   
+sampl =  (age>=age_initial[:,None]) & (age<=age_final[:,None])  &  (M.sim.couple_lag==1)
+sampl2 =(sampl) &  (M.sim.couple==1)
+lov,rel,plov,prel=np.zeros((4,model.par.simN,M.par.T))
     
    
-        
+    
+#########################        
 #Policy Functions
+########################
+
 cmaps = ('viridis','gray')
 model_list = ('model 1',)
 
@@ -104,7 +116,10 @@ var_list = ('couple','A','power','love','WLP')
 model_list = ('model 1',)
 
 
-    
+
+###################################
+#Averages AMONG SAMPLE
+##################################    
 for var in var_list:
 
     fig, ax = plt.subplots()
@@ -112,11 +127,11 @@ for var in var_list:
     for i,name in enumerate(model_list):
 
         # pick out couples (if not the share of couples is plotted)
-        if var == 'couple': nan = 0.0
-        else:
-            I = model.sim.couple<1
-            nan = np.zeros(I.shape)
-            nan[I] = np.nan
+        if var == 'couple': I = ~sampl
+        else: I = ~sampl2
+        
+        nan = np.zeros(I.shape)
+        nan[I] = np.nan
 
         # pick relevant variable for couples
         y = getattr(model.sim,var);y = np.nanmean(y + nan,axis=0)
@@ -131,21 +146,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-M=model
-
-
-age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh   
-sampl =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1)
-sampl2 =(sampl) &  (M.sim.couple==1)
-lov,rel,plov,prel=np.zeros((4,model.par.simN,M.par.T))
-
+#Match quality value
 for i in range(M.par.T):lov[:,i]=M.par.grid_love[i][M.sim.love[:,i]]
+
+#Relative earnings
 rel=M.sim.incw/M.sim.incm
 
 
 #Income and consumption growth
-
 ΔYm  =np.log(M.sim.incm)  -np.log(np.roll(M.sim.incm,1,axis=1))
 ΔYw  =np.log(M.sim.incw)  -np.log(np.roll(M.sim.incw,1,axis=1))
 
@@ -156,14 +164,10 @@ rel=M.sim.incw/M.sim.incm
 Δd=np.log(M.sim.dw)  -np.log(np.roll(M.sim.dw,1,axis=1))
     
 
-
+#Match surplus
 Sw=M.sim.Vcw-M.sim.Vsw
 Sm=M.sim.Vcm-M.sim.Vsm
      
-
-
-
-
 
 
 def heatmap(x,y,z,bins_x,bins_y,tick_density,Xlabel,Ylabel,Zlabel,fig_name,vmax=1.0):
@@ -215,7 +219,7 @@ heatmap(lov[sampl],#x axis
         np.linspace(0.0, 2, 20),#Y bins
         4,#1/(ticks density)
         'Match quality','Earnins w/Earnings m','Share renegotiations or divorces',
-        root+'/Model/results/match_earn_ren_div.eps')
+        root+'/Output files/model/match_earn_ren_div.eps')
 
 
 #Men, women's earnings and renegotiations
@@ -226,7 +230,7 @@ heatmap(ΔYm[sampl],#x axis
         np.linspace(0, 1.5, 10),#X bins
         2,#1/(ticks density)
         'M income shock','W income shock','Share renegotiation or divorced',
-        root+'/Model/results/shocks_ren_div.eps',
+        root+'/Output files/model/shocks_ren_div.eps',
         vmax=0.2)#max value displayed
 
 heatmap(ΔYm[sampl],#x axis
@@ -236,7 +240,7 @@ heatmap(ΔYm[sampl],#x axis
         np.linspace(0, 1.5, 10),#X bins
         2,#1/(ticks density)
         'M income shock','W income shock','Share divorces',
-        root+'/Model/results/shocks_div.eps',
+        root+'/Output files/model/shocks_div.eps',
         vmax=0.2)#max value displayed)
 
 heatmap(ΔYm[sampl],#x axis
@@ -246,7 +250,7 @@ heatmap(ΔYm[sampl],#x axis
         np.linspace(0, 1.5, 10),#X bins
         2,#1/(ticks density)
         'M income shock','W income shock','Share renegotiation by W',
-        root+'/Model/results/shocks_ren_w.eps',
+        root+'/Output files/model/shocks_ren_w.eps',
         vmax=0.2)#max value displayed
 
 
@@ -257,7 +261,7 @@ heatmap(ΔYm[sampl],#x axis
         np.linspace(0, 1.5, 10),#X bins
         2,#1/(ticks density)
         'M income shock','W income shock','Share renegotiation by M',
-        root+'/Model/results/shocks_ren_m.eps',
+        root+'/Output files/model/shocks_ren_m.eps',
         vmax=0.2)#max value displayed
 
 
@@ -272,7 +276,7 @@ heatmap(np.roll(Sw,1)[sampl],#x axis
         np.linspace(0, 3, 20),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share renegotiations or divorces',
-        root+'/Model/results/surp_ren_div.eps',
+        root+'/Output files/model/surp_ren_div.eps',
         vmax=0.6)#max value displayed
 
 heatmap(np.roll(Sw,1)[sampl],#x axis
@@ -282,7 +286,7 @@ heatmap(np.roll(Sw,1)[sampl],#x axis
         np.linspace(0, 3, 20),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share divorces',
-        root+'/Model/results/surp_div.eps',
+        root+'/Output files/model/surp_div.eps',
         vmax=0.6)#max value displayed
 
 
@@ -293,7 +297,7 @@ heatmap(np.roll(Sw,1)[sampl],#x axis
         np.linspace(0, 3, 20),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share renegotiations triggered by w',
-        root+'/Model/results/surp_renw.eps',
+        root+'/Output files/model/surp_renw.eps',
         vmax=0.6)#max value displayed
 
 heatmap(np.roll(Sw,1)[sampl],#x axis
@@ -303,31 +307,32 @@ heatmap(np.roll(Sw,1)[sampl],#x axis
         np.linspace(0, 3, 20),  # 10 bins for Y
         6,#1/(ticks density)
         'Surplus W','Surplus M','Share renegotiations triggered by m',
-        root+'/Model/results/surp_renm.eps',
+        root+'/Output files/model/surp_renm.eps',
         vmax=0.6)#max value displayed
 
 
 #Distribution of marital surplus
 fig, axs = plt.subplots(nrows=1, ncols=1)
-axs.hist2d(Sw[sampl], Sm[sampl], bins=20,
-           range=[[0.0,3.0], [0.0, 3]],vmax=np.sum(Sw[sampl]>=0)/200,vmin=0.0)
+axs.hist2d(Sw[sampl], Sm[sampl], bins=30,
+           range=[[0.0,100.0], [0.0, 20]],vmax=np.sum(Sw[sampl]>=0)/400,vmin=0.0)
 axs.set(xlabel='Surplus, w',ylabel='Surplus, m')
 fig.tight_layout()
-plt.savefig(root+'/Model/results/surplus_dist.eps', format='eps', bbox_inches="tight")    
+plt.savefig(root+'/Output files/model/surplus_dist.eps', format='eps', bbox_inches="tight")    
 plt.show()
 
 #Distribution of marital surplus
-sns.histplot(1e-2+Sw[:,:M.par.Tr].flatten(),log_scale=True,  stat='percent', label='Wife surplus',color='red')
-sns.histplot(1e-2+Sm[:,:M.par.Tr].flatten(),log_scale=True,  stat='percent', label='Husband surplus',color='blue')
+sns.histplot(1e-2+Sw[sampl].flatten(),log_scale=True,  stat='percent', label='Wife surplus',color='red')
+sns.histplot(1e-2+Sm[sampl].flatten(),log_scale=True,  stat='percent', label='Husband surplus',color='blue')
 plt.legend()
-plt.savefig(root+'/Model/results/surplus_dist_2d.eps', format='eps', bbox_inches="tight")  
+plt.savefig(root+'/Output files/model/surplus_dist_2d.eps', format='eps', bbox_inches="tight")  
 plt.show()
 
 
-sns.histplot(Sm[(M.sim.couple_lag==0)].flatten(), log_scale=True , stat='percent',  label='Husband surplus',color='blue')
-sns.histplot(Sw[(M.sim.couple_lag==0)].flatten(), log_scale=True,  stat='percent',  label='Wife surplus',color='red')
+at_meeting=(np.roll(M.sim.power,1,axis=1)[sampl2]<-1) & (Sw[sampl2]>=0) & (Sm[sampl2]>=0)
+sns.histplot(1e-2+Sm[sampl2][at_meeting], log_scale=True , stat='percent',  label='Husband surplus',color='blue')
+sns.histplot(1e-2+Sw[sampl2][at_meeting], log_scale=True,  stat='percent',  label='Wife surplus',color='red')
 plt.legend()
-plt.savefig(root+'/Model/results/surplus_dist_i_2d.eps', format='eps', bbox_inches="tight")  
+plt.savefig(root+'/Output files/model/surplus_dist_i_2d.eps', format='eps', bbox_inches="tight")  
 plt.show()
 
 
@@ -346,21 +351,23 @@ plt.show()
 def mom(d,o=1):
     "Compute mean and higher order moments: mean (o=1), variance (o=2), skeweness (o=3), kurtosis (o=4)"
 
-    if o==1:  return np.mean(d)
-    elif o==2:return np.var(d)
-    elif o==3:return skew(d)
-    elif o==4:return kurtosis(d)
+    S=np.roll(sampl2,1,axis=1) & (sampl2)
+    
+    if o==1:  return np.mean(d[S])
+    elif o==2:return np.var(d[S])
+    elif o==3:return skew(d[S])
+    elif o==4:return kurtosis(d[S])
     else:     return "Error!!!" 
 
     
 
-MΔC=np.array([mom(ΔC[sampl2].flatten(), o=i) for i in range(1,5)])
-MΔCw=np.array([mom(ΔCw[sampl2].flatten(), o=i) for i in range(1,5)])
-MΔCm=np.array([mom(ΔCm[sampl2].flatten(), o=i) for i in range(1,5)])
-MΔws=np.array([mom(Δws[sampl2].flatten(), o=i) for i in range(1,5)])
-MΔd=np.array([mom(Δd[sampl2].flatten(), o=i) for i in range(1,5)])
-MΔYm=np.array([mom(ΔYm[sampl2].flatten(), o=i) for i in range(1,5)])
-MΔYw=np.array([mom(ΔYw[sampl2].flatten(), o=i) for i in range(1,5)])
+MΔC=np.array([mom(ΔC, o=i) for i in range(1,5)])
+MΔCw=np.array([mom(ΔCw, o=i) for i in range(1,5)])
+MΔCm=np.array([mom(ΔCm, o=i) for i in range(1,5)])
+MΔws=np.array([mom(Δws, o=i) for i in range(1,5)])
+MΔd=np.array([mom(Δd, o=i) for i in range(1,5)])
+MΔYm=np.array([mom(ΔYm, o=i) for i in range(1,5)])
+MΔYw=np.array([mom(ΔYw, o=i) for i in range(1,5)])
 
 
 #Table with the moments
@@ -370,72 +377,71 @@ table=r'Wife, private consumption          & '+p33(MΔCw[0])+' & '+p33(MΔCw[1])
       r'Wife share of private consumption  & '+p33(MΔws[0])+' & '+p33(MΔws[1])+' & '+p33(MΔws[2])+' & '+p33(MΔws[3])+'    \\\\ '+\
       r'Home good expenditure              & '+p33(MΔd[0])+' & '+p33(MΔd[1])+' & '+p33(MΔd[2])+' & '+p33(MΔd[3])+'    \\\\ '+\
       r'Total consumption                  & '+p33(MΔC[0])+' & '+p33(MΔC[1])+' & '+p33(MΔC[2])+' & '+p33(MΔC[3])+'    \\\\ '+\
-      r'Wife, earnings                     & '+p33(MΔYw[0])+' & '+p33(MΔYw[1])+' & '+p33(MΔYw[2])+' & '+p33(MΔYw[3])+'    \\\\ '+\
       r'Husband, earnings                  & '+p33(MΔYm[0])+' & '+p33(MΔYm[1])+' & '+p33(MΔYm[2])+' & '+p33(MΔYm[3])+'    \\\\\\bottomrule'
       
-with open(root+'/Model/results/log_growth_moments.tex', 'w') as f: f.write(table); f.close() 
+with open(root+'/Output files/model/log_growth_moments.tex', 'w') as f: f.write(table); f.close() 
 
 
 
-plt.plot(np.var(np.log(M.sim.incm[:,:par.Tr]),axis=0),label='Log men earnings')
-plt.plot(np.var(np.log(M.sim.C_tot[:,:par.Tr]),axis=0),label='Log total consumption')
-plt.plot(np.var(np.log(M.sim.dw[:,:par.Tr]),axis=0),label='Log hom good expenditures')
+plt.plot(np.nanvar(np.log(M.sim.incm[:,:par.Tr]),axis=0),label='Log men earnings')
+plt.plot(np.nanvar(np.log(M.sim.C_tot[:,:par.Tr]),axis=0),label='Log total consumption')
+plt.plot(np.nanvar(np.log(M.sim.dw[:,:par.Tr]),axis=0),label='Log hom good expenditures')
 plt.legend()
 plt.xlabel("Age")   
 plt.ylim(0, 2.5)   
-plt.savefig(root+'/Model/results/lifecycle_ineq1.eps', format='eps', bbox_inches="tight")                   
+plt.savefig(root+'/Output files/model/lifecycle_ineq1.eps', format='eps', bbox_inches="tight")                   
 plt.show()
 
-plt.plot(np.var(np.log(M.sim.incm[:,:par.Tr]),axis=0),label='Log men earnings')
-plt.plot(np.var(np.log(M.sim.Cw[:,:par.Tr]),axis=0),label='Log w private consumption')
-plt.plot(np.var(np.log(M.sim.Cm[:,:par.Tr]),axis=0),label='Log m private consumption')
+plt.plot(np.nanvar(np.log(M.sim.incm[:,:par.Tr]),axis=0),label='Log men earnings')
+plt.plot(np.nanvar(np.log(M.sim.Cw[:,:par.Tr]),axis=0),label='Log w private consumption')
+plt.plot(np.nanvar(np.log(M.sim.Cm[:,:par.Tr]),axis=0),label='Log m private consumption')
 plt.legend()
 plt.xlabel("Age")   
 plt.ylim(0, 2.5)   
-plt.savefig(root+'/Model/results/lifecycle_ineq2.eps', format='eps', bbox_inches="tight")                   
+plt.savefig(root+'/Output files/model/lifecycle_ineq2.eps', format='eps', bbox_inches="tight")                   
 plt.show()
 
 
-########################
-#Life-cycle behavior
-######################
+########################################################################
+#Life-cycle behavior, excluding nan (before women enters the sample)
+##########################################################################
 
 #Aggregate
 keep=M.sim.couple<=1
-plt.plot(np.mean(M.sim.dw,axis=0,where=keep),label="Public exp.")
-plt.plot(np.mean(M.sim.A,axis=0,where=keep),label="Total Assets")
-plt.plot(np.mean(M.sim.incm+M.sim.incw*M.sim.WLP,axis=0,where=keep),label="Total earnings")
-plt.plot(np.mean(M.sim.Cw,axis=0,where=keep),label="Priv C, w")
-plt.plot(np.mean(M.sim.Cm,axis=0,where=keep),label="Priv C, m")
+plt.plot(np.nanmean(M.sim.dw,axis=0,where=keep),label="Public exp.")
+plt.plot(np.nanmean(M.sim.A,axis=0,where=keep),label="Total Assets")
+plt.plot(np.nanmean(M.sim.incm+M.sim.incw*M.sim.WLP,axis=0,where=keep),label="Total earnings")
+plt.plot(np.nanmean(M.sim.Cw,axis=0,where=keep),label="Priv C, w")
+plt.plot(np.nanmean(M.sim.Cm,axis=0,where=keep),label="Priv C, m")
 plt.legend()
 plt.xlabel("Age") 
 plt.ylim(0, 20)       
-plt.savefig(root+'/Model/results/lifecycle_aggregate.eps', format='eps', bbox_inches="tight")                   
+plt.savefig(root+'/Output files/model/lifecycle_aggregate.eps', format='eps', bbox_inches="tight")                   
 plt.show()
          
 #Married
 keep=M.sim.couple==1
-plt.plot(np.mean(M.sim.dw,axis=0,where=keep),label="Public exp.")
-plt.plot(np.mean(M.sim.A,axis=0,where=keep),label="HH Assets")
-plt.plot(np.mean(M.sim.incm+M.sim.incw*M.sim.WLP,axis=0,where=keep),label="HH earnings")
-plt.plot(np.mean(M.sim.Cw,axis=0,where=keep),label="Priv C, w")
-plt.plot(np.mean(M.sim.Cm,axis=0,where=keep),label="Priv C, m")
+plt.plot(np.nanmean(M.sim.dw,axis=0,where=keep),label="Public exp.")
+plt.plot(np.nanmean(M.sim.A,axis=0,where=keep),label="HH Assets")
+plt.plot(np.nanmean(M.sim.incm+M.sim.incw*M.sim.WLP,axis=0,where=keep),label="HH earnings")
+plt.plot(np.nanmean(M.sim.Cw,axis=0,where=keep),label="Priv C, w")
+plt.plot(np.nanmean(M.sim.Cm,axis=0,where=keep),label="Priv C, m")
 plt.xlabel("Age") 
 plt.ylim(0, 20)       
 plt.legend()      
-plt.savefig(root+'/Model/results/lifecycle_married.eps', format='eps', bbox_inches="tight")                          
+plt.savefig(root+'/Output files/model/lifecycle_married.eps', format='eps', bbox_inches="tight")                          
 plt.show()
 
 #Single
 keep=M.sim.couple==0
-plt.plot(np.mean(M.sim.dw,axis=0,where=keep),label="Public exp.")
-plt.plot(np.mean(M.sim.Aw,axis=0,where=keep),label="Assets")
-plt.plot(np.mean(M.sim.incm+M.sim.incw*M.sim.WLP,axis=0,where=keep),label="Earnings, w")
-plt.plot(np.mean(M.sim.Cw,axis=0,where=keep),label="Priv C, w")
+plt.plot(np.nanmean(M.sim.dw,axis=0,where=keep),label="Public exp.")
+plt.plot(np.nanmean(M.sim.Aw,axis=0,where=keep),label="Assets")
+plt.plot(np.nanmean(M.sim.incm+M.sim.incw*M.sim.WLP,axis=0,where=keep),label="Earnings, w")
+plt.plot(np.nanmean(M.sim.Cw,axis=0,where=keep),label="Priv C, w")
 plt.xlabel("Age")    
 plt.ylim(0, 20)    
 plt.legend()                              
-plt.savefig(root+'/Model/results/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
+plt.savefig(root+'/Output files/model/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
 plt.show()
 
 
@@ -457,11 +463,11 @@ def tops(x,p=1):
     top1=np.percentile(x,100-p)
     return np.sum(x[x>top1])/np.sum(x)
 
-assets=M.sim.A*(M.sim.couple==1)+M.sim.Aw*(M.sim.couple==0)
-earnings=(M.sim.incm+M.sim.incw*M.sim.WLP)*(M.sim.couple==1)+(M.sim.incw*M.sim.WLP)*(M.sim.couple==0)
+assets=M.sim.A
+earnings=(M.sim.incm+M.sim.incw*M.sim.WLP)
 
 
-list_a=[assets[M.sim.couple<=1],earnings[M.sim.couple<=1],M.sim.Cw[M.sim.couple==1],M.sim.Cm[M.sim.couple==1],M.sim.dw[M.sim.couple==1]]
+list_a=[assets[sampl2],earnings[sampl2],M.sim.Cw[sampl2],M.sim.Cm[sampl2],M.sim.dw[sampl2]]
 list_s=['A','E','Cw','Cm','X']
 
 mean={s:i.mean()  for i,s in zip(list_a,list_s)}
@@ -474,7 +480,6 @@ def p33(x): y=x;return str('%3.3f' % y)
 table=r'Mean          & '+p33(mean['A'])+' & '+p33(mean['E'])+' & '+p33(mean['Cw'])+' & '+p33(mean['Cm'])+' & '+p33(mean['X'])+'    \\\\ '+\
       r'Gini          & '+p33(gini['A'])+' & '+p33(gini['E'])+' & '+p33(gini['Cw'])+' & '+p33(gini['Cm'])+' & '+p33(gini['X'])+'    \\\\ '+\
       r'Top 1\% share & '+p33(top1['A'])+' & '+p33(top1['E'])+' & '+p33(top1['Cw'])+' & '+p33(top1['Cm'])+' & '+p33(top1['X'])+'    \\\\\\bottomrule'
-with open(root+'/Model/results/sum_stat.tex', 'w') as f: f.write(table); f.close() 
+with open(root+'/Output files/model/sum_stat.tex', 'w') as f: f.write(table); f.close() 
 
     
-sample = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M.sim.couple_lag==1)

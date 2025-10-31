@@ -297,7 +297,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     plt.plot([-0.2, 1], [-0.2, 1], color = 'black', linestyle='--', linewidth = 2,zorder=1)
     plt.xlabel("BPP") 
     plt.ylabel("True") 
-    plt.savefig(root+'/Model/results/BPP_true.eps', format='eps', bbox_inches="tight")  
+    plt.savefig(root+'/Output files/model/BPP_true.eps', format='eps', bbox_inches="tight")  
     plt.show()
     
 
@@ -362,7 +362,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     # Create a line with the decomposition in latex and save it
     table=name_line+'& '+p31(Passive_insurance)+' & '+p31(Active_insurance)+'& '+p31(Taxes)+'& '+p31(Self_insurance)+'& '+p31(private_shift)+'& '+p31(bargaining_shift)+'& '+p31(ind_con_ins)
-    with open(root+'/Model/results/'+name_file+'exp.tex', 'w') as f: f.write(table); f.close() 
+    with open(root+'/Output files/model/'+name_file+'exp.tex', 'w') as f: f.write(table); f.close() 
     
     # Store the decomposition of insurance
     ins_dec={ 'Passive_insurance':Passive_insurance,     

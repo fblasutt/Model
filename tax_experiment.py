@@ -39,7 +39,7 @@ age_marriage=final_sample[:,5]
 
 
 # Parametrization: [ν,σL,α,χ,wedge]
-xc=np.array([0.35870364, 0.00596541, 0.89223739, 0.96875457, 0.71759143])
+xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
 
 #Parametrize the model 
 par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
@@ -233,6 +233,6 @@ for i in range(len(gridτ)):
 # plt.xlabel("Deduction")    
 # #plt.ylim(0, 20)    
 # plt.legend()                              
-# #plt.savefig(root+'/Model/results/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
+# #plt.savefig(root+'/Output files/model/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
 # plt.show()
 
