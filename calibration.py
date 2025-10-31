@@ -48,15 +48,12 @@ w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
 # Guess of internal parameters: [ν,σL,α,χ,wedge]
-xc=np.array([0.35870364, 0.00596541, 0.89223739, 0.96875457, 0.71759143])
-xc=np.array([0.35870364, 0.00596541, 0.89223739, 2.5, 0.71759143])
+#xc=np.array([0.35870364, 0.00596541, 0.89223739, 0.96875457, 0.71759143])
+xc=np.array([0.35870364, 0.00596541, 0.89223739, 2.5, 2.0])
 
-
-xc=np.array([0.35870364, 0.006, 0.89223739, 4.5       , 2.25])
-
-xc=np.array([0.3, 0.006, 0.82, 4.5       , 3.0])
-
-xc=np.array([2.52748693e-01,8.25000000e-05,9.81698177e-01,4.7,5.2e+00])
+#xc=np.array([0.35870364, 0.006, 0.89223739, 4.5       , 2.25])
+#xc=np.array([0.3, 0.006, 0.82, 4.5       , 3.0])
+#xc=np.array([2.52748693e-01,8.25000000e-05,9.81698177e-01,4.7,5.2e+00])
 
 # Lower and higher bounds of parameters
 xl=np.array([0.02,0.000082,0.1,1.5,0.5]) 
@@ -166,7 +163,8 @@ def q(pt,table=False):
     
      
                         
-        fit =((wife_empl-.567 )/.567)**2+((divorce_rate_young-.0109)/.0109)**2+((divorce_rate-.0101)/.0101)**2+((expenditure_x_share-.782)/.782)**2+((βdC-.9)/.9)**2
+      #   fit =((wife_empl-.567 )/.567)**2+((divorce_rate_young-.0109)/.0109)**2+((divorce_rate-.0101)/.0101)**2+((expenditure_x_share-.782)/.782)**2+((βdC-.9)/.9)**2
+        fit =((wife_empl-.565 )/.565)**2+((divorce_rate_young-.0107)/.0107)**2+((divorce_rate-.00996)/.00996)**2+((expenditure_x_share-.812)/.812)**2+((βdC-1.0403)/1.0403)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
         print('Simulated moments are {}'.format([wife_empl,divorce_rate_young,divorce_rate,expenditure_x_share,βdC]))
         
@@ -182,7 +180,9 @@ def q(pt,table=False):
         # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
         if table:tables(M,sample_reg,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,gender_gap_earnings,share_full_time)
       
-        fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
+        #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
+        fitt=[((wife_empl-.565)/.565),((divorce_rate_young-.0107)/.0107),((divorce_rate-.00996)/.00996),((expenditure_x_share-.812)/.812),((βdC-1.0403)/1.0403)]   
+
         if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0]     
         return fitt
     
@@ -316,16 +316,16 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
     table=r'\begin{table}[H]\caption{Model fit and validation}\label{table:fit}\centering'+\
          r'\begin{tabular}{lccc}\toprule '+\
         r'Target Moments & Data  & Model  \\ \midrule '+\
-        r'Divorce rate, all women              & '+p43(0.0101)+' & '+p43(divorce_rate)+'  \\\\'+\
-        r'Divorce rate, younger women               & '+p43(0.0115)+' & '+p43(divorce_rate_young)+' \\\\'+\
-        r'Total to public cons pass-through        & '+p43(0.895)+' & '+p43(βdC)+' \\\\'+\
-        r'Women employment rate                   & '+p43(0.567)+' & '+p43(wife_empl)+'  \\\\'+\
-        r'Expenditure share on common goods                & '+p43(0.782)+' & '+p43(expenditure_x_share)+'  \\\\'+\
+        r'Divorce rate, all women              & '+p43(0.010)+' & '+p43(divorce_rate)+'  \\\\'+\
+        r'Divorce rate, younger women               & '+p43(0.011)+' & '+p43(divorce_rate_young)+' \\\\'+\
+        r'Total to public cons pass-through        & '+p43(1.04)+' & '+p43(βdC)+' \\\\'+\
+        r'Women employment rate                   & '+p43(0.565)+' & '+p43(wife_empl)+'  \\\\'+\
+        r'Expenditure share on common goods                & '+p43(0.812)+' & '+p43(expenditure_x_share)+'  \\\\'+\
         r'\midrule '+\
         r'External Moments & Data  & Model \\'+\
         r'\midrule '+\
         r'Gender earnings gap                                       & '+p43(0.52)+' & '+p43(gender_gap_earnings)+'\\\\'+\
-        r'Share of women working full-time                          & '+p43(0.356)+' &  '+p43(share_full_time)+'\\\\'+\
+        r'Share of women working full-time                          & '+p43(0.443)+' &  '+p43(share_full_time)+'\\\\'+\
         r'Cross-elasticity of women employment                          & '+p43(-0.03)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
         r'\bottomrule '+\
         r'\end{tabular}'+\
