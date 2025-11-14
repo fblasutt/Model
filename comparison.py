@@ -43,9 +43,16 @@ age_marriage=final_sample[:,5]
 # POints: [ν,σL,α,χ,wedge]
 xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
 
+xc=np.array([0.42479046, 0.09802193, 0.88076762, 2.70746333, 0.98291311])
+
+xc=np.array([0.46344477, 0.11207432, 0.96426469, 2.61904296, 1.02913132])
+
+xc=np.array([0.63, 0.07727044, 0.96195962, 2.49445985, 0.98877908])
+
+xc=np.array([0.63346319, 0.19978654, 0.95496136, 2.50722362, 0.89168122])
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'σL0':xc[4],'wedge':0.0} 
 model = brg.HouseholdModelClass(par=par)  
 
 ###########################################################
@@ -53,7 +60,7 @@ model = brg.HouseholdModelClass(par=par)
 ###########################################################
 
 #We start simulating the agent at age_initial
-model.par.sample_init=age_initial-20
+model.par.sample_init=np.array(age_initial-20,dtype=np.int_)
 
 #Given the parameters, set the initial pareto weight for couples
 param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
@@ -314,7 +321,7 @@ heatmap(np.roll(Sw,1)[sampl],#x axis
 #Distribution of marital surplus
 fig, axs = plt.subplots(nrows=1, ncols=1)
 axs.hist2d(Sw[sampl], Sm[sampl], bins=30,
-           range=[[0.0,100.0], [0.0, 20]],vmax=np.sum(Sw[sampl]>=0)/400,vmin=0.0)
+           range=[[0.0,60.0], [0.0, 60]],vmax=np.sum(Sw[sampl]>=0)/400,vmin=0.0)
 axs.set(xlabel='Surplus, w',ylabel='Surplus, m')
 fig.tight_layout()
 plt.savefig(root+'/Output files/model/surplus_dist.eps', format='eps', bbox_inches="tight")    
