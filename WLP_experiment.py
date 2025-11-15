@@ -168,7 +168,7 @@ age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh
 alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
 alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])
 
-sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) #& (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
+sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
 sample1=np.roll(sample,1,axis=1)
     
 
@@ -189,7 +189,7 @@ Names_line=['Baseline', 'Low GWG', 'No GWG']
 for i in range(len(gridτ)):
 
 
-    B=insurance(Bmodel[i],(sample) & (Bmodel[i].sim.couple_lag==1),
+    B=insurance(Bmodel[i],(sample),
                 shock_type='permanent',
                 shock_gender='Male',
                 consumption_gender='Male',
@@ -200,7 +200,7 @@ for i in range(len(gridτ)):
     B['par']=gridτ[i]
     Bgrid.append(B)
     
-    Bf=insurance(Bfmodel[i],(sample) & (Bmodel[i].sim.couple_lag==1),                
+    Bf=insurance(Bfmodel[i],(sample),                
                  shock_gender='Male',
                  shock_type='permanent',
                  consumption_gender='Male',

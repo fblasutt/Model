@@ -37,12 +37,30 @@ h_income=final_sample[:,3]
 w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
+#############################################################################
+#     INITIAL INFORMATION - grid and list of models
+############################################################################
+
+#Tax progressivity parameters to consider
+gridτ=np.linspace(0.08,0.3,3)
+
+#Lists that contains model information
+Bmodel=list()
+Bfmodel=list()
+
+
+###########################################################
+##########################################################
+# Limited commitment
+########################################################
+#######################################################
+
 
 # Parametrization: [ν,σL,α,χ,wedge,β]
 xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
 model = brg.HouseholdModelClass(par=par)  
 
 
@@ -66,16 +84,7 @@ model.sim.init_z=izm*model.par.num_zm+izw
 
 
 
-#############################################################################
-#     INITIAL INFORMATION
-############################################################################
 
-#Tax progressivity parameters to consider
-gridτ=np.linspace(model.par.τ,0.3,3)
-
-#Lists that contains model information
-Bmodel=list()
-Bfmodel=list()
 
 ############################################################################
 # BALANCE THE GOVERNMENT BUDGET
@@ -112,11 +121,11 @@ def budget(x,i):
     return ((discounting*m.sim.tax)[(age>=age_initial[:,None])]).sum()-taxes_baseline
 
 #Find the level of Λ so that goivernment surplus is the same than at baseline
-gridΛ=np.array([optimize.bisect(budget,0.87,1.03,args=(i,),xtol=0.001) for i in range(1,len(gridτ))])
+gridΛ=np.array([optimize.bisect(budget,0.88,.99,args=(i,),xtol=0.1) for i in range(1,len(gridτ))])
 gridΛ=np.append(M.par.Λ,gridΛ)
-#array([0.92    , 0.946875, 0.964375])
+#array([0.92   , 0.946875, 0.964375])
 ############################################################################
-#                        BALANCE THE BUDGET
+#                        Experiment
 ########################################################################
 
 
@@ -132,13 +141,97 @@ for i in range(len(gridτ)):
     M.simulate() 
     Bmodel.append(M)
  
+    
+ 
+    
+###########################################################
+##########################################################
+# Full commitment
+########################################################
+#######################################################
+
+
+
+# Parametrization: [ν,σL,α,χ,wedge,β]
+xc=np.array([.39952677, 0.05340794, 0.9663709,  1.77013286, 0.97075888, 0.9862394])
+
+
+#Parametrize the model 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
+model = brg.HouseholdModelClass(par=par)  
+
+
+#####################################################################
+# Set the initial conditions for the couples based on baseline sample
+#####################################################################
+
+#We start simulating the agent at age_initial
+model.par.sample_init=age_initial-20
+
+#Given the parameters, set the initial pareto weight for couples
+param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
+model.sim.init_power=param/(1.0+param)
+
+#Set the initial income gridpoints for income, the closest to our value
+izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
+izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
+model.sim.init_z=izm*model.par.num_zm+izw
+
+
+
+
+
+############################################################################
+# BALANCE THE GOVERNMENT BUDGET
+########################################################################
+
+#All limited commitment models should imply the same government surplus:
+#First, we want to adjust tax level Λ accordingly
+
+#age of hh
+age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh  
+
+#discounting to check present values
+discounting=(1/model.par.R)**(np.cumsum(age>=age_initial[:,None],axis=1)-1)
+
+#Solve the model at baseline
+M = model.copy(name='numba_new_copy')   
+M.par.full=True 
+M.solve() 
+M.simulate() 
+
+
+#Obtain taxes
+taxes_baseline=((discounting*M.sim.tax)[(age>=age_initial[:,None])]).sum()
+    
+#create function to find deviations from baseline budget
+def budget(x,i):
+    
+    m=model.copy(name='numba_new_copy')    
+    m.par.τ=gridτ[i]
+    m.par.full=True
+    m.par.Λ=x
+    m.solve() 
+    m.simulate()
+    
+    print(((discounting*m.sim.tax)[(age>=age_initial[:,None])]).sum()-taxes_baseline,x)
+    return ((discounting*m.sim.tax)[(age>=age_initial[:,None])]).sum()-taxes_baseline
+
+#Find the level of Λ so that goivernment surplus is the same than at baseline
+gridΛf=np.array([optimize.bisect(budget,0.88,.99,args=(i,),xtol=0.1) for i in range(1,len(gridτ))])
+gridΛf=np.append(M.par.Λ,gridΛ)
+#array([0.92   , 0.946875, 0.964375])
+
+
 #Loop over gender wage gap grid and solve the model - full commitment
 for i in range(len(gridτ)):
     
     # Set up the model - full commitment
     Mf = model.copy(name='numba_new_copy')    
     Mf.par.τ=gridτ[i]    
-    Mf.par.Λ=gridΛ[i]
+    Mf.par.Λ=gridΛf[i]
    
     Mf.par.full=True
 

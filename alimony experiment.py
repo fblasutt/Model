@@ -38,10 +38,6 @@ w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
 
-    
-
-
-
 ############################################################################
 # Solve the model for different alimony levels
 ############################################################################
@@ -52,35 +48,36 @@ gridτ=np.linspace(0.0,0.1,3)
 #This list will store all them models we solve and simulate
 Bmodel=list()
 
+# Parametrization: [ν,σL,α,χ,wedge,β]
+xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
 
+#Parametrize the model 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
+model = brg.HouseholdModelClass(par=par)  
+
+
+#####################################################################
+# Set the initial conditions for the couples based on baseline sample
+#####################################################################
+
+#We start simulating the agent at age_initial
+model.par.sample_init=age_initial-20
+
+#Given the parameters, set the initial pareto weight for couples
+param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
+model.sim.init_power=param/(1.0+param)
+
+#Set the initial income gridpoints for income, the closest to our value
+izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
+izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
+model.sim.init_z=izm*model.par.num_zm+izw
+    
 #Solve and simulate the model
 for i in range(len(gridτ)):
 
-    # Parametrization: [ν,σL,α,χ,wedge,β]
-    xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
 
-    #Parametrize the model 
-    par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
-    model = brg.HouseholdModelClass(par=par)  
-
-
-    #####################################################################
-    # Set the initial conditions for the couples based on baseline sample
-    #####################################################################
-
-    #We start simulating the agent at age_initial
-    model.par.sample_init=age_initial-20
-
-    #Given the parameters, set the initial pareto weight for couples
-    param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
-    model.sim.init_power=param/(1.0+param)
-
-    #Set the initial income gridpoints for income, the closest to our value
-    izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
-    izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
-    izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
-    izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
-    model.sim.init_z=izm*model.par.num_zm+izw
     
     # Set up the model - limited commitment
     M = model.copy(name='numba_new_copy')    
