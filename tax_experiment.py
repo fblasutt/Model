@@ -38,13 +38,12 @@ w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
 
-# Parametrization: [ν,σL,α,χ,wedge]
-xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
+# Parametrization: [ν,σL,α,χ,wedge,β]
+xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
 model = brg.HouseholdModelClass(par=par)  
-
 
 
 #####################################################################

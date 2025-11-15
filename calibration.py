@@ -32,6 +32,8 @@ else:
 #Create sample with replacement 
 N=10_000#sample size 
 
+#estimating the model (True) or compute tables given paramters in xc below (BPP, paramters, fitt) (False)
+ESTIMATE=False
 
 #Import information for the sample, then store the relevant variables
 baseline_sample=np.array(pd.read_excel(root+'/Output files/data_sample.csv'))
@@ -47,15 +49,22 @@ h_income=final_sample[:,3]
 w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
-# Guess of internal parameters: [ν,σL,α,χ,wedge]
-xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
+# Guess of internal parameters: [ν,σL,α,χ,wedge,β]
+
+#With wealth as a target - limited commitment
+xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
+
+
+#With wealth as a target - full commitment
+#xc=np.array([.39952677, 0.05340794, 0.9663709,  1.77013286, 0.97075888, 0.9862394])
+
 
 # Lower and higher bounds of parameters
-xl=np.array([0.02,0.000082,0.1,1.5,0.5]) 
-xu=np.array([0.8,0.2,0.999,6.0,6.0]) 
+xl=np.array([0.02,0.000082,0.1,1.5,0.5,0.9]) 
+xu=np.array([0.8,0.2,0.999,6.0,6.0,1.1]) 
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
 model = brg.HouseholdModelClass(par=par)  
 
 
@@ -93,7 +102,9 @@ def q(pt,table=False):
         M.par.grid_love,M.par.Πl,M.par.Πl0= usr.addaco_nonst(M.par.T,pt[1],pt[1],M.par.num_love)
         M.par.α=pt[2] 
         M.par.χ=pt[3]
-        M.par.wedge=pt[4]        
+        M.par.wedge=pt[4]   
+        M.par.β=pt[5]
+        
     
         # Solve and simulate the model
         M.solve() 
@@ -120,7 +131,9 @@ def q(pt,table=False):
 
         ######################################
         #Moments here
-        ######################################       
+        ######################################   
+        
+        #
         wife_empl = np.mean(M.sim.WLP[sample_empl]>0)        
         divorce_rate=np.mean((M.sim.couple==0)[sample_div])
         divorce_rate_young=np.mean((M.sim.couple==0)[(sample_div) & (age<=40)])
@@ -132,6 +145,10 @@ def q(pt,table=False):
         
         samee=(M.sim.WLP[sample_pass]==M.sim.WLP[sample_pass_m1])
         βdC=np.cov(ΔC[samee],Δd[samee])[0,1]/np.var(ΔC[samee])
+        
+        
+        # Average household income
+        couple_assets = M.sim.A[sample_empl].mean()/M.sim.incm[sample_empl].mean()
         
         
         # # Combine into a DataFrame
@@ -159,9 +176,9 @@ def q(pt,table=False):
      
                         
       #   fit =((wife_empl-.567 )/.567)**2+((divorce_rate_young-.0109)/.0109)**2+((divorce_rate-.0101)/.0101)**2+((expenditure_x_share-.782)/.782)**2+((βdC-.9)/.9)**2
-        fit =((wife_empl-.565 )/.565)**2+((divorce_rate_young-.0107)/.0107)**2+((divorce_rate-.00996)/.00996)**2+((expenditure_x_share-.812)/.812)**2+((βdC-1.0403)/1.0403)**2
+        fit =((wife_empl-.565 )/.565)**2+((divorce_rate_young-.0107)/.0107)**2+((divorce_rate-.00996)/.00996)**2+((expenditure_x_share-.812)/.812)**2+((βdC-1.0403)/1.0403)**2+((couple_assets-2.967)/2.967)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
-        print('Simulated moments are {}'.format([wife_empl,divorce_rate_young,divorce_rate,expenditure_x_share,βdC]))
+        print('Simulated moments are {}'.format([wife_empl,divorce_rate_young,divorce_rate,expenditure_x_share,βdC,couple_assets]))
         
         ###################################
         # Non-targeted moments
@@ -173,21 +190,21 @@ def q(pt,table=False):
         
         
         # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
-        if table:tables(M,sample_reg,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,gender_gap_earnings,share_full_time)
+        if table:tables(M,sample_reg,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time)
       
         #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
-        fitt=[((wife_empl-.565)/.565),((divorce_rate_young-.0107)/.0107),((divorce_rate-.00996)/.00996),((expenditure_x_share-.812)/.812),((βdC-1.0403)/1.0403)]   
+        fitt=[((wife_empl-.565)/.565),((divorce_rate_young-.0107)/.0107),((divorce_rate-.00996)/.00996),((expenditure_x_share-.812)/.812),((βdC-1.0403)/1.0403),((couple_assets-2.967)/2.967)]   
 
-        if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0]     
+        if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]     
         return fitt
     
     except:
 
         print("Global error! Point is {}".format(pt))
-        return [10000.0,10000.0,10000.0,10000.0,10000.0]     
+        return [10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]     
     
      
-def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,gender_gap_earnings,share_full_time):
+def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time):
     
     # Extract empirical pass throughs from Sara's files
     def simple_extract(filename):
@@ -296,6 +313,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
           r'Home goods utility curvature                      & $\chi$         & '+p42(pt[3])+' & Consumption to home goods pass-through'+' \\\\'+\
           r'Weight on home goods                              & $\alpha$          & '+p42(pt[2])+' & Women employment rate'+'  \\\\'+\
           r'Home input weight            & $\nu$            & '+p42(pt[0])+' &  Expenditure share on common goods'+' \\\\'+\
+          r'Discount factor            & $\beta$            & '+p42(pt[5])+' &  Wealth to (husband) earnings ratio'+' \\\\'+\
           r' \bottomrule '+\
           r'\end{tabular}'+\
           r'\end{table}'
@@ -316,6 +334,7 @@ def tables(M,sample,pt,root,divorce_rate,divorce_rate_young,expenditure_x_share,
         r'Total to public cons pass-through        & '+p43(1.04)+' & '+p43(βdC)+' \\\\'+\
         r'Women employment rate                   & '+p43(0.565)+' & '+p43(wife_empl)+'  \\\\'+\
         r'Expenditure share on common goods                & '+p43(0.812)+' & '+p43(expenditure_x_share)+'  \\\\'+\
+        r'Wealth to (husband) earnings ratio                & '+p43(2.967)+' & '+p43(couple_assets)+'  \\\\'+\
         r'\midrule '+\
         r'External Moments & Data  & Model \\'+\
         r'\midrule '+\
@@ -340,12 +359,19 @@ import numpy as np
  
 if __name__ == '__main__': 
      
-    # Estimate the model
-    res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
-                npt=len(xc)+5,scaling_within_bounds=True,   
-                user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
-                              'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
-                objfun_has_noise=False,print_progress=True) 
-    
-    # Obtain tables
-    q(res.x,table=True)
+    if ESTIMATE:
+        
+        # Estimate the model
+        res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
+                    npt=len(xc)+5,scaling_within_bounds=True,   
+                    user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
+                                  'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
+                    objfun_has_noise=False,print_progress=True) 
+        
+        # Obtain tables
+        q(res.x,table=True)
+        
+    else:
+        
+        # Commpute tables with with paramters, and BPP given parameter xc
+        q(xc,table=True)

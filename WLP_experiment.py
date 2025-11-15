@@ -39,11 +39,76 @@ w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
 
 
-# Parametrization: [ν,σL,α,χ,wedge]
-xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
+
+
+
+############################################################################
+# Solve the model for different gender wage gap, with and without commitment
+############################################################################
+
+#Values of the gender wage gap we consider
+gridτ=np.linspace(-0.591,-0.224,3)#gender wage gap grid
+
+
+#These lists will store all them models we solve and simulate
+Bmodel=list()#limited commitment
+Bfmodel=list()#full commitment
+
+
+# Parametrization: [ν,σL,α,χ,wedge,β]
+xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
+model = brg.HouseholdModelClass(par=par)  
+
+
+#####################################################################
+# Set the initial conditions for the couples based on baseline sample
+#####################################################################
+
+#We start simulating the agent at age_initial
+model.par.sample_init=age_initial-20
+
+#Given the parameters, set the initial pareto weight for couples
+param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
+model.sim.init_power=param/(1.0+param)
+
+#Set the initial income gridpoints for income, the closest to our value
+izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
+izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
+model.sim.init_z=izm*model.par.num_zm+izw
+
+#Loop over gender wage gap grid and solve the model - limited commitment
+for i in range(len(gridτ)):
+    
+
+
+    # Set up the model - limited commitment
+    M = model.copy(name='numba_new_copy')    
+    M.par.ι0w=gridτ[i]    
+    
+    # income shocks grids: singles and couples
+    M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
+        M.par.grid_zm,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
+                                    M.par.Π=usr.labor_income(M.par) 
+                                    
+                                    
+    # income shocks grids: singles and couples
+    M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
+        M.par.grid_zm,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
+                                            M.par.Πs=usr.labor_income(M.par,single=True) 
+    M.solve() 
+    M.simulate()  
+    Bmodel.append(M)
+ 
+# Parametrization: [ν,σL,α,χ,wedge,β]
+xc=np.array([.39952677, 0.05340794, 0.9663709,  1.77013286, 0.97075888, 0.9862394])
+
+#Parametrize the model 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
 model = brg.HouseholdModelClass(par=par)  
 
 
@@ -66,46 +131,10 @@ izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_in
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
 model.sim.init_z=izm*model.par.num_zm+izw
 
-
-
-
-
-############################################################################
-# Solve the model for different gender wage gap, with and without commitment
-############################################################################
-
-#Values of the gender wage gap we consider
-gridτ=np.linspace(model.par.ι0w,model.par.ι0m,3)#gender wage gap grid
-
-
-#These lists will store all them models we solve and simulate
-Bmodel=list()#limited commitment
-Bfmodel=list()#full commitment
-
-
-#Loop over gender wage gap grid and solve the model - limited commitment
-for i in range(len(gridτ)):
-
-    # Set up the model - limited commitment
-    M = model.copy(name='numba_new_copy')    
-    M.par.ι0w=gridτ[i]    
-    
-    # income shocks grids: singles and couples
-    M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
-        M.par.grid_zm,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
-                                    M.par.Π=usr.labor_income(M.par) 
-                                    
-                                    
-    # income shocks grids: singles and couples
-    M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
-        M.par.grid_zm,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
-                                            M.par.Πs=usr.labor_income(M.par,single=True) 
-    M.solve() 
-    M.simulate()  
-    Bmodel.append(M)
- 
 #Loop over gender wage gap grid and solve the model - full commitment
 for i in range(len(gridτ)):
+    
+
     
     # Set up the model - full
     Mf = model.copy(name='numba_new_copy')    
@@ -139,7 +168,7 @@ age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh
 alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
 alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])
 
-sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
+sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) #& (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
 sample1=np.roll(sample,1,axis=1)
     
 
@@ -160,7 +189,7 @@ Names_line=['Baseline', 'Low GWG', 'No GWG']
 for i in range(len(gridτ)):
 
 
-    B=insurance(Bmodel[i],sample,
+    B=insurance(Bmodel[i],(sample) & (Bmodel[i].sim.couple_lag==1),
                 shock_type='permanent',
                 shock_gender='Male',
                 consumption_gender='Male',
@@ -171,7 +200,7 @@ for i in range(len(gridτ)):
     B['par']=gridτ[i]
     Bgrid.append(B)
     
-    Bf=insurance(Bfmodel[i],sample,                
+    Bf=insurance(Bfmodel[i],(sample) & (Bmodel[i].sim.couple_lag==1),                
                  shock_gender='Male',
                  shock_type='permanent',
                  consumption_gender='Male',
