@@ -123,6 +123,9 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     # Change in WLP
     ΔWLP=m.par.grid_wlp[m.sim.WLP][sample1]-m.par.grid_wlp[m.sim.WLP][sample]
     
+    #Savings
+    ΔA=m.sim.A[sample1]-m.sim.A[sample]
+    
 
     ##########################################
     # Compact OLS regression
@@ -337,9 +340,9 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     K6=ols(SHOCK,ΔC,sm,cov=CONTROLS,take=1)/(κyp*K5)
     
     # Finally the decomposition of household insurance   
-    Passive_insurance = 1-K1*K2
-    Active_insurance  = 1-K1*K2*K3*K4-(1-K1*K2)
-    Taxes             = 1-K1*K2*K3*K4*K5-(1-K1*K2*K3*K4)
+    Passive_insurance = 1-K1*K2            -(1-K1)
+    Active_insurance  = 1-K1*K2*K3*K4      -(1-K1*K2)
+    Taxes             = 1-K1*K2*K3*K4*K5   -(1-K1*K2*K3*K4)
     Self_insurance    = 1-K1*K2*K3*K4*K5*K6-(1-K1*K2*K3*K4*K5)
        
     ### B from hosehold to individual conusmption insurance

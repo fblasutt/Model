@@ -64,7 +64,7 @@ xl=np.array([0.02,0.000082,0.1,1.5,0.5,0.9])
 xu=np.array([0.8,0.2,0.999,6.0,6.0,1.1]) 
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
 model = brg.HouseholdModelClass(par=par)  
 
 

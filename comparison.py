@@ -43,9 +43,14 @@ age_marriage=final_sample[:,5]
 # POints: [ν,σL,α,χ,wedge]
 xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
 
+#Full commitment
+xc=np.array([.39952677, 0.05340794, 0.9663709,  1.77013286, 0.97075888, 0.9862394])
+
+#With wealth as a target - limited commitment
+xc=np.array([0.35978987, 0.01736841, 0.96208174, 1.88845673, 1.07120931,0.98501768])
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]} 
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'σL0':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4],'β':xc[5]} 
 model = brg.HouseholdModelClass(par=par)  
 
 ###########################################################
@@ -483,3 +488,25 @@ table=r'Mean          & '+p33(mean['A'])+' & '+p33(mean['E'])+' & '+p33(mean['Cw
 with open(root+'/Output files/model/sum_stat.tex', 'w') as f: f.write(table); f.close() 
 
     
+#######################################################
+# Lise and Seitz decomposition of individual inequality
+#######################################################
+sampl_dec= (sampl) & (M.sim.couple)
+age_grid=np.arange(30,55)
+
+#Define consumption
+Cm=np.log(M.sim.Cm)#np.log(M.sim.Cm+M.sim.dm)
+Cw=np.log(M.sim.Cw)#np.log(M.sim.Cw+M.sim.dw)
+
+#Only private consumption
+var_ind_cons=np.array([np.var(np.concatenate((Cm[(age==t) & (sampl_dec) & (M.sim.couple)],Cw[(age==t) & (sampl_dec)]))) for t in age_grid])
+var_hh_cons=np.array([np.var(((Cm+Cw/2)[(age==t) & (sampl_dec)])) for t in age_grid])
+var_within_cons=np.array([np.mean(np.var(np.stack((Cw,Cm),axis=2),axis=2)[(age==t) & (sampl_dec)]) for t in age_grid])
+
+plt.plot(age_grid,var_within_cons,label="Within Inequality")
+plt.plot(age_grid,var_hh_cons,label="Between inequality")
+plt.xlabel("Age")    
+plt.legend()                              
+plt.savefig(root+'/Output files/model/cons_ineq_decomp.eps', format='eps', bbox_inches="tight")  
+plt.show()
+
