@@ -14,6 +14,12 @@ import dfols
 import getpass
 import time
 import quantecon.markov.approximation as quant
+import scipy
+import pandas as pd 
+import statsmodels.formula.api as smf 
+import statsmodels.api as sm 
+from pyhdfe import create
+import matplotlib.pyplot as plt
 
 #Initialize seed 
 np.random.seed(10) 
@@ -31,7 +37,7 @@ else:
 
 
 #Create sample with replacement 
-N=10_000#sample size 
+N=30_000#sample size 
 
 
 #Import information for the sample, then store the relevant variables
@@ -47,60 +53,64 @@ cw_cons_share=final_sample[:,2]
 h_income=final_sample[:,3]
 w_income=final_sample[:,4]
 age_marriage=final_sample[:,5]
+year=final_sample[:,6]
+assets=final_sample[:,7]*np.mean(np.exp(h_income))
+
+
 
 # Guess of internal parameters: [ν,σL,α,χ,wedge]
-xc=np.array([0.42531844, 0.1, 0.91954311, 2.3879687,  1.03524518])
 
-#xc=np.array([0.37341742, 0.2075481, 0.95942081, 1.94180964, 1.0])
+xc=np.array([0.46      , 0.03      , 0.81436483, 1.29157562, 0.58      ])
 
-xc=np.array([0.42479046, 0.09802193, 0.88076762, 2.70746333, 0.98291311])
+xc=np.array([0.5      , 0.02      , 0.81436483, 1.29157562, 0.63      ])
 
-xc=np.array([0.50279046, 0.09802193, 0.88076762, 2.70746333, 0.98291311])
+#xc=np.array([0.5      , 0.01      , 0.81436483, 1.29157562, 0.63      ])
 
-xc=np.array([0.46344477, 0.11207432, 0.96426469, 2.61904296, 1.02913132])
-
-xc=np.array([0.50279046,0.09802193,0.88076762,2.,0.8291311])
+xc=np.array([0.38319299, 0.01227291, 0.74583664, 0.96036123, 0.50535224])
 
 
-xc=np.array([0.6027904, 0.08,   0.88076762, 2.0,0.96])
+xc=np.array([0.40140019, 0.01351466, 0.79613314, 1.03148895, 0.52124526])
 
-
-xc=np.array([0.63, 0.2, 0.96195962, 2.49445985, 0.9])
-
-
-xc=np.array([0.5      , 0.25  , 0.85, 1.01, 0.1       ])
-
-xc=np.array([0.56051222, 0.09639175, 0.84930073, 1.06684268, 0.28508579])
-
-xc=np.array([0.56051222, 0.09639175*0.7, 0.84930073, 1.06684268, 0.28508579*0.7])
 
 # Lower and higher bounds of parameters
-xl=np.array([0.00001,0.000082,0.1,0.5,0.1]) 
-xu=np.array([0.67,0.4,0.999,6.0,3.0]) 
+xl=np.array([0.00001,0.000082,0.1,0.5,0.01]) 
+xu=np.array([0.8,0.4,0.999,2.5,1.0]) 
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4]} 
-model = brg.HouseholdModelClass(par=par)  
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'sample_init':np.array(age_initial-20,dtype=np.int_)}
+model=brg.HouseholdModelClass(par=par)
 
 
 #####################################################################
 # Set the initial conditions for the couples based on baseline sample
 #####################################################################
 
-#We start simulating the agent at age_initial
-model.par.sample_init=np.array(age_initial-20,dtype=np.int_)
 
 #Given the parameters, set the initial pareto weight for couples
 param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
 model.sim.init_power=param/(1.0+param)
 
 #Set the initial income gridpoints for income, the closest to our value
-izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+
+gridzw=model.par.grid_zw[:,:,np.linspace(0,model.par.num_z-1,model.par.num_zm,dtype=np.int_)]
+gridzm=model.par.grid_zm[:,:,:model.par.num_zw]
+
+izm=np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]),0,:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
-izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw=np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]),0,:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
 model.sim.init_z=izm*model.par.num_zm+izw
- 
+model.sim.init_A=assets
+
+
+#Create variable for policy change
+age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh  
+calendar_year=age-age_initial[:,None]+year[:,None]
+
+policy=np.maximum(calendar_year[:,0],2007)
+age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)#*0+13
+
+
 #Function to minimize 
 def q(pt,table=False): 
  
@@ -114,18 +124,20 @@ def q(pt,table=False):
         #Pre reform model
         ####################
         tic=time.time()
+        
         # Set up the model with the input parameters pt
-        M_bef = model.copy(name='numba_new_copy')    
+        M_bef = model.copy(name='numba_new_copy')
+       
         M_bef.par.ν=pt[0] 
-        M_bef.par.grid_lovew,M_bef.par.Πlw,M_bef.par.Πlw0= usr.rouw_nonst(M_bef.par.T,pt[1],pt[4],M_bef.par.num_lovew) 
-        M_bef.par.grid_lovem,M_bef.par.Πlm,M_bef.par.Πlm0    = usr.rouw_nonst(M_bef.par.T,pt[1],pt[4],M_bef.par.num_lovem) 
+        M_bef.par.grid_lovew,M_bef.par.Πlw,M_bef.par.Πlw0= usr.rouw_nonst(M_bef.par.T,pt[1],pt[1]*0+0.03,M_bef.par.num_lovew) 
+        M_bef.par.grid_lovem,M_bef.par.Πlm,M_bef.par.Πlm0= usr.rouw_nonst(M_bef.par.T,pt[1],pt[1]*0+0.03,M_bef.par.num_lovem) 
         
         
         M_bef.par.Πl=[np.kron(M_bef.par.Πlw[t],M_bef.par.Πlm[t]) for t in range(M_bef.par.T-1)] # couples trans matrix
         M_bef.par.Πl0=[np.kron(M_bef.par.Πlw0[t],M_bef.par.Πlm0[t]) for t in range(M_bef.par.T-1)] # couples trans matrix 
         M_bef.par.α=pt[2] 
         M_bef.par.ρ=pt[3]
-        M_bef.par.wedge=0.7#pt[4]        
+        M_bef.par.wedge=pt[4]        
     
         # Solve and simulate the model
         M_bef.solve() 
@@ -139,15 +151,19 @@ def q(pt,table=False):
 
         M = M_bef.copy(name='numba_new_copy')  
         M.par.pens_reform=True #set up pension reform
-        M.par.policy_init=(np.ones(N,dtype=np.int_)+34)
+        M.par.policy_init=age_policy
         M.par.ν=pt[0] 
-        M.par.grid_lovew,M.par.Πlw,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],pt[4],M.par.num_lovew) 
-        M.par.grid_lovem,M.par.Πlm,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],pt[4],M.par.num_lovem) 
+        M.par.grid_lovew,M.par.Πlw,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],pt[1]*0+0.03,M.par.num_lovew) 
+        M.par.grid_lovem,M.par.Πlm,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],pt[1]*0+0.03,M.par.num_lovem) 
         
         
         M.par.Πl=[np.kron(M.par.Πlw[t],M.par.Πlm[t]) for t in range(M.par.T-1)] # couples trans matrix 
         M.par.Πl0=[np.kron(M.par.Πlw0[t],M.par.Πlm0[t]) for t in range(M.par.T-1)] # couples trans matrix 
-        M.par.Πl0=[np.kron(M.par.Πlw0[t],M.par.Πlm0[t]) for t in range(M.par.T-1)] # couples trans matrix
+        
+        # Income shocks grids: couples
+        M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
+            M.par.grid_zm,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
+                                        M.par.Π=usr.labor_income(M.par,pens_reform=M.par.pens_reform)     
         
         M.par.grid_zws,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
             M.par.grid_zms,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
@@ -155,7 +171,7 @@ def q(pt,table=False):
                                                 
         M.par.α=pt[2] 
         M.par.ρ=pt[3]
-        M.par.wedge=0.7#pt[4]        
+        M.par.wedge=pt[4]        
     
         # Solve and simulate the model
         M.solve() 
@@ -163,6 +179,126 @@ def q(pt,table=False):
         
         toc=time.time()
         print('Time elapsed for model solution is {}'.format(toc-tic))
+        
+        
+        #############################################
+        #Analyze rebargaining and divorce by age
+        ############################################
+        
+        zm,ϵm,zw,ϵw=np.zeros((4,M.par.simN,M.par.T))
+        izm=M.sim.iz%M.par.num_zw
+        izw=M.sim.iz//M.par.num_zm
+        
+        trend_m=np.array([M.par.ι0m+M.par.ι1m*t+M.par.ι2m*t**2 for t in range(M.par.T)])
+        trend_w=np.array([M.par.ι0w+M.par.ι1w*t+M.par.ι2w*t**2 for t in range(M.par.T)])
+        
+        for t in range(M.par.T):
+            for i in range(M.par.simN):
+            
+                zm[i,t]=M.par.grid_pm[t,0,izm[i,t],M.sim.ih[i,t]]
+                ϵm[i,t]=M.par.grid_ϵm[t,0,izm[i,t],M.sim.ih[i,t]]
+                zw[i,t]=M.par.grid_pw[t,0,izw[i,t],M.sim.ih[i,t]]
+                ϵw[i,t]=M.par.grid_ϵw[t,0,izw[i,t],M.sim.ih[i,t]]
+                    
+                
+        # # Potential (if working 1 unit of time) gross income of men and women
+        YM=(zm)[np.arange(M.par.simN),M.par.policy_init-1]#M.par.grid_zm[M.par.policy_init-1,14,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+        YW=(zw)[np.arange(M.par.simN),M.par.policy_init-1]#M.par.grid_zw[M.par.policy_init-1,14,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+
+
+
+        
+        # time_to_policy= (np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)-M.par.policy_init[:,None]
+        # event_time=time_to_policy.copy()
+        # #event_time[event_time<=-5]=-5
+        # #event_time[event_time>=6]=6
+        # idd=np.repeat(np.cumsum(np.ones(M.par.simN))[:,None],M.par.T,axis=1)
+        # agei=np.repeat((age_initial)[:,None],M.par.T,axis=1) 
+        
+        # policy_init= np.repeat((M.par.policy_init)[:,None],M.par.T,axis=1) 
+        
+        # assets=np.repeat((M.sim.init_A)[:,None],M.par.T,axis=1) 
+        # iz=np.repeat((M.sim.init_z)[:,None],M.par.T,axis=1) 
+        # power=np.repeat((param)[:,None],M.par.T,axis=1) 
+        
+      
+        
+        
+        
+        # treat_group=np.repeat((M.par.policy_init>=15)[:,None],M.par.T,axis=1) & (M.par.policy_init>=15)[:,None]
+        
+        # treat_group=np.repeat( ((M.par.policy_init-(age_initial-20))>=8)[:,None],M.par.T,axis=1)
+        
+        # treat_group=np.repeat((YW<YM)[:,None],M.par.T,axis=1)
+        
+       
+        
+        # event_time_PER_treat=event_time*treat_group 
+        
+        # wife_share=M.sim.Cw/(M.sim.Cw+M.sim.Cm)
+        
+        # #Sample
+        # subset=    (age>=age_initial[:,None])   & (M.sim.power>0) & (event_time>=-5) & (event_time<=10) & (age_initial-20<=M.par.policy_init-1)[:,None]
+                 
+     
+        # # Combine into a DataFrame 
+        # df = pd.DataFrame({ 
+        #     "A":assets[subset],
+        #     "agei":agei[subset],
+        #     "power":power[subset],
+        #     "policy_init":policy_init[subset],
+        #     "post":(event_time>=0)[subset],
+        #     "inter":(treat_group*(event_time>=0))[subset],
+        #     "wife_share":wife_share[subset], 
+        #     "event_time":event_time[subset], 
+        #     "iz":iz[subset],
+        #     "idd":idd[subset], 
+        #     "age":age[subset], 
+        #     "treat_group":treat_group[subset],
+        #     "event_time_PER_treat":event_time_PER_treat[subset] 
+        # }) 
+         
+        # df.to_stata('delete.dta')
+     
+        # reference_value=-1
+        # event_cats = sorted(df['event_time'].unique()) 
+        # if reference_value in event_cats: 
+        #     event_cats.remove(reference_value) 
+        #     event_cats = [reference_value] + event_cats 
+             
+
+             
+         
+         
+        # # Example: your data frame 
+        # # df must contain columns: y, x1, x2, firm, year, region 
+         
+        # # Step 1: Create the fixed effects structure 
+        # fe_df = df[[ 'event_time','age','treat_group','idd']].astype('category')
+        # #fe_df = df[['post','treat_group']].astype('category')
+         
+        # # Step 2: Create the HDFE projector 
+        # hdfe = create(fe_df) 
+         
+        # # Create categorical with this ordering 
+        # df['event_cat'] = pd.Categorical(df['event_time_PER_treat'], categories=event_cats) 
+     
+        # # Create dummies, drop_first will now drop your reference group 
+        # event_dummies = pd.get_dummies(df['event_cat'], prefix='event', drop_first=True) 
+         
+        # # Residualize both y and X 
+        # y_resid = hdfe.residualize(df[['wife_share']].values) 
+        # X_resid = hdfe.residualize(event_dummies.values) 
+        # #X_resid = hdfe.residualize(df[['inter']].values) 
+         
+        
+        # # OLS on residuals 
+        # model_ = sm.OLS(y_resid, X_resid) 
+        # results = model_.fit() 
+        # plt.plot(results.params)
+         
+        
+      
         
         # import matplotlib.pyplot as plt
 
@@ -179,46 +315,200 @@ def q(pt,table=False):
         # Event study with policy introduction
         #########################################
         
+        #import matplotlib.pyplot as plt
+        
         time_to_policy= (np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)-M.par.policy_init[:,None]
         event_time=np.arange(-5,12)
         
-        # div_event=np.array([(M.sim.couple==0)[(time_to_policy==i)].mean() for i in event_time])
-        # div_event_bef=np.array([(M_bef.sim.couple==0)[(time_to_policy==i)].mean() for i in event_time])
-        # plt.plot(event_time,div_event,event_time,div_event_bef)
+        # #Power compared to before policy
+        # rel_power=(M.sim.power-0*M.sim.power[np.arange(M.par.simN),M.par.policy_init-1][:,None]) #& (M.sim.power>0)       
+        # rel_power_=(M_bef.sim.power-0*M_bef.sim.power[np.arange(M.par.simN),M.par.policy_init-1][:,None]) # & (M_bef.sim.power>0)
         
-        # reb_event=np.array([(M.sim.power)[(M.sim.power>0) & (time_to_policy==i)].mean() for i in event_time])
-        # reb_event_bef=np.array([(M_bef.sim.power)[(M_bef.sim.power>0) & (time_to_policy==i)].mean() for i in event_time])
-        # plt.plot(event_time,reb_event,event_time,reb_event_bef)
+        # #Power has changed since before policy
+        # rel_powerC=(M.sim.power!=M.sim.power[np.arange(M.par.simN),M.par.policy_init-1][:,None]) #& (M.sim.power>0)      
+        # rel_powerC_=(M_bef.sim.power!=M_bef.sim.power[np.arange(M.par.simN),M.par.policy_init-1][:,None]) # & (M_bef.sim.power>0)
         
+   
+        # sample=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
+        #          & (M_bef.sim.power>0) &  (M.sim.power>0) 
+                 
+        # #Probability barg power changed
+        # B_bef=np.array([rel_power_[(sample) & (time_to_policy==i)].mean() for i in event_time])
+        # B_aft=np.array([rel_power[ (sample) & (time_to_policy==i)].mean() for i in event_time])
+        #plt.plot(event_time,B_aft-B_bef)        
+        
+        # #Probability barg power changed
+        # PR_bef=np.array([rel_powerC_[ (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # PR_aft=np.array([rel_powerC[    (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # plt.plot(event_time,PR_bef,event_time,PR_aft)
+        
+        # #Bargaining power conditional on having changed
+        # sample_change=(rel_powerC)   & (sample) 
+        # sample_change_=(rel_powerC_)   & (sample) 
+        
+        # C_bef=np.array([rel_power_[ (sample_change_)  & (time_to_policy==i)].mean() for i in event_time])
+        # C_aft=np.array([rel_power[    (sample_change)  & (time_to_policy==i)].mean() for i in event_time])
+        # plt.plot(event_time,C_bef,event_time,C_aft)
+        
+        
+        # #CHeck decomposition works
+        # plt.plot(event_time,C_aft*PR_aft-C_bef*PR_bef,
+        #          event_time,B_aft-B_bef)
+        
+        
+        # #Surplus of men and women
+        # sample  =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.power>0) 
+        # sample_ =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.power>0) 
+        
+     
+        # plt.plot(np.arange(M.par.simT),np.nanmean(Sm_<0.001,where=sample_,axis=0),np.arange(M.par.simT),np.nanmean(Sm<0.001,where=sample,axis=0))
+           
+        # plt.plot(np.arange(M.par.simT),np.nanmean(Sw_<0.001,where=sample_,axis=0),np.arange(M.par.simT),np.nanmean(Sw<0.001,where=sample,axis=0))
+          
+        # #Ovreall change in power
+        # plt.plot(np.arange(M.par.simT),np.nanmean(M_bef.sim.power,where=sample_,axis=0),np.arange(M.par.simT),np.nanmean(M.sim.power,where=sample,axis=0))
+              
+     
+        # #Number of rebargaining
+        # plt.plot(np.arange(M.par.simT),np.nanmean(M_bef.sim.power<M_bef.sim.power[:,24][:,None],where=sample_,axis=0),np.arange(M.par.simT),np.nanmean(M.sim.power<M.sim.power[:,24][:,None],where=sample,axis=0))
+         
+        # #Power conditional on rebargaining
+        # sampleC_=(sample_) & (M_bef.sim.power!=M_bef.sim.power_lag)
+        # sampleC =(sample ) & (M    .sim.power!=M    .sim.power_lag)
+        
+        # plt.plot(np.arange(M.par.simT),np.nanmean(M_bef.sim.power,where=sampleC_,axis=0),np.arange(M.par.simT),np.nanmean(M.sim.power,where=sampleC,axis=0))
+         
+        #Divorce
+        # sampleD  =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) & (YW/YM<0.3)[:,None]
+        # sampleD_ =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple_lag==1)  & (YW/YM<0.3)[:,None]
+        
+        # plt.plot(np.arange(M.par.simT),np.nanmean(M_bef.sim.power<-10,where=sampleD_,axis=0),np.arange(M.par.simT),np.nanmean(M.sim.power<-10,where=sampleD,axis=0))
+         
+        # #Selection
+        # sampleS  =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==0) & (M.sim.power[:,24]>0)[:,None]
+        # sampleS_ =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==0) & (M_bef.sim.power[:,24]>0)[:,None] 
+        
+        # aft=np.array([Sw[:,24][sampleS[:,i]].mean() for i in range(M.par.simT)])
+        # bef=np.array([Sw_[:,24][sampleS_[:,i]].mean() for i in range(M.par.simT)])
+        
+        # plt.plot(np.arange(M.par.simT),bef,np.arange(M.par.simT),aft)
+         
         
         #Wife share of consumption
+        event_time=np.arange(-5,12)
         wife_share_aft=M.sim.Cw/(M.sim.Cw+M.sim.Cm)
         wife_share_bef=M_bef.sim.Cw/(M_bef.sim.Cw+M_bef.sim.Cm)
-       
         
-        wife_share_bef_=np.array([wife_share_bef[(M_bef.sim.power>0) & (time_to_policy==i)].mean() for i in event_time])
-        wife_share_aft_=np.array([wife_share_aft[(M.sim.power>0)    & (time_to_policy==i)].mean() for i in event_time])
-        
-        wife_share_effect=np.array([(wife_share_aft-wife_share_bef)[(M.sim.power>0) & (M_bef.sim.power>0)    & (time_to_policy==i)].mean() for i in event_time])
-        
-        #plt.plot(event_time,wife_share_aft_-wife_share_bef_,event_time,wife_share_effect)
-        
-        policy_effect_wife_share=wife_share_effect[5:].mean()#ife_share_aft_[5:].mean()-wife_share_bef_[5:].mean()
-        
-        
-        # Divorce
-        divorce_bef=np.array([(M_bef.sim.couple==0)[(M_bef.sim.power_lag>0) & (time_to_policy==i)].mean() for i in event_time])
-        divorce_aft=np.array([(M.sim.couple==0)    [(M.sim.power_lag>0)     & (time_to_policy==i)].mean() for i in event_time])
-        policy_divorce_effect=np.nanmean((divorce_aft[5:]-divorce_bef[5:])/0.01)
-        
+        sample=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
+                 & (M_bef.sim.power>0) &  (M.sim.power>0) & (age<=40) &  (M.par.sample_init<M.par.policy_init)[:,None]# & (age<=40)
+                 
+        sample_bef=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
+                 & (M_bef.sim.power>0) & (age<=40) &  (M.par.sample_init<M.par.policy_init)[:,None] 
          
+        sample_aft=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
+                  &  (M.sim.power>0) &  (age<=40) &  (M.par.sample_init<M.par.policy_init)[:,None] 
+   
+        
+        wife_share_bef_=np.array([np.log(wife_share_bef)[ (sample_bef)  & (time_to_policy==i)].mean() for i in event_time])
+        wife_share_aft_=np.array([np.log(wife_share_aft)[     (sample_aft)  & (time_to_policy==i)].mean() for i in event_time])
+        plt.plot(wife_share_aft_-wife_share_bef_)
+        
+        wife_share_effect=np.array([(np.log(wife_share_aft)-np.log(wife_share_bef))[(sample)    & (time_to_policy==i)].mean() for i in event_time])
+        plt.plot(wife_share_effect)
+        
+        wife_share_effectw=np.array([(np.log(M.sim.Cw)-np.log(M_bef.sim.Cw))[(sample)    & (time_to_policy==i)].mean() for i in event_time])
+        wife_share_effectm=np.array([(np.log(M.sim.Cm)-np.log(M_bef.sim.Cm))[(sample)    & (time_to_policy==i)].mean() for i in event_time])
+        plt.plot(event_time,wife_share_effectw,event_time,wife_share_effectm)
+              
+        # wife_share_effect=np.array([(wife_share_aft-wife_share_bef)[ ((age[np.arange(M.par.simN),M.par.policy_init]-20)[:,None]<15) &  (M.sim.power>0) & (M_bef.sim.power>0)    & (time_to_policy==i)].mean() for i in event_time])
+        
+
+        # wife_share_bef_E=np.array([wife_share_bef[ (M.par.policy_init>=15)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # wife_share_aft_E=np.array([wife_share_aft[ (M.par.policy_init>=15)[:,None] &    (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        
+        
+        # wife_share_bef_A=np.array([wife_share_bef[ (M.par.policy_init<15)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # wife_share_aft_A=np.array([wife_share_aft[ (M.par.policy_init<15)[:,None] &    (sample)  & (time_to_policy==i)].mean() for i in event_time])
+
+        
+        # wife_share_bef_E=np.array([wife_share_bef[ ((M.par.policy_init-(age_initial-20))>=6)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # wife_share_aft_E=np.array([wife_share_aft[ ((M.par.policy_init-(age_initial-20))>=6)[:,None] &    (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        
+        
+        # wife_share_bef_A=np.array([wife_share_bef[((M.par.policy_init-(age_initial-20))<6)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # wife_share_aft_A=np.array([wife_share_aft[ ((M.par.policy_init-(age_initial-20))<6)[:,None] &    (sample)  & (time_to_policy==i)].mean() for i in event_time])
+      
+      
+        #plt.plot(event_time,wife_share_aft_E-wife_share_bef_E-(wife_share_aft_A-wife_share_bef_A))
+        
+        #plt.plot(event_time,wife_share_aft_E-wife_share_aft_A)
+        
+        # plt.plot(event_time,wife_share_aft_-wife_share_bef_,event_time,wife_share_effect)
+        
+        policy_effect_wife_share=np.nanmean(wife_share_effect[5:])#ife_share_aft_[5:].mean()-wife_share_bef_[5:].mean()
+
+      
+       
+        # YMo=M.par.grid_zm[M.par.policy_init-1,0,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+        # YWo=M.par.grid_zw[M.par.policy_init-1,0,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+
+
+        # YMp=M.par.grid_zm[M.par.Tr,14,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+        # YWp=M.par.grid_zw[M.par.Tr,14,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+        
+        # YMa=M_bef.par.grid_zm[M.par.Tr,14,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+        # YWa=M_bef.par.grid_zw[M.par.Tr,14,M_bef.sim.iz[np.arange(M.par.simN),M.par.policy_init-1],0]#[:,par.Tr-1]
+       
+        # YMp=M.sim.incm[:,M.par.Tr]
+        # YWp=M.sim.incw[:,M.par.Tr]
+        
+        # YMa=M_bef.sim.incm[:,M.par.Tr]
+        # YWa=M_bef.sim.incw[:,M.par.Tr]
+        
+        
+        # wife_share_bef_E=np.array([wife_share_bef[ (YW<YM)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # wife_share_aft_E=np.array([wife_share_aft[ (YW<YM)[:,None] &    (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        
+        
+        # wife_share_bef_A=np.array([wife_share_bef[  (YW>YM)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+        # wife_share_aft_A=np.array([wife_share_aft[  (YW>YM)[:,None] & (sample)  & (time_to_policy==i)].mean() for i in event_time])
+      
+        
+        # plt.plot(event_time,wife_share_aft_E-wife_share_bef_E-(wife_share_aft_A-wife_share_bef_A))
+        
+        
+        ###########################
+        #CHECKS TO DO
+        #########################
+        
+        #How much of the pension is shared?
+        #M.par.PW[(M.par.sample_init//M.par.Dper)][(M.par.sample_init<M.par.policy_init)].mean()
+
+
+        #Are effects given by sample selection?
+        #plt.plot(np.nanmean(M_bef.sim.power,axis=0,where=(M.sim.power>0) & ((M_bef.sim.power>0))))
+        #plt.plot(np.nanmean(M_bef.sim.power,axis=0,where=((M_bef.sim.power>0))))
+        
+        #Who is binding? Men or women?
+        #plt.plot(np.nanmean(M_bef.sim.power>M_bef.sim.power_lag,axis=0,where=(M_bef.sim.power>0) & (age>age_initial[:,None])))
+        #np.nanmean(np.abs(M.sim.Vcm-M_bef.sim.Vsm<0.00001))
+        #How is bargaining power changing across specifications?
+        #plt.plot(np.nanmean(M_bef.sim.power>M.sim.power,axis=0,where=(M.sim.power>0) & (M_bef.sim.power>0)))
+        
+        #Bargaining and surplus
+        
+   
+        #plt.plot(np.nanmean((M_bef.sim.power<M.sim.power),axis=0,where=(M.sim.Vsm>M_bef.sim.Vsm) & (M.sim.power>0) & (M_bef.sim.power>0)))
+
+        #plt.plot(np.nanmean(M.sim.Vsw-M_bef.sim.Vcw,axis=0,where=(M.sim.power>M_bef.sim.power) & (M.sim.power>0) & (M_bef.sim.power>0)))
+ 
         #############################################
         #Sample selection in accordance with the data
         ############################################
-        age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh  
+        
                
         # Sample used for divorce moments and employment/expenditures moments
-        sample_div =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) 
+        sample_div =  (age>=age_initial[:,None]-1) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) 
         sample_empl =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) 
 
         # Sample to be used for pass through from total to public good expenditures
@@ -269,9 +559,9 @@ def q(pt,table=False):
      
                         
       #   fit =((wife_empl-.567 )/.567)**2+((divorce_rate_young-.0109)/.0109)**2+((divorce_rate-.0101)/.0101)**2+((expenditure_x_share-.782)/.782)**2+((βdC-.9)/.9)**2
-        fit =((wife_empl-.565 )/.565)**2+((policy_divorce_effect-.2)/.2)**2+((divorce_rate-.00996)/.00996)**2+((expenditure_x_share-.812)/.812)**2+((βdC-.94)/.94)**2
+        fit =((wife_empl-.565 )/.565)**2+((policy_effect_wife_share-.12)/.12)**2+((divorce_rate-.00996)/.00996)**2+((expenditure_x_share-.812)/.812)**2+((βdC-.96)/.96)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
-        print('Simulated moments are {}'.format([wife_empl,policy_divorce_effect,divorce_rate,expenditure_x_share,βdC]))
+        print('Simulated moments are {}'.format([wife_empl,policy_effect_wife_share,divorce_rate,expenditure_x_share,βdC]))
         
         ###################################
         # Non-targeted moments
@@ -282,14 +572,16 @@ def q(pt,table=False):
         print('Simulated moments are {}'.format([gender_gap_earnings,share_full_time,policy_effect_wife_share]))
         
         
+      
+        
         # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
         if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_share,expenditure_x_share,wife_empl,βdC,gender_gap_earnings,share_full_time)
       
         #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
-        fitt=[((wife_empl-.565)/.565),((policy_divorce_effect-.2)/.2),((divorce_rate-.00996)/.00996),((expenditure_x_share-.812)/.812),((βdC-.94)/.94)]   
+        fitt=[((wife_empl-.565)/.565),((policy_effect_wife_share-.12)/.12),((divorce_rate-.00996)/.00996),((expenditure_x_share-.812)/.812),((βdC-.96)/.96)]   
 
-        if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0]     
-        return fitt
+        if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0]#   
+        return fitt#fit#
     
     except:
 
@@ -453,11 +745,13 @@ if __name__ == '__main__':
    
     #q(xc)
     #Estimate the model
-    res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
+    res=dfols.solve(q, xc, rhobeg = 0.4, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
                 npt=len(xc)+5,scaling_within_bounds=True,   
                 user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
                               'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
                 objfun_has_noise=False,print_progress=True) 
     
+    # res = scipy.optimize.minimize(q,xc,args=(model),bounds=list(zip(list(xl), list(xu))),method='Nelder-Mead',tol=1e-3)
+    
     # Obtain tables
-    #q(res.x,table=True)
+    # q(res.x,table=True)

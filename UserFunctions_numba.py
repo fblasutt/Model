@@ -31,7 +31,9 @@ def util(c_priv,d_pub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=0.0,ishom=0.0,female=
     """
     Intra-temporal utility function
     """
-    Q=home_good(d_pub,ν,ϕ,wedge,couple=couple,ishom=ishom)
+    
+    dd=d_pub/1.4375 if couple==1 else d_pub
+    Q=home_good(dd,ν,ϕ,wedge,couple=couple,ishom=ishom)
 
     return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge-ν*(1-ishom)
 
@@ -42,10 +44,9 @@ def resources_couple(par,t,ih,iz,assets):
     "This gives the cash in hand available to couple, resources, plus gross and net labor income
     """
    
-    izw=iz//par.num_zm;izm=iz%par.num_zw  
 
     #women earningsF
-    yw= np.array([par.grid_zw[t,izw,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)])
+    yw= np.array([par.grid_zw[t,0,iz,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)])
     
     #spousal deduction based on womens earnings
     SpDed=np.array([np.maximum(par.d0+par.d1*yw[wlp]+par.d2*yw[wlp]**2,0.0) for wlp in range(par.num_wlp)])
@@ -54,7 +55,7 @@ def resources_couple(par,t,ih,iz,assets):
     if t<par.Tr:
         
         #men income and taxable income
-        yh = par.grid_zm[t,izm,ih]
+        yh = par.grid_zm[t,0,iz,ih]
         yh_taxable =   np.array([yh -SpDed[wlp] for wlp in range(par.num_wlp)])
         
         #nota that taxation is individual 
@@ -63,9 +64,10 @@ def resources_couple(par,t,ih,iz,assets):
         
     else:
         
-        #men income and taxable income
-        yh = par.grid_zm[t,izm,ih]
-        yh_taxable =   np.array([yh -SpDed[-1] for wlp in range(par.num_wlp)])
+        #men + women income and taxable income
+        yh = par.grid_zm[t,0,iz,ih]
+        yw= np.array([par.grid_zw[t,0,iz,ih] for wlp in range(par.num_wlp)])
+        yh_taxable =   np.array([yh for wlp in range(par.num_wlp)])
         
         #nota that taxation is individual 
         taxw=np.array([        yw[-1] -  (par.Λ)*        (yw[-1])**(1-par.τ) for wlp in range(par.num_wlp)])
@@ -80,15 +82,13 @@ def resources_couple(par,t,ih,iz,assets):
 
 
 @njit(cache=cache)  
-def income_single(par,t,ih,iz,assets,women=True): 
+def income_single(par,t,iD,ih,iz,assets,women=True): 
     """"
     This gives gross and net labor income of singles income
     """ 
     
-    iz_i=iz//par.num_zm if women else iz%par.num_zw 
-    
      
-    labor_income =  par.grid_zws[t,iz_i,ih]*par.grid_wlp[-1] if women else par.grid_zms[t,iz_i,ih]#without HC! 
+    labor_income =  par.grid_zws[t,iD,iz,ih]*par.grid_wlp[-1] if women else par.grid_zms[t,iD,iz,ih]#without HC! 
    
     tax_income = (labor_income) -par.Λ*(labor_income)**(1-par.τ)#taxes(labor_income,s=True)# 
   
@@ -177,7 +177,7 @@ def couple_root(x,c,powe,ρ,χ,α,ν,ϕ,wedge,ishom):
     m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))      
     home_time = (2*ϕ+ishom*(1-ϕ)) 
 
-    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*0.92*home_time**((1-0.92)*(1-χ))*x**(0.92-0.92*χ-1)
+    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*0.92*home_time**((1-0.92)*(1-χ))*0.695**((0.92)*(1-χ))*1.43*x**(0.92-0.92*χ-1)
  
  
 
@@ -205,44 +205,79 @@ def labor_income(par,single=False,pens_reform=False):
 
     
     #Store here all the components of earnings
-    XXw,XPw,XTw,XHw,XDw=np.zeros((5,par.T,par.num_pw*par.num_ϵw,len(par.grid_h)))
-    XXm,XPm,XTm,XHm,XDm=np.zeros((5,par.T,par.num_pm*par.num_ϵm,len(par.grid_h)))
+    XXw,XPw,XTw,XHw,XDw=np.zeros((5,par.T,par.num_perdiv,par.num_pw*par.num_ϵw,len(par.grid_h)))
+    XXm,XPm,XTm,XHm,XDm=np.zeros((5,par.T,par.num_perdiv,par.num_pm*par.num_ϵm,len(par.grid_h)))
+    
+    #Trends
+    trend_m=np.array([par.ι0m+par.ι1m*t+par.ι2m*t**2 for t in range(par.T)])
+    trend_w=np.array([par.ι0w+par.ι1w*t+par.ι2w*t**2 for t in range(par.T)])
+    
+
     
     for t in range(par.T):
         for i in range(len(par.grid_h)):
-            
-            XTw[t,:,i]=(np.zeros(Pw[t].shape)[:,None]+gridw[None,:]).flatten()
-            XPw[t,:,i]=(Pw[t][:,None]+np.zeros(gridw.shape)[None,:]).flatten()
-            XHw[t,:,i] = par.grid_h[i] 
-            XDw[t,:,i] = par.ι0w+par.ι1w*t+par.ι2w*t**2
-            
-            XTm[t,:,i]=(np.zeros(Pm[t].shape)[:,None]+gridm[None,:]).flatten()
-            XPm[t,:,i]=(Pm[t][:,None]+np.zeros(gridm.shape)[None,:]).flatten()
-            XHm[t,:,i] =  0.0
-            XDm[t,:,i] = par.ι0m+par.ι1m*t+par.ι2m*t**2
-            
-
+            for iD in range(par.num_perdiv):
+                
+                XTw[t,iD,:,i]=(np.zeros(Pw[t].shape)[:,None]+gridw[None,:]).flatten()
+                XPw[t,iD,:,i]=(Pw[t][:,None]+np.zeros(gridw.shape)[None,:]).flatten()
+                XHw[t,iD,:,i] = par.grid_h[i] 
+                XDw[t,iD,:,i] = trend_w[t]
+                
+                XTm[t,iD,:,i]=(np.zeros(Pm[t].shape)[:,None]+gridm[None,:]).flatten()
+                XPm[t,iD,:,i]=(Pm[t][:,None]+np.zeros(gridm.shape)[None,:]).flatten()
+                XHm[t,iD,:,i] =  0.0
+                XDm[t,iD,:,i] = trend_m[t]
+                
+    #Earnings - potential
     XXw=np.exp(XTw+XPw+XHw+XDw)
     XXm=np.exp(XTm+XPm+XHm+XDm)
     
+    # Now reconstruct aggregate indexing:
+    XXwA,XXmA = np.zeros((2,par.T,par.num_perdiv,par.num_z,len(par.grid_h)))
+    
+    XXwA2,XXmA2 = np.zeros((2,par.T,par.num_perdiv,par.num_z,len(par.grid_h)))
+    
+    for iz_m in range(par.num_zm):
+        for iz_w in range(par.num_zw):
+            
+            iz = iz_w * par.num_zm + iz_m
+            
+            izmp=iz_m//par.num_ϵm
+            izwp=iz_w//par.num_ϵw
+            #izmt=iz_m%par.num_pm
+            #izwt=iz_w%par.num_pw
+            
+            #Here get rid of transitory shocks to compute pension
+            iz_w_mod=izwp*par.num_ϵw+par.num_ϵw//2
+            iz_m_mod=izmp*par.num_ϵm+par.num_ϵm//2
+            
+            XXwA[:,:,iz,:]=XXw[:,:,iz_w,:]#[:,:,iz_w//par.num_ϵw,:]
+            XXmA[:,:,iz,:]=XXm[:,:,iz_m,:]#[:,:,iz_m//par.num_ϵm,:]
+            
+            XXwA2[:,:,iz,:]=XXw[:,:,iz_w_mod,:]
+            XXmA2[:,:,iz,:]=XXm[:,:,iz_m_mod,:]
+
+        
+    #Pension calculation
+   
+    #Full calcluation below
     for t in range(par.Tr,par.T):
         for i in range(len(par.grid_h)):
-            
-            #Distinguish between pension reform being in place or not
-            if pens_reform:
+            for iD in range(par.num_perdiv):
+
+                #Individual pension
+                Ind_M = XXmA2[par.Tr-1,iD,:,i]
+                Ind_W = XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
                 
-                Share_M = (XXw[par.Tr-1,:,i]*0.4+XXm[par.Tr-1,:,i])/2
-                Share_W = (XXw[par.Tr-1,:,i]*0.4+XXm[par.Tr-1,:,i])/2
+                #Shared pension accumulated while married
+                Shared = (Ind_M+Ind_W)/2
                 
-            else:
-                
-                Share_M =  XXm[par.Tr-1,:,i]
-                Share_W = XXw[par.Tr-1,:,i]*0.4
-            
-            
-            XXw[t,:,i]=pens(Share_W,par.p_b,par.κ)
-            XXm[t,:,i]=pens(Share_M,par.p_b,par.κ)
-    
+                #Weight of Shared vs.individual pension  depending on pension reform implementation                
+                ws=par.PW[iD] if pens_reform else 0.0
+                             
+                XXwA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_W,par.p_b,par.κ)
+                XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
+        
     #####################
     # Transition matrices
     ####################
@@ -264,8 +299,43 @@ def labor_income(par,single=False,pens_reform=False):
     for t in range(par.Tr-1,par.T-1): Π[t][:]=np.eye(par.num_pm*par.num_ϵm*par.num_pw*par.num_ϵw) 
     
  
-    return XXw, XTw,XPw, Pi0w,XXm, XTm,XPm, Pi0m,Π
+    return XXwA, XTw,XPw, Pi0w,XXmA, XTm,XPm, Pi0m,Π
 
+def pension_share(par):
+    """
+    The objective of this function is to compute the share of pension credits
+    to be shared among husband and wife in case of a divorce in period iD -> num_perdiv.
+    
+    This computation is based on the distribution of age at marriage, which allows to
+    estimate the duration of time spent in a couple for a given date of divorce iD.
+
+    """
+    
+    # Age_share=age at marriage distribution 
+    age_share=np.array([((par.sample_init)==i).mean() for i in range(par.Tr)])
+
+    # Create age weights, where depending on the data of divorce (rows),
+    # you get a distribution of age at marriage in the columns, taking
+    # into account that you cannot divorce before you marry
+    age_weights=np.zeros((par.Tr,par.Tr))
+    for i in range(par.Tr): 
+        
+        reweight=age_share.copy()
+        reweight[i:]=0.0
+        reweight=reweight/reweight.sum()
+        age_weights[i]=reweight
+
+    age_weights[np.isnan(age_weights)]=0.0
+
+
+    # Create array A_w_t where, for each year, you have the weight of the shared pension
+    A_w_t = np.array([age_weights[i]@ ((i-np.arange(par.Tr))/(par.Tr)) for i in range(par.Tr)])
+    
+    #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
+    A_w = np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
+  
+    return A_w
+    
 def build_directly(Pia, Pib, Pic, Pid):
     """
     Use einsum to directly construct the ordering you would obtain by running

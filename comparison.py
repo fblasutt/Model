@@ -174,7 +174,9 @@ rel=M.sim.incw/M.sim.incm
 #Match surplus
 Sw=M.sim.Vcw-M.sim.Vsw
 Sm=M.sim.Vcm-M.sim.Vsm
-     
+
+
+
 
 
 def heatmap(x,y,z,bins_x,bins_y,tick_density,Xlabel,Ylabel,Zlabel,fig_name,vmax=1.0):

@@ -36,10 +36,10 @@ class HouseholdModelClass(EconModelClass):
         par.Tr = 40+5 # age at retirement
          
         # Prices
-        par.R = 1.00068#1+ interest rate
+        par.R = 1.0#1+ interest rate
                
         # Preferences
-        par.β = 1.01    # Discount factor
+        par.β = .999   # Discount factor
         par.ρ = 1.5     # Risk avresion private goods
         par.χ = 1.5    # Risk aversion home goods
         par.α = 0.35    # Weight on home good
@@ -48,15 +48,15 @@ class HouseholdModelClass(EconModelClass):
         
         # Income processes: tren and shocks (sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks)
         par.ι0m= -0.224; par.ι1m=0.046   ;par.ι2m=-0.00075858 #trend for husband
-        par.ι0w=-0.591  ;par.ι1w=0.046   ;par.ι2w=-0.00075858 #trend for wife
+        par.ι0w=-0.791  ;par.ι1w=0.046   ;par.ι2w=-0.00075858 #trend for wife
  
         par.σzm=0.0082**0.5  ;par.σϵm= 0.0125**0.5;par.σ0m=  0.0338**0.5; #shock size husband
         par.σzw= 0.00978**0.5;par.σϵw=0.0137**0.5 ;par.σ0w= 0.1198**0.5; #shock size wife
         par.σϵwm=0.0#0.00289 #correlation of transitory shocks
         
         # Pension parameters
-        par.p_b=0.3578 #basic pension
-        par.κ=0.219    #proportional part of pension
+        par.p_b=0.03578 #basic pension
+        par.κ=0.419    #proportional part of pension
         
         # Depreciation of human capital
         par.μ = 1.195        # Human capital depreciation drift
@@ -82,6 +82,10 @@ class HouseholdModelClass(EconModelClass):
         # Grid-related parameters and state space
         ##########################################
         
+        #Divorce period and grid
+        par.num_perdiv = 14
+        par.Dper = int(par.Tr/par.num_perdiv)
+        
         # Wealth
         par.num_A = 15;par.max_A = 75.0
         
@@ -104,16 +108,24 @@ class HouseholdModelClass(EconModelClass):
         
         # pre-computation of consumption Ctot=cf+cm+d, used in the intra-period maximization
         par.num_Ctot = 150;par.max_Ctot = par.max_A*2
+
         
         ##########################################
         # Simulations parameters
         ##########################################
-        par.seed = 9211;par.simT = par.T;par.simN = 100_000
-       
+        par.seed = 9211;par.simT = par.T;par.simN = 30_000
+        
+        # Simulations Grids
+        par.women =np.ones(par.simN)#0: simumate men, 1 women
+        par.sample_init=np.zeros(par.simN,dtype=np.int_)#in which period do we start simulating the sample?
+        par.policy_init=np.zeros(par.simN,dtype=np.int_)#when does the pension policy (if pens_reform=True) kicks in?
+               
         
     def setup_grids(self):
         par = self.par
+    
         
+
         #Grid for the pr. of meeting a partner in each t
         par.λ_grid = np.ones(par.T)*par.meet
         for t in range(par.Tr,par.T):par.λ_grid[t]=0.0
@@ -130,11 +142,7 @@ class HouseholdModelClass(EconModelClass):
         par.grid_lovew,par.Πlw,par.Πlw0= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovew) 
         par.grid_lovem,par.Πlm,par.Πlm0= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovem) 
         
-        
-
-        
-        
-        
+          
         par.Πl=[np.kron(par.Πlw[t],par.Πlm[t]) for t in range(par.T-1)] # couples trans matrix 
         par.Πl0=[np.kron(par.Πlw0[t],par.Πlm0[t]) for t in range(par.T-1)] # couples trans matrix 
  
@@ -153,6 +161,9 @@ class HouseholdModelClass(EconModelClass):
         
         # Grid of total consumption, used in the intra-period problem
         par.grid_Ctot = nonlinspace(1.0e-6,par.max_Ctot,par.num_Ctot,1.1)
+        
+        # % of shared pension in case of policy change, for given divorce period
+        par.PW=usr.pension_share(par)
  
         # Income shocks grids: couples
         par.grid_zw,par.grid_ϵw,par.grid_pw,par.Π_zw0, \
@@ -163,11 +174,9 @@ class HouseholdModelClass(EconModelClass):
         par.grid_zws,par.grid_ϵw,par.grid_pw,par.Π_zw0, \
             par.grid_zms,par.grid_ϵm,par.grid_pm,par.Π_zm0, \
                                                 par.Πs=usr.labor_income(par,single=True,pens_reform=par.pens_reform) 
-              
-        # Simulation arrays
-        par.women =np.ones(par.simN)#0: simumate men, 1 women
-        par.sample_init=np.zeros(par.simN,dtype=np.int_)#in which period do we start simulating the sample?
-        par.policy_init=np.zeros(par.simN,dtype=np.int_)#when does the pension policy (if pens_reform=True) kicks in?
+                                                
+
+
         
     def allocate(self):
         par = self.par;sol = self.sol;sim = self.sim;self.setup_grids()
@@ -191,7 +200,7 @@ class HouseholdModelClass(EconModelClass):
         par.grid_marg_u_s = np.nan + np.ones((par.num_Ctot,2))# singles
          
         # Singles: value functions (vf), consumption, marg util
-        shape_single = (par.T,par.num_h,par.num_z,par.num_A)
+        shape_single = (par.T,par.num_perdiv,par.num_h,par.num_z,par.num_A)
         sol.Vw_single = np.nan + np.ones(shape_single)     # vw in t
         sol.Vm_single = np.nan + np.ones(shape_single)     # vm in t
         sol.Cw_tot_single = np.nan + np.ones(shape_single) # = cw+d
@@ -228,6 +237,7 @@ class HouseholdModelClass(EconModelClass):
         sim.Vcm = np.nan + np.ones(shape_sim)       # before-ren value function m
         
         sim.iz = np.ones(shape_sim,dtype=np.int_)   # index of income shocks 
+        sim.ID = np.zeros(shape_sim,dtype=np.int_) #index period at divorce
         sim.A = np.zeros(shape_sim)                 # total assets (m+w)
         sim.Aw = np.zeros(shape_sim)                # w's assets
         sim.Am = np.zeros(shape_sim)                # m's assets
@@ -256,6 +266,7 @@ class HouseholdModelClass(EconModelClass):
         sim.init_ih = np.zeros(par.simN,dtype=np.int_)                  # Initial w's human capital
         sim.init_couple = np.ones(par.simN,dtype=bool)                  # State (couple=1/single=0)
         sim.init_power =  np.random.random_sample(par.simN)             # Barg power 
+        sim.init_A =  np.zeros(par.simN)                               # Assets 
         sim.init_lovew = np.ones(par.simN,dtype=np.int_)*par.num_lovew//2#w's initial love 
         sim.init_lovem = np.ones(par.simN,dtype=np.int_)*par.num_lovem//2#m's initial love 
         sim.init_love = sim.init_lovew*par.num_lovem+sim.init_lovem          #initial love 
@@ -359,73 +370,7 @@ def solve_intraperiod(sol,par):
 # SOLUTIONS - SINGLES #
 #######################
 
-#IF UNCOMMENT ALL BELOW, YOU ALLOW FOR MATCHING AFTER DIVORCE (SHOULD ALOS COMMENT THE intergrate_single after this one here)
-# @njit(parallel=parallel)
-# def integrate_single(sol,par,t):
-#     Ew_nomeet,Em_nomeet,Ew_meet,Em_meet=np.zeros((4,par.num_h,par.num_z,par.num_A)) 
-     
-#     # 1. Expected value if not meeting a partner
-#     for iA in prange(par.num_A):
-#         for iz in range(par.num_z):
-#             for ih in range(par.num_h):
-#                 for jz in range(par.num_z):
-                                      
-#                     Ew_nomeet[ih,iz,iA] += sol.Vw_single[t+1,:,jz,iA] @ par.Πh[t][-1,:,ih] * par.Πs[t][jz,iz]
-#                     Em_nomeet[ih,iz,iA] += sol.Vm_single[t+1,:,jz,iA] @ par.Πh[t][-1,:,ih] * par.Πs[t][jz,iz]                    
-       
-#     # 2. Expected value if meeting a partner: Π=kroneker product of love, wage, HC risk.
-#     Π=usr.rescale_matrix(np.kron(np.kron(par.Πh[t][-1],par.Πs[t]),par.Πl0[t])) 
-#     for iA in prange(par.num_A):
-#         for jz in range(par.num_z):
-#             for jh in range(par.num_h):
-#                 for jL in range(par.num_love):
-                    
-#                     #indices (mean-zero love shock for w and m: assumes symmetry)
-#                     iL = par.num_love//2+2;cjx=(t+1,jh,jz,slice(None),jL,iA)                   
-#                     a_cjx =jh*par.num_love*par.num_z + jz*par.num_love+jL;sjx = (t+1,jh,jz,iA);
-                    
-#                     #w and m value of max(partner,single) for cjx,sjx
-#                     vwt,vmt,_,_=marriage_mkt(par,sol.Vw_remain_couple[cjx],sol.Vm_remain_couple[cjx],
-#                                                   sol.Vw_single[sjx],sol.Vm_single[sjx])                  
-#                     for iz in range(par.num_z):
-#                         for ih in range(par.num_h):
-                                                      
-#                             a_cix =   ih*par.num_love*par.num_z + iz*par.num_love+iL
-                            
-#                             Ew_meet[ih,iz,iA]+= vwt * Π[a_cjx,a_cix]
-#                             Em_meet[ih,iz,iA]+= vmt * Π[a_cjx,a_cix]
-                            
-#     # 3. Return expected value given meeting probabilities                                              
-#     return par.λ_grid[t]*Ew_meet+(1.0-par.λ_grid[t])*Ew_nomeet, par.λ_grid[t]*Em_meet+(1.0-par.λ_grid[t])*Em_nomeet
 
-# @njit
-# def marriage_mkt(par,vcw,vcm,vsw,vsm):
-       
-#     wp = vcw - vsw; mp = vcm - vsm # surplus of being in a couple by pareto weight and gender
-              
-#     if (wp[-1]<0) | (mp[0]<0): return vsw,vsm,-100.0, False # negative surplus for any b. power
-#     else:
-
-#         θmin = np.maximum(linear_interp.interp_1d(vcw,      par.grid_power,      vsw),par.power_min)
-#         θmax = np.minimum(linear_interp.interp_1d(vcm[::-1],par.grid_power[::-1],vsm),par.power_max)
-        
-#         if θmin>θmax: return vsw,vsm,-100.0,False #again, negative surplus for any b. power
-#         else:#find the the b. powdr that maximizes symmetric nash bargaining
-        
-#             θ, v = usr.optimizer(nash_bargaining,θmin,θmax,args=(par.grid_power,wp,mp))
-#             vcwi = linear_interp.interp_1d(par.grid_power,vcw,θ)
-#             vcmi = linear_interp.interp_1d(par.grid_power,vcm,θ)  
-            
-                
-            
-#             return vcwi,vcmi,θ,True
-
-# @njit
-# def nash_bargaining(x,xgrid,wp,mp):
-    
-#     wpθ=linear_interp.interp_1d(xgrid,wp,x)
-#     mpθ=linear_interp.interp_1d(xgrid,mp,x)
-#     return  -wpθ*mpθ
 
 @njit(parallel=parallel)
 def integrate_single(sol, par, t):
@@ -443,8 +388,8 @@ def integrate_single(sol, par, t):
     """
     
     # Output arrays: Ew_nomeet[ih, iz, iA] and Em_nomeet[ih, iz, iA]
-    Ew_nomeet  = np.zeros((par.num_h, par.num_z, par.num_A))
-    Em_nomeet  = np.zeros((par.num_h, par.num_z, par.num_A))
+    Ew_nomeet  = np.zeros((par.num_perdiv, par.num_h, par.num_z, par.num_A))
+    Em_nomeet  = np.zeros((par.num_perdiv, par.num_h, par.num_z, par.num_A))
 
     # -------------------------
     # Precompute contiguous versions of Πh and Πs for fast column access
@@ -456,31 +401,33 @@ def integrate_single(sol, par, t):
 
     # Parallelize across iA
     for iA in prange(par.num_A):
-        # Ensure fast row access for V* (C-order = contiguous rows)
-        Vw = np.ascontiguousarray(sol.Vw_single[t+1, :, :, iA])  # (2, 81)
-        Vm = np.ascontiguousarray(sol.Vm_single[t+1, :, :, iA])  # (2, 81)
-
-        # Step (a): collapse h (2) -> produce per-z vectors for each ih in one go
-        # V*.T: (81, 2) @ H: (2, 2) -> Uw/Um: (81, 2)
-        Uw = Vw.T @ H
-        Um = Vm.T @ H
-
-        # Step (b): collapse z with one GEMM
-        # Uw.T: (2, 81) @ S: (81, 81) -> (2, 81)
-        Ew_nomeet[:, :, iA] = Uw.T @ S
-        Em_nomeet[:, :, iA] = Um.T @ S
+        for iD in range(par.num_perdiv):
+            
+            # Ensure fast row access for V* (C-order = contiguous rows)
+            Vw = np.ascontiguousarray(sol.Vw_single[t+1,iD, :, :, iA])  # (2, 81)
+            Vm = np.ascontiguousarray(sol.Vm_single[t+1,iD, :, :, iA])  # (2, 81)
+    
+            # Step (a): collapse h (2) -> produce per-z vectors for each ih in one go
+            # V*.T: (81, 2) @ H: (2, 2) -> Uw/Um: (81, 2)
+            Uw = Vw.T @ H
+            Um = Vm.T @ H
+    
+            # Step (b): collapse z with one GEMM
+            # Uw.T: (2, 81) @ S: (81, 81) -> (2, 81)
+            Ew_nomeet[iD,:, :, iA] = Uw.T @ S
+            Em_nomeet[iD,:, :, iA] = Um.T @ S
 
     return Ew_nomeet, Em_nomeet
     
-@njit#(parallel=parallel)
+@njit(parallel=parallel)
 def solve_single_egm(sol,par,t):
 
     #Integrate to get continuation value unless if you are in the last period
-    Ew,Em=np.zeros((2,par.num_h,par.num_zw,par.num_A))
+    Ew,Em=np.zeros((2,par.num_perdiv,par.num_h,par.num_zw,par.num_A))
     if t<par.T-1:Ew,Em = integrate_single(sol,par,t) #if t<par.T-1 else 
              
     #Pre-define outcomes (if update .sol directly, parallelization go crazy)
-    cwt,Ewt,cwp,cmt,Emt,cmp=np.ones((6,par.num_h,par.num_z,par.num_A))
+    cwt,Ewt,cwp,cmt,Emt,cmp=np.ones((6,par.num_perdiv,par.num_h,par.num_z,par.num_A))
     
     
     #function to find optimal savings, called for both men and women below
@@ -492,28 +439,29 @@ def solve_single_egm(sol,par,t):
         
         for iz in range(par.num_z):
             for ih in range(par.num_h):
+                for iD in range(par.num_perdiv):
 
-                resi = par.R*grid_Ai+usr.income_single(par,t,ih,iz,grid_Ai,women)[0]
-                
-                if t==(par.T-1): 
+                    resi = par.R*grid_Ai+usr.income_single(par,t,iD,ih,iz,grid_Ai,women)[0]
                     
-                    ci[ih,iz,:] = resi.copy() #consume all resources
-                    linear_interp.interp_1d_vec(par.grid_Ctot,par.grid_cpriv_s[:,ret],ci[ih,iz,:],cip[ih,iz,:])#private cons
-                    vi[ih,iz,:]=usr.util(cip[ih,iz,:],ci[ih,iz,:]-cip[ih,iz,:],*pars)#util
-                    
-                else: #before T-1 make consumption saving choices
-                    
-                    # marginal utility of assets next period
-                    βEid=par.β*usr.deriv(grid_Ai,Ei[ih,iz,:])
-                    
-                    # first get toatl -consumption out of grid using FOCs
-                    linear_interp.interp_1d_vec(np.flip(par.grid_marg_u_s[:,ret]),par.grid_inv_marg_u,βEid,cit[ih,iz,:])
-                    
-                    # use budget constraint to get current resources
-                    Ri_now = grid_Ai.flatten() + cit[ih,iz,:]
-                           
-                    # use the upper envelope algorithm to get optimal consumption and util
-                    upp_env_single(grid_Ai,Ri_now,cit[ih,iz,:],par.β*Ei[ih,iz,:],resi,ci[ih,iz,:],vi[ih,iz,:],*pars)
+                    if t==(par.T-1): 
+                        
+                        ci[iD,ih,iz,:] = resi.copy() #consume all resources
+                        linear_interp.interp_1d_vec(par.grid_Ctot,par.grid_cpriv_s[:,ret],ci[iD,ih,iz,:],cip[iD,ih,iz,:])#private cons
+                        vi[iD,ih,iz,:]=usr.util(cip[iD,ih,iz,:],ci[iD,ih,iz,:]-cip[iD,ih,iz,:],*pars)#util
+                        
+                    else: #before T-1 make consumption saving choices
+                        
+                        # marginal utility of assets next period
+                        βEid=par.β*usr.deriv(grid_Ai,Ei[iD,ih,iz,:])
+                        
+                        # first get toatl -consumption out of grid using FOCs
+                        linear_interp.interp_1d_vec(np.flip(par.grid_marg_u_s[:,ret]),par.grid_inv_marg_u,βEid,cit[iD,ih,iz,:])
+                        
+                        # use budget constraint to get current resources
+                        Ri_now = grid_Ai.flatten() + cit[iD,ih,iz,:]
+                               
+                        # use the upper envelope algorithm to get optimal consumption and util
+                        upp_env_single(grid_Ai,Ri_now,cit[iD,ih,iz,:],par.β*Ei[iD,ih,iz,:],resi,ci[iD,ih,iz,:],vi[iD,ih,iz,:],*pars)
 
     loop_savings_singles(par,par.grid_Aw,sol.Cw_tot_single[t],Ew,cwt,Ewt,cwp,sol.Vw_single[t],True,False) #savings
     loop_savings_singles(par,par.grid_Am,sol.Cm_tot_single[t],Em,cmt,Emt,cmp,sol.Vm_single[t],False,False)#savings
@@ -614,7 +562,7 @@ def solve_remain_couple_egm(par,sol,t):
                     #Eventual rebargaining happens below
                     for iA in range(par.num_A):        
                         
-                        idx_s = (t,ih,iz,iA)
+                        idx_s = (t,t//par.Dper,ih,iz,iA)
                         idxx = [(t,ih,iz,i,iL,iA) for i in range(par.num_power)]               
                         list_couple = (sol.Vw_couple, sol.Vm_couple)                 #couple        list
                         list_raw    = (Vw[ih,iz,:,iL,iA],Vm[ih,iz,:,iL,iA])          #remain-couple list
@@ -699,7 +647,7 @@ def check_participation_constraints(par,solpower,gridpower,list_raw,list_single,
         else:#Limited commitment case
 
             #1) all iP values are consistent with marriage
-            if ((min_Sw >= 0.0) & (min_Sm >= 0.0)) | (par.full): 
+            if ((min_Sw >= 0.0) & (min_Sm >= 0.0)): 
                 solpower[idx[iP]] = power #update power, below update value function
                 if nosim:no_power_change(list_couple,list_raw,idx,iP,power)
                          
@@ -761,7 +709,7 @@ def simulate_lifecycle(sim,sol,par):
     
     # unpacking some values to help numba optimize (horrible)
     A=sim.A;Aw=sim.Aw;Am=sim.Am;couple=sim.couple;power=sim.power;C_tot=sim.C_tot;Cm_tot=sim.Cm_tot;Cw_tot=sim.Cw_tot;couple_lag=sim.couple_lag;power_lag=sim.power_lag
-    love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;incwg=sim.incwg;incmg=sim.incmg
+    love=sim.love;shock_love=sim.shock_love;iz=sim.iz;wlp=sim.WLP;incw=sim.incw;incm=sim.incm;ih=sim.ih;iD=sim.ID;incwg=sim.incwg;incmg=sim.incmg
     dw=sim.dw;dm=sim.dm;Cw=sim.Cw;Cm=sim.Cm;Vsm=sim.Vsm;Vsw=sim.Vsw;Vcm=sim.Vcm;Vcw=sim.Vcw;tax=sim.tax
 
 
@@ -779,36 +727,38 @@ def simulate_lifecycle(sim,sol,par):
             #BELOW YOUACTICATE HETEROGENEITY IN INITIAL MATCH QUALITY
             if t==par.sample_init[i]:
     
+                #Initial condition for assets
+                A[i,t] = sim.init_A[i]; Aw[i,t] =  par.div_A_share * A[i,t];  Am[i,t] =  (1.0-par.div_A_share) * A[i,t]
+                
                 delete=np.ones(power.shape)
                 
                 #Store before renegotiations utilities
-                Vsw_=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,sim.init_ih[i],sim.init_z[i]],Aw[i,t])
-                Vsm_=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,sim.init_ih[i],sim.init_z[i]],Am[i,t])
+                Vsw_=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,t//par.Dper,sim.init_ih[i],sim.init_z[i]],Aw[i,t])
+                Vsm_=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,t//par.Dper,sim.init_ih[i],sim.init_z[i]],Am[i,t])
                 
                 # value of transitioning into singlehood
                 list_single = (Vsw_,Vsm_)
                 
           
-                mat=(np.ones(par.Πl0[0].shape)/par.num_love)#par.Πl0[t].copy()             
-                for j in range(par.num_love):
+                mat=par.Πl0[t].copy()   #(np.ones(par.Πl0[0].shape)/par.num_love)#          
+                for j in range(par.num_love-1):
                     
                     idxx = (t,sim.init_ih[i],sim.init_z[i],slice(None),j)
                     
             
                     list_raw    = (np.array([linear_interp.interp_1d(par.grid_A,sol.Vw_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]),
-                                    np.array([linear_interp.interp_1d(par.grid_A,sol.Vm_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]))
+                                   np.array([linear_interp.interp_1d(par.grid_A,sol.Vm_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]))
             
                     check_participation_constraints(par,delete,np.array([sim.init_power[i]]),list_raw,list_single,[(i,t)],nosim=False)
                     
                     
-                    if delete[i,t] <= 0.0:#((np.allclose(delete[i,t],sim.init_power[i])) & (delete[i,t] >= 0.0)):#:#np.allclose(delete[i,t],sim.init_power[i]):
+                    if delete[i,t] <= -10.0:#((np.allclose(delete[i,t],sim.init_power[i])) & (delete[i,t] >= 0.0)):#:#np.allclose(delete[i,t],sim.init_power[i]):
                         mat[j,:]=0.0
-                        break
                     
                 #Now create the initial matrix
                 mat=mat/mat.sum(axis=0)
                     
-                initial[i]=usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])
+                initial[i]=usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
 
             
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation) 
@@ -818,6 +768,8 @@ def simulate_lifecycle(sim,sol,par):
             if (par.pens_reform): copy = True if par.policy_init[i]>par.sample_init[i] else t>par.sample_init[i] 
             else:                 copy = t>par.sample_init[i]
                 
+            
+            #Initial condition for other variables
             Π = par.Πh[t][wlp[i,t-1]]                                                if t>0 else par.Πh[t][-1]
             ih[i,t] = usr.mc_simulate(ih[i,t-1],Π,sim.shock_h[i,t])                  if copy else sim.init_ih[i]            
             couple_lag[i,t] = couple[i,t-1]                                          if copy else sim.init_couple[i]
@@ -833,8 +785,8 @@ def simulate_lifecycle(sim,sol,par):
             if (couple_lag[i,t]) & (t<par.Tr):# do rebargaining power and divorce choice ifin a couple and not retired                 
 
                 # Store before renegotiations utilities
-                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
-                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
+                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih[i,t],iz[i,t]],Aw[i,t])
+                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,t//par.Dper,ih[i,t],iz[i,t]],Am[i,t])
 
                 # Value of transitioning into singlehood
                 list_single = (Vsw[i,t],Vsm[i,t])
@@ -845,7 +797,11 @@ def simulate_lifecycle(sim,sol,par):
 
                 # Rebargainings happens here
                 check_participation_constraints(par,power,np.array([power_lag[i,t]]),list_raw,list_single,[(i,t)],nosim=False)
-                couple[i,t] = False if power[i,t] <= -100.0 else True # partnership status: divorce is coded as -100
+                couple[i,t] = False if power[i,t] <= -10.0 else True # partnership status: divorce is coded as -100
+                
+                #If divorce, update period at divorce
+                if power[i,t] <= -10.0:
+                    iD[i,:]=int(t//(par.Tr/par.num_perdiv))
                     
             else: #divorce is an absorbing state
                 
@@ -854,12 +810,14 @@ def simulate_lifecycle(sim,sol,par):
             # update behavior
             if couple[i,t]:
                 
-                # Store before renegotiations utilities
-                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,ih[i,t],iz[i,t]],Aw[i,t])
-                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,ih[i,t],iz[i,t]],Am[i,t])
-                Vcw[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vw_remain_couple[idx],power[i,t],A[i,t])
-                Vcm[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vm_remain_couple[idx],power[i,t],A[i,t])
-                
+                if (t<par.Tr):
+                    
+                    # Store before renegotiations utilities
+                    Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih[i,t],iz[i,t]],Aw[i,t])
+                    Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,t//par.Dper,ih[i,t],iz[i,t]],Am[i,t])
+                    Vcw[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vw_remain_couple[idx],power[i,t],A[i,t])
+                    Vcm[i,t]=linear_interp.interp_2d(par.grid_power,par.grid_A,sol.Vm_remain_couple[idx],power[i,t],A[i,t])
+                    
                 # First decide about labor participation, given employment probabilities part_i and draw from [0,1] uniform shock_taste
                 part_i=np.array([linear_interp.interp_2d(par.grid_power,par.grid_A,sol.remain_WLP[t,wls,*idx[1:]],power[i,t],A[i,t]) for wls in range(par.num_wlp)])
                 wlp[i,t]=usr.binary_search_event(part_i, sim.shock_taste[i,t])            
@@ -887,8 +845,8 @@ def simulate_lifecycle(sim,sol,par):
             else: # single
                
                 # pick relevant solution for single
-                sol_single_w = sol.Cw_tot_single[t,ih[i,t],iz[i,t]]
-                sol_single_m = sol.Cm_tot_single[t,ih[i,t],iz[i,t]]
+                sol_single_w = sol.Cw_tot_single[t,iD[i,t],ih[i,t],iz[i,t]]
+                sol_single_m = sol.Cm_tot_single[t,iD[i,t],ih[i,t],iz[i,t]]
                 
                 #Store before renegotiations utilities
                 Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol_single_w,Aw[i,t])
@@ -907,7 +865,7 @@ def simulate_lifecycle(sim,sol,par):
                 wlp[i,t]=par.num_wlp-1 if t<par.Tr else 0
                 
                 #resources
-                incw[i,t],incwg[i,t],taxsw=usr.income_single(par,t,ih[i,t],iz[i,t],Aw[i,t],women=True);incm[i,t],incmg[i,t],taxsm=usr.income_single(par,t,ih[i,t],iz[i,t],Am[i,t],women=False)
+                incw[i,t],incwg[i,t],taxsw=usr.income_single(par,t,iD[i,t],ih[i,t],iz[i,t],Aw[i,t],women=True);incm[i,t],incmg[i,t],taxsm=usr.income_single(par,t,iD[i,t],ih[i,t],iz[i,t],Am[i,t],women=False)
                 tax[i,t]=taxsw+taxsm
                 
                 # update end-of-period states
