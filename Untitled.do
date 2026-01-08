@@ -21,9 +21,6 @@ reg wife_share b99.event_time_PER_treat100 b99.event_time100 treat_group
 areg wife_share b99.event_time_PER_treat100, absorb(event_time100 treat_group age)
 
 
-gen post=0
-replace post=1 if event_time>=0
 
-gen inter=post*treat_group
 
 reg wife_share treat_group post inter

@@ -71,6 +71,8 @@ xc=np.array([0.38319299, 0.01227291, 0.74583664, 0.96036123, 0.50535224])
 
 xc=np.array([0.40140019, 0.01351466, 0.79613314, 1.03148895, 0.52124526])
 
+xc=np.array([0.406009,   0.00893523, 0.77535802, 1.02542591, 0.52330953])
+
 
 # Lower and higher bounds of parameters
 xl=np.array([0.00001,0.000082,0.1,0.5,0.01]) 
@@ -108,7 +110,7 @@ age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh
 calendar_year=age-age_initial[:,None]+year[:,None]
 
 policy=np.maximum(calendar_year[:,0],2007)
-age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)#*0+13
+age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 
 
 #Function to minimize 
@@ -123,7 +125,7 @@ def q(pt,table=False):
         ###################
         #Pre reform model
         ####################
-        tic=time.time()
+        #tic=time.time()
         
         # Set up the model with the input parameters pt
         M_bef = model.copy(name='numba_new_copy')
@@ -177,8 +179,8 @@ def q(pt,table=False):
         M.solve() 
         M.simulate() 
         
-        toc=time.time()
-        print('Time elapsed for model solution is {}'.format(toc-tic))
+        #toc=time.time()
+        #print('Time elapsed for model solution is {}'.format(toc-tic))
         
         
         #############################################
@@ -208,94 +210,98 @@ def q(pt,table=False):
 
 
         
-        # time_to_policy= (np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)-M.par.policy_init[:,None]
-        # event_time=time_to_policy.copy()
-        # #event_time[event_time<=-5]=-5
-        # #event_time[event_time>=6]=6
-        # idd=np.repeat(np.cumsum(np.ones(M.par.simN))[:,None],M.par.T,axis=1)
-        # agei=np.repeat((age_initial)[:,None],M.par.T,axis=1) 
+        time_to_policy= (np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)-M.par.policy_init[:,None]
+        event_time=time_to_policy.copy()
+        #event_time[event_time<=-5]=-5
+        #event_time[event_time>=6]=6
+        idd=np.repeat(np.cumsum(np.ones(M.par.simN))[:,None],M.par.T,axis=1)
+        agei=np.repeat((age_initial)[:,None],M.par.T,axis=1) 
         
-        # policy_init= np.repeat((M.par.policy_init)[:,None],M.par.T,axis=1) 
+        policy_init= np.repeat((M.par.policy_init)[:,None],M.par.T,axis=1) 
         
-        # assets=np.repeat((M.sim.init_A)[:,None],M.par.T,axis=1) 
-        # iz=np.repeat((M.sim.init_z)[:,None],M.par.T,axis=1) 
-        # power=np.repeat((param)[:,None],M.par.T,axis=1) 
+        assets=np.repeat((M.sim.init_A)[:,None],M.par.T,axis=1) 
+        iz=np.repeat((M.sim.init_z)[:,None],M.par.T,axis=1) 
+        power=np.repeat((param)[:,None],M.par.T,axis=1) 
         
-      
+        time=age-agei
         
         
         
-        # treat_group=np.repeat((M.par.policy_init>=15)[:,None],M.par.T,axis=1) & (M.par.policy_init>=15)[:,None]
+        treat_group=np.repeat((M.par.policy_init>=15)[:,None],M.par.T,axis=1) & (M.par.policy_init>=15)[:,None]
         
-        # treat_group=np.repeat( ((M.par.policy_init-(age_initial-20))>=8)[:,None],M.par.T,axis=1)
+        treat_group=np.repeat( ((M.par.policy_init-(age_initial-20))>=8)[:,None],M.par.T,axis=1)
         
-        # treat_group=np.repeat((YW<YM)[:,None],M.par.T,axis=1)
+        treat_group=np.repeat((age[np.arange(M.par.simN),age_policy][:,None]>=30),M.par.T,axis=1)
         
        
         
-        # event_time_PER_treat=event_time*treat_group 
+        event_time_PER_treat=event_time*treat_group 
         
-        # wife_share=M.sim.Cw/(M.sim.Cw+M.sim.Cm)
+        wife_share=np.log(M.sim.Cw/(M.sim.Cw+M.sim.Cm))
         
-        # #Sample
-        # subset=    (age>=age_initial[:,None])   & (M.sim.power>0) & (event_time>=-5) & (event_time<=10) & (age_initial-20<=M.par.policy_init-1)[:,None]
+        #Sample
+        subset=    (age>=age_initial[:,None])   & (M.sim.power>0) & (event_time>=-5) & (event_time<=10) & (age_initial-20<=M.par.policy_init-1)[:,None]
                  
      
-        # # Combine into a DataFrame 
-        # df = pd.DataFrame({ 
-        #     "A":assets[subset],
-        #     "agei":agei[subset],
-        #     "power":power[subset],
-        #     "policy_init":policy_init[subset],
-        #     "post":(event_time>=0)[subset],
-        #     "inter":(treat_group*(event_time>=0))[subset],
-        #     "wife_share":wife_share[subset], 
-        #     "event_time":event_time[subset], 
-        #     "iz":iz[subset],
-        #     "idd":idd[subset], 
-        #     "age":age[subset], 
-        #     "treat_group":treat_group[subset],
-        #     "event_time_PER_treat":event_time_PER_treat[subset] 
-        # }) 
+        # Combine into a DataFrame 
+        df = pd.DataFrame({ 
+            "A":assets[subset],
+            "agei":agei[subset],
+            "power":power[subset],
+            "time":time[subset],
+            "policy_init":policy_init[subset],
+            "post":(event_time>=0)[subset],
+            "inter":(treat_group*(event_time>=0))[subset],
+            "wife_share":wife_share[subset], 
+            "event_time":event_time[subset], 
+            "iz":iz[subset],
+            "idd":idd[subset], 
+            "age":age[subset], 
+            "treat_group":treat_group[subset],
+            "event_time_PER_treat":event_time_PER_treat[subset] 
+        }) 
          
-        # df.to_stata('delete.dta')
+        df.to_stata('delete.dta')
      
-        # reference_value=-1
-        # event_cats = sorted(df['event_time'].unique()) 
-        # if reference_value in event_cats: 
-        #     event_cats.remove(reference_value) 
-        #     event_cats = [reference_value] + event_cats 
+        reference_value=-1
+        event_cats = sorted(df['event_time'].unique()) 
+        if reference_value in event_cats: 
+            event_cats.remove(reference_value) 
+            event_cats = [reference_value] + event_cats 
              
 
              
          
          
-        # # Example: your data frame 
-        # # df must contain columns: y, x1, x2, firm, year, region 
+        # Example: your data frame 
+        # df must contain columns: y, x1, x2, firm, year, region 
          
-        # # Step 1: Create the fixed effects structure 
-        # fe_df = df[[ 'event_time','age','treat_group','idd']].astype('category')
-        # #fe_df = df[['post','treat_group']].astype('category')
+        # Step 1: Create the fixed effects structure 
+        fe_df = df[[ 'event_time','treat_group','idd','time']].astype('category')
+
          
-        # # Step 2: Create the HDFE projector 
-        # hdfe = create(fe_df) 
+        # Step 2: Create the HDFE projector 
+        hdfe = create(fe_df) 
          
-        # # Create categorical with this ordering 
-        # df['event_cat'] = pd.Categorical(df['event_time_PER_treat'], categories=event_cats) 
+        # Create categorical with this ordering 
+        df['event_cat'] = pd.Categorical(df['event_time_PER_treat'], categories=event_cats) 
      
-        # # Create dummies, drop_first will now drop your reference group 
-        # event_dummies = pd.get_dummies(df['event_cat'], prefix='event', drop_first=True) 
+        # Create dummies, drop_first will now drop your reference group 
+        event_dummies = pd.get_dummies(df['event_cat'], prefix='event', drop_first=True) 
          
-        # # Residualize both y and X 
-        # y_resid = hdfe.residualize(df[['wife_share']].values) 
-        # X_resid = hdfe.residualize(event_dummies.values) 
-        # #X_resid = hdfe.residualize(df[['inter']].values) 
+        # Residualize both y and X 
+        y_resid = hdfe.residualize(df[['wife_share']].values) 
+        X_resid = hdfe.residualize(event_dummies.values) 
+        X2_resid = hdfe.residualize(df[['inter']].values) 
          
         
-        # # OLS on residuals 
-        # model_ = sm.OLS(y_resid, X_resid) 
-        # results = model_.fit() 
-        # plt.plot(results.params)
+        # OLS on residuals 
+        model_ = sm.OLS(y_resid, X_resid) 
+        results = model_.fit() 
+        plt.plot(results.params)
+        
+        policy_effect_wife_share=sm.OLS(y_resid, X2_resid).fit().params[0] 
+        
          
         
       
@@ -400,7 +406,11 @@ def q(pt,table=False):
         wife_share_bef=M_bef.sim.Cw/(M_bef.sim.Cw+M_bef.sim.Cm)
         
         sample=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
-                 & (M_bef.sim.power>0) &  (M.sim.power>0) & (age<=40) &  (M.par.sample_init<M.par.policy_init)[:,None]# & (age<=40)
+                 & (M_bef.sim.power>0) &  (M.sim.power>0) & (age[np.arange(M.par.simN),age_policy][:,None]>=30) &  (M.par.sample_init<M.par.policy_init)[:,None]# & (age<=40)
+
+        sampley=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
+                 & (M_bef.sim.power>0) &  (M.sim.power>0) & (age[np.arange(M.par.simN),age_policy][:,None]<30) &  (M.par.sample_init<M.par.policy_init)[:,None]# & (age<=40)
+               
                  
         sample_bef=    (age>=age_initial[:,None]) & (age<=age_final[:,None]) \
                  & (M_bef.sim.power>0) & (age<=40) &  (M.par.sample_init<M.par.policy_init)[:,None] 
@@ -414,7 +424,10 @@ def q(pt,table=False):
         plt.plot(wife_share_aft_-wife_share_bef_)
         
         wife_share_effect=np.array([(np.log(wife_share_aft)-np.log(wife_share_bef))[(sample)    & (time_to_policy==i)].mean() for i in event_time])
-        plt.plot(wife_share_effect)
+        
+        wife_share_effecty=np.array([(np.log(wife_share_aft)-np.log(wife_share_bef))[(sampley)    & (time_to_policy==i)].mean() for i in event_time])
+        
+        plt.plot(wife_share_effect-wife_share_effecty*0)
         
         wife_share_effectw=np.array([(np.log(M.sim.Cw)-np.log(M_bef.sim.Cw))[(sample)    & (time_to_policy==i)].mean() for i in event_time])
         wife_share_effectm=np.array([(np.log(M.sim.Cm)-np.log(M_bef.sim.Cm))[(sample)    & (time_to_policy==i)].mean() for i in event_time])
@@ -445,7 +458,7 @@ def q(pt,table=False):
         
         # plt.plot(event_time,wife_share_aft_-wife_share_bef_,event_time,wife_share_effect)
         
-        policy_effect_wife_share=np.nanmean(wife_share_effect[5:])#ife_share_aft_[5:].mean()-wife_share_bef_[5:].mean()
+        #policy_effect_wife_share=np.nanmean(wife_share_effect[5:]-wife_share_effecty[5:])#ife_share_aft_[5:].mean()-wife_share_bef_[5:].mean()
 
       
        
@@ -743,13 +756,13 @@ import numpy as np
 if __name__ == '__main__': 
      
    
-    #q(xc)
-    #Estimate the model
-    res=dfols.solve(q, xc, rhobeg = 0.4, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
-                npt=len(xc)+5,scaling_within_bounds=True,   
-                user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
-                              'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
-                objfun_has_noise=False,print_progress=True) 
+    q(xc)
+    # #Estimate the model
+    # res=dfols.solve(q, xc, rhobeg = 0.4, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
+    #             npt=len(xc)+5,scaling_within_bounds=True,   
+    #             user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
+    #                           'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
+    #             objfun_has_noise=False,print_progress=True) 
     
     # res = scipy.optimize.minimize(q,xc,args=(model),bounds=list(zip(list(xl), list(xu))),method='Nelder-Mead',tol=1e-3)
     

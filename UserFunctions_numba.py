@@ -45,14 +45,14 @@ def resources_couple(par,t,ih,iz,assets):
     """
    
 
-    #women earningsF
-    yw= np.array([par.grid_zw[t,0,iz,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)])
-    
-    #spousal deduction based on womens earnings
-    SpDed=np.array([np.maximum(par.d0+par.d1*yw[wlp]+par.d2*yw[wlp]**2,0.0) for wlp in range(par.num_wlp)])
-    
     
     if t<par.Tr:
+        
+        #women earningsF
+        yw= np.array([par.grid_zw[t,0,iz,ih]*par.grid_wlp[wlp] for wlp in range(par.num_wlp)])
+        
+        #spousal deduction based on womens earnings
+        SpDed=np.array([np.maximum(par.d0+par.d1*yw[wlp]+par.d2*yw[wlp]**2,0.0) for wlp in range(par.num_wlp)])
         
         #men income and taxable income
         yh = par.grid_zm[t,0,iz,ih]
@@ -87,8 +87,8 @@ def income_single(par,t,iD,ih,iz,assets,women=True):
     This gives gross and net labor income of singles income
     """ 
     
-     
-    labor_income =  par.grid_zws[t,iD,iz,ih]*par.grid_wlp[-1] if women else par.grid_zms[t,iD,iz,ih]#without HC! 
+    ws=1.0 if t>=par.Tr else par.grid_wlp[-1]
+    labor_income =  par.grid_zws[t,iD,iz,ih]*ws if women else par.grid_zms[t,iD,iz,ih]#without HC! 
    
     tax_income = (labor_income) -par.Λ*(labor_income)**(1-par.τ)#taxes(labor_income,s=True)# 
   
@@ -251,6 +251,9 @@ def labor_income(par,single=False,pens_reform=False):
             iz_w_mod=izwp*par.num_ϵw+par.num_ϵw//2
             iz_m_mod=izmp*par.num_ϵm+par.num_ϵm//2
             
+            iz_w_mod=1*par.num_ϵw+par.num_ϵw//2
+            iz_m_mod=1*par.num_ϵm+par.num_ϵm//2
+            
             XXwA[:,:,iz,:]=XXw[:,:,iz_w,:]#[:,:,iz_w//par.num_ϵw,:]
             XXmA[:,:,iz,:]=XXm[:,:,iz_m,:]#[:,:,iz_m//par.num_ϵm,:]
             
@@ -266,17 +269,33 @@ def labor_income(par,single=False,pens_reform=False):
             for iD in range(par.num_perdiv):
 
                 #Individual pension
-                Ind_M = XXmA2[par.Tr-1,iD,:,i]
-                Ind_W = XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
+                Ind_M = XXmA[par.Tr-1,iD,:,i]
+                Ind_W = XXwA[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
                 
                 #Shared pension accumulated while married
-                Shared = (Ind_M+Ind_W)/2
+                Shared = (Ind_M+Ind_W)/2#(XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
                 
                 #Weight of Shared vs.individual pension  depending on pension reform implementation                
                 ws=par.PW[iD] if pens_reform else 0.0
                              
                 XXwA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_W,par.p_b,par.κ)
                 XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
+                
+                
+                #Shared pension accumulated while married
+                Shared = (XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
+                
+                lossm= XXmA2[par.Tr-1,iD,:,i] - Shared
+                gainw= Shared - XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
+                
+                #Weight of Shared vs.individual pension  depending on pension reform implementation                
+                ws=par.PW[iD] if pens_reform else 0.0
+                             
+                XXwA[t,iD,:,i]=pens(Ind_W+gainw*ws,par.p_b,par.κ)
+                XXmA[t,iD,:,i]=pens(Ind_M-lossm*ws,par.p_b,par.κ)
+        
+        
+
         
     #####################
     # Transition matrices
@@ -333,6 +352,8 @@ def pension_share(par):
     
     #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
     A_w = np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
+    
+    A_w=np.array([(par.Dper*(i+1))/par.Tr for i in range(par.num_perdiv)])
   
     return A_w
     

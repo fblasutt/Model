@@ -39,7 +39,7 @@ class HouseholdModelClass(EconModelClass):
         par.R = 1.0#1+ interest rate
                
         # Preferences
-        par.β = .999   # Discount factor
+        par.β = 1.0   # Discount factor
         par.ρ = 1.5     # Risk avresion private goods
         par.χ = 1.5    # Risk aversion home goods
         par.α = 0.35    # Weight on home good
@@ -48,15 +48,15 @@ class HouseholdModelClass(EconModelClass):
         
         # Income processes: tren and shocks (sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks)
         par.ι0m= -0.224; par.ι1m=0.046   ;par.ι2m=-0.00075858 #trend for husband
-        par.ι0w=-0.791  ;par.ι1w=0.046   ;par.ι2w=-0.00075858 #trend for wife
+        par.ι0w=-0.591  ;par.ι1w=0.046   ;par.ι2w=-0.00075858 #trend for wife
  
         par.σzm=0.0082**0.5  ;par.σϵm= 0.0125**0.5;par.σ0m=  0.0338**0.5; #shock size husband
         par.σzw= 0.00978**0.5;par.σϵw=0.0137**0.5 ;par.σ0w= 0.1198**0.5; #shock size wife
         par.σϵwm=0.0#0.00289 #correlation of transitory shocks
         
         # Pension parameters
-        par.p_b=0.03578 #basic pension
-        par.κ=0.419    #proportional part of pension
+        par.p_b=0.3578 #basic pension
+        par.κ=0.319    #proportional part of pension
         
         # Depreciation of human capital
         par.μ = 1.195        # Human capital depreciation drift
@@ -83,7 +83,7 @@ class HouseholdModelClass(EconModelClass):
         ##########################################
         
         #Divorce period and grid
-        par.num_perdiv = 14
+        par.num_perdiv = 5
         par.Dper = int(par.Tr/par.num_perdiv)
         
         # Wealth
@@ -135,7 +135,7 @@ class HouseholdModelClass(EconModelClass):
         par.grid_Aw =  par.grid_A * par.div_A_share; par.grid_Am =  par.grid_A*(1.0-par.div_A_share)
 
         # Women's labor supply grids
-        par.grid_wlp=np.array([0.0,0.823])
+        par.grid_wlp=np.array([0.0,0.672])#np.array([0.0,0.823])
         par.num_wlp=len(par.grid_wlp)
         
         # Match quality shock grid and transition matrices  
@@ -785,11 +785,11 @@ def simulate_lifecycle(sim,sol,par):
             if (couple_lag[i,t]) & (t<par.Tr):# do rebargaining power and divorce choice ifin a couple and not retired                 
 
                 # Store before renegotiations utilities
-                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih[i,t],iz[i,t]],Aw[i,t])
-                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,t//par.Dper,ih[i,t],iz[i,t]],Am[i,t])
+                Vsw__=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih[i,t],iz[i,t]],Aw[i,t])
+                Vsm__=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,t//par.Dper,ih[i,t],iz[i,t]],Am[i,t])
 
                 # Value of transitioning into singlehood
-                list_single = (Vsw[i,t],Vsm[i,t])
+                list_single = (Vsw__,Vsm__)
 
                 # Value of being ina  couple with given bargaining power
                 list_raw    = (np.array([linear_interp.interp_1d(par.grid_A,sol.Vw_remain_couple[idx][iP],A[i,t]) for iP in range(par.num_power)]),
@@ -800,8 +800,7 @@ def simulate_lifecycle(sim,sol,par):
                 couple[i,t] = False if power[i,t] <= -10.0 else True # partnership status: divorce is coded as -100
                 
                 #If divorce, update period at divorce
-                if power[i,t] <= -10.0:
-                    iD[i,:]=int(t//(par.Tr/par.num_perdiv))
+                if power[i,t] <= -10.0: iD[i,:]=t//par.Dper
                     
             else: #divorce is an absorbing state
                 
@@ -832,8 +831,8 @@ def simulate_lifecycle(sim,sol,par):
                 M_resources= M_resources_raw[wlp[i,t]] 
                 
                 if t< par.simT-1:A[i,t+1] = M_resources - C_tot[i,t]#
-                if t< par.simT-1:Aw[i,t+1] =       par.div_A_share * A[i,t]# in case of divorce 
-                if t< par.simT-1:Am[i,t+1] = (1.0-par.div_A_share) * A[i,t]# in case of divorce 
+                if t< par.simT-1:Aw[i,t+1] =       par.div_A_share * A[i,t+1]# in case of divorce 
+                if t< par.simT-1:Am[i,t+1] = (1.0-par.div_A_share) * A[i,t+1]# in case of divorce 
                 
                 # Obtain public and private consumption given total consumption Ctot
                 ret=1 if t>=par.Tr else 0
@@ -849,8 +848,8 @@ def simulate_lifecycle(sim,sol,par):
                 sol_single_m = sol.Cm_tot_single[t,iD[i,t],ih[i,t],iz[i,t]]
                 
                 #Store before renegotiations utilities
-                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol_single_w,Aw[i,t])
-                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol_single_m,Am[i,t])
+                Vsw[i,t]=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,iD[i,t],ih[i,t],iz[i,t]],Aw[i,t])
+                Vsm[i,t]=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,iD[i,t],ih[i,t],iz[i,t]],Am[i,t])
 
                 # optimal consumption allocations
                 Cw_tot[i,t] = linear_interp.interp_1d(par.grid_Aw,sol_single_w,Aw[i,t])
@@ -873,7 +872,9 @@ def simulate_lifecycle(sim,sol,par):
                 Mm = par.R*Am[i,t] + incm[i,t] # total resources man
 
                 if t< par.simT-1: 
-                    if par.women[i]: Aw[i,t+1] = Mw - Cw_tot[i,t]; Am[i,t+1] = Aw[i,t+1]*par.div_A_share
-                    else:            Am[i,t+1] = Mm - Cm_tot[i,t]; Aw[i,t+1] = Am[i,t+1]*par.div_A_share
+                    #if par.women[i]: Aw[i,t+1] = Mw - Cw_tot[i,t]; Am[i,t+1] = Aw[i,t+1]*par.div_A_share
+                    #else:            Am[i,t+1] = Mm - Cm_tot[i,t]; Aw[i,t+1] = Am[i,t+1]*par.div_A_share
+                    Aw[i,t+1] = Mw - Cw_tot[i,t]#; Am[i,t+1] = Aw[i,t+1]*par.div_A_share
+                    Am[i,t+1] = Mm - Cm_tot[i,t]#; Aw[i,t+1] = Am[i,t+1]*par.div_A_share
                     A[i,t+1]  = Aw[i,t+1] + Am[i,t+1] 
                     
