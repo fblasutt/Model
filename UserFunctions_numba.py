@@ -323,10 +323,10 @@ def labor_income(par,single=False,pens_reform=False):
 def pension_share(par):
     """
     The objective of this function is to compute the share of pension credits
-    to be shared among husband and wife in case of a divorce in period iD -> num_perdiv.
+    to be shared among husband and wife in case of a divorce in period i -> num_perdiv.
     
     This computation is based on the distribution of age at marriage, which allows to
-    estimate the duration of time spent in a couple for a given date of divorce iD.
+    estimate the duration of time spent in a couple for a given date of divorce i.
 
     """
     
@@ -353,6 +353,7 @@ def pension_share(par):
     #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
     A_w = np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
     
+    #Trick
     A_w=np.array([(par.Dper*(i+1))/par.Tr for i in range(par.num_perdiv)])
   
     return A_w

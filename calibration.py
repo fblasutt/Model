@@ -237,7 +237,7 @@ def q(pt,table=False):
         
         event_time_PER_treat=event_time*treat_group 
         
-        wife_share=np.log(M.sim.Cw/(M.sim.Cw+M.sim.Cm))
+        wife_share=np.log(M_bef.sim.Cw/(M_bef.sim.Cw+M_bef.sim.Cm))
         
         #Sample
         subset=    (age>=age_initial[:,None])   & (M.sim.power>0) & (event_time>=-5) & (event_time<=10) & (age_initial-20<=M.par.policy_init-1)[:,None]
@@ -277,7 +277,7 @@ def q(pt,table=False):
         # df must contain columns: y, x1, x2, firm, year, region 
          
         # Step 1: Create the fixed effects structure 
-        fe_df = df[[ 'event_time','treat_group','idd','time']].astype('category')
+        fe_df = df[[ 'event_time','idd','age']].astype('category')
 
          
         # Step 2: Create the HDFE projector 
@@ -292,15 +292,17 @@ def q(pt,table=False):
         # Residualize both y and X 
         y_resid = hdfe.residualize(df[['wife_share']].values) 
         X_resid = hdfe.residualize(event_dummies.values) 
-        X2_resid = hdfe.residualize(df[['inter']].values) 
+        #X2_resid = hdfe.residualize(df[['inter']].values) 
          
         
         # OLS on residuals 
         model_ = sm.OLS(y_resid, X_resid) 
         results = model_.fit() 
-        plt.plot(results.params)
         
-        policy_effect_wife_share=sm.OLS(y_resid, X2_resid).fit().params[0] 
+        params=np.insert(results.params, 5, 0)
+        plt.plot(np.linspace(-5,10,16),params)
+        
+        policy_effect_wife_share=params[6:].mean()#sm.OLS(y_resid, X2_resid).fit().params[0] 
         
          
         
