@@ -1,20 +1,18 @@
-*------------------------------------------------------------------------------*
-*							Globals 
-*------------------------------------------------------------------------------*
+********************************************************************************
+*
+*	  Analysis of model simulated reform
+*
+********************************************************************************
 
 	if  "`c(username)'" == "sara" {
-		global JPSC 		"~/Dropbox/Family Insurance"
+		global JPSC 		"~/Dropbox/Family Risk Sharing/Model_replicated_reform"
 	}
-	// modify yours appropriately
 	else if "`c(username)'" == "32489" {
-		global JPSC 		"~/Dropbox/Family Insurance"
+		global JPSC 		"~/Dropbox/Family Risk Sharing/Model_replicated_reform"
 	}
-
-		
-		global cleandata	"${JPSC}/Empirical analysis//Data/JPSC2022_v2/cleandata"
-		global tables 		"${JPSC}/Tables"
-		global figures 		"${JPSC}/Figures"
-
+	
+	* Requires ftools, require, reghdfe
+	
 *------------------------------------------------------------------------------*
 
 *------------------------------------------------------------------------------*

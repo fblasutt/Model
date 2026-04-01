@@ -75,13 +75,14 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     zm,ϵm,zw,ϵw=np.zeros((4,par.simN,par.T))
     izm=m.sim.iz%par.num_zw
     izw=m.sim.iz//par.num_zm
+    ID=m.sim.ID
     for t in range(par.T):
         for i in range(par.simN):
         
-            zm[i,t]=par.grid_pm[t,izm[i,t],m.sim.ih[i,t]]
-            ϵm[i,t]=par.grid_ϵm[t,izm[i,t],m.sim.ih[i,t]]
-            zw[i,t]=par.grid_pw[t,izw[i,t],m.sim.ih[i,t]]
-            ϵw[i,t]=par.grid_ϵw[t,izw[i,t],m.sim.ih[i,t]]
+            zm[i,t]=par.grid_pm[t,ID[i,t],izm[i,t],m.sim.ih[i,t]]
+            ϵm[i,t]=par.grid_ϵm[t,ID[i,t],izm[i,t],m.sim.ih[i,t]]
+            zw[i,t]=par.grid_pw[t,ID[i,t],izw[i,t],m.sim.ih[i,t]]
+            ϵw[i,t]=par.grid_ϵw[t,ID[i,t],izw[i,t],m.sim.ih[i,t]]
                 
     Δzm=zm[sample1]-zm[sample] # persisten shocks husband
     Δϵm=ϵm[sample1]-ϵm[sample] # transitory shocks husband
@@ -122,6 +123,17 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     # Change in WLP
     ΔWLP=m.par.grid_wlp[m.sim.WLP][sample1]-m.par.grid_wlp[m.sim.WLP][sample]
+    
+    #Love shock changes
+    lovw,lovm=np.zeros((2,m.par.simN,m.par.T))
+    
+    for i in range(par.T):lovw[:,i]=par.grid_lovew[i][m.sim.love[:,i]//par.num_lovem]
+    for i in range(par.T):lovm[:,i]=par.grid_lovem[i][m.sim.love[:,i]%par.num_lovew]
+    
+    Δlovw=lovw[sample1]-lovw[sample]
+    Δlovm=lovm[sample1]-lovm[sample]
+    
+     
     
 
     ##########################################
@@ -299,6 +311,63 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     plt.ylabel("True") 
     plt.savefig(root+'/Output files/model/BPP_true.eps', format='eps', bbox_inches="tight")  
     plt.show()
+    
+    # Innovation in consumption
+    ξ=ΔC-(Δzm*totc['per_m']+Δzw*totc['per_w']+Δϵm*totc['tra_m']+Δϵw.var()*totc['tra_w'])
+    
+    
+    
+    #Checks for durables
+    per_m=ols(Δzm,Δd,sm,cov=(Δzw,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
+    per_w=ols(Δzw,Δd,sm,cov=(Δzm,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
+    tra_w=ols(Δϵw,Δd,sm,cov=(Δzm,Δϵm,Δzw,Δlovw,Δlovm),take=1)
+    tra_m=ols(Δϵm,Δd,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δlovm),take=1)
+    
+    lov_m=ols(Δlovm,Δd,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δϵm),take=1)
+    lov_w=ols(Δlovw,Δd,sm,cov=(Δzm,Δϵw,Δzw,Δlovm,Δϵm),take=1)
+    
+    shocks=np.array([Δzm[sm],Δzw[sm],Δϵm[sm],Δϵw[sm],Δlovm[sm],Δlovw[sm]])
+    PAS_THR=np.array([per_m,per_w,tra_m,tra_w,lov_m,lov_w])
+    
+    ξd=Δd[sm]-(shocks.T@PAS_THR)
+    
+    print(np.sum(shocks.var(axis=1)*PAS_THR**2)+ξd.var(),Δd[sm].var())
+    
+ 
+
+    #Checks for total consumption
+    per_m=ols(Δzm,ΔC,sm,cov=(Δzw,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
+    per_w=ols(Δzw,ΔC,sm,cov=(Δzm,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
+    tra_w=ols(Δϵw,ΔC,sm,cov=(Δzm,Δϵm,Δzw,Δlovw,Δlovm),take=1)
+    tra_m=ols(Δϵm,ΔC,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δlovm),take=1)
+    
+    lov_m=ols(Δlovm,ΔC,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δϵm),take=1)
+    lov_w=ols(Δlovw,ΔC,sm,cov=(Δzm,Δϵw,Δzw,Δlovm,Δϵm),take=1)
+    
+    shocks=np.array([Δzm[sm],Δzw[sm],Δϵm[sm],Δϵw[sm],Δlovm[sm],Δlovw[sm]])
+    PAS_THR=np.array([per_m,per_w,tra_m,tra_w,lov_m,lov_w])
+    
+    ξC=ΔC[sm]-(shocks.T@PAS_THR)
+    
+    print(np.sum(shocks.var(axis=1)*PAS_THR**2)+ξC.var(),ΔC[sm].var())
+    
+    #Checks for individual consumption
+    per_m=ols(Δzm,Δcm,sm,cov=(Δzw,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
+    per_w=ols(Δzw,Δcm,sm,cov=(Δzm,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
+    tra_w=ols(Δϵw,Δcm,sm,cov=(Δzm,Δϵm,Δzw,Δlovw,Δlovm),take=1)
+    tra_m=ols(Δϵm,Δcm,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δlovm),take=1)
+    
+    lov_m=ols(Δlovm,Δcm,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δϵm),take=1)
+    lov_w=ols(Δlovw,Δcm,sm,cov=(Δzm,Δϵw,Δzw,Δlovm,Δϵm),take=1)
+    
+    shocks=np.array([Δzm[sm],Δzw[sm],Δϵm[sm],Δϵw[sm],Δlovm[sm],Δlovw[sm]])
+    PAS_THR=np.array([per_m,per_w,tra_m,tra_w,lov_m,lov_w])
+    
+    ξcm=Δcm[sm]-(shocks.T@PAS_THR)
+    
+    print(np.sum(shocks.var(axis=1)*PAS_THR**2)+ξcm.var(),Δcm[sm].var())
+    
+    
     
 
     ####################################################    

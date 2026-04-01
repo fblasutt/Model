@@ -340,21 +340,48 @@ def pension_share(par):
     for i in range(par.Tr): 
         
         reweight=age_share.copy()
-        reweight[i:]=0.0
+        reweight[i+1:]=0.0
         reweight=reweight/reweight.sum()
         age_weights[i]=reweight
 
     age_weights[np.isnan(age_weights)]=0.0
 
 
+
+
     # Create array A_w_t where, for each year, you have the weight of the shared pension
-    A_w_t = np.array([age_weights[i]@ ((i-np.arange(par.Tr))/(par.Tr)) for i in range(par.Tr)])
+    A_w_t = np.array([age_weights[i]@ ((i-np.arange(par.Tr))/(par.Tr-1)) for i in range(par.Tr)])
     
     #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
     A_w = np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
     
+    
+    
+    # #Below you weight by contribution. But version below should take into account
+    # #women contributions as well and A_w should be gender dependent...
+  
+    # #Share of pension shared by year together
+    # trend=np.exp(np.array([par.ι0m+par.ι1m*t+par.ι2m*t**2 for t in range(par.Tr)]))
+    
+    # inc_weights=np.zeros((par.Tr,par.Tr))
+    # for i in range(par.Tr): 
+    #     for j in range(par.Tr): 
+        
+    #         reweight=trend[:i+1].sum()/trend.sum()
+    #         inc_weights[i,j]=trend[j:i+1].sum()/trend.sum()*(i>=j)
+
+ 
+    
+    # # Create array A_w_t where, for each year, you have the weight of the shared pension
+    # A_w_t = np.array([age_weights[i]@inc_weights[i] for i in range(par.Tr)])
+    
+  
+    # #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
+    # A_w = np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
+    
+    
     #Trick
-    A_w=np.array([(par.Dper*(i+1))/par.Tr for i in range(par.num_perdiv)])
+    #A_w=np.array([(par.Dper*(i+1))/par.Tr for i in range(par.num_perdiv)])
   
     return A_w
     

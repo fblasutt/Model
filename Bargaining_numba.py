@@ -36,7 +36,7 @@ class HouseholdModelClass(EconModelClass):
         par.Tr = 40+5 # age at retirement
          
         # Prices
-        par.R = 1.0#1+ interest rate
+        par.R = 1.0121#1+ interest rate Source:FM.M.JP.JPY.4F.BB.R_JP10YT_RR.YLDA
                
         # Preferences
         par.β = 1.0   # Discount factor
@@ -98,7 +98,7 @@ class HouseholdModelClass(EconModelClass):
 
         # love/match quality
         par.num_lovew = 3;par.num_lovem = 3;par.num_love=par.num_lovem*par.num_lovew
-        par.σL = 0.1; par.σL0 = 0.1
+        par.σL = 0.1; par.σL0 = 0.8
         
         # productivity of men and women: gridpoints
         par.num_ϵw=3;par.num_ϵm=3#transitory
@@ -752,7 +752,7 @@ def simulate_lifecycle(sim,sol,par):
                     check_participation_constraints(par,delete,np.array([sim.init_power[i]]),list_raw,list_single,[(i,t)],nosim=False)
                     
                     
-                    if delete[i,t] <= -10.0:#((np.allclose(delete[i,t],sim.init_power[i])) & (delete[i,t] >= 0.0)):#:#np.allclose(delete[i,t],sim.init_power[i]):
+                    if (not (np.allclose(delete[i,t],sim.init_power[i])) & (delete[i,t] >= 0.0)):#:#np.allclose(delete[i,t],sim.init_power[i]):
                         mat[j,:]=0.0
                     
                 #Now create the initial matrix

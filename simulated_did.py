@@ -37,6 +37,10 @@ N=30_000#sample size
 #Import information for the sample, then store the relevant variables
 baseline_sample=np.array(pd.read_excel(root+'/Output files/data_sample.csv'))
 
+#Without those two lines below there are nan which screw up things
+baseline_sample=baseline_sample[~np.isnan(baseline_sample).any(axis=1)]
+baseline_sample[:, 0] = np.arange(len(baseline_sample))
+
 pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
 indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
 final_sample= baseline_sample[:,1:][indexes] 
@@ -55,9 +59,10 @@ assets=final_sample[:,7]*np.mean(np.exp(h_income))
 # Guess of internal parameters: [ν,σL,α,χ,wedge]
 pt=np.array([0.406009,   0.00893523, 0.77535802, 1.02542591, 0.52330953])
 
+pt=np.array([0.51  , 0.00893523, 0.77535802, 1.02542591, 0.72])
 
 #Parametrize the model 
-par = {'simN':N,'ν': pt[0],'σL':pt[1],'α':pt[2],'ρ':pt[3],'wedge':pt[4],'sample_init':np.array(age_initial-20,dtype=np.int_)}
+par = {'simN':N,'ν': pt[0],'σL':pt[1],'α':pt[2],'ρ':pt[3],'wedge':pt[4],'sample_init':np.array(np.maximum(age_marriage-20,0),dtype=np.int_)}
 model=brg.HouseholdModelClass(par=par)
 
 
@@ -165,7 +170,7 @@ the reform was never introduced
 """
 
 #Choose your model
-MM = M.copy()
+MM = M_bef.copy()
 
 #Time to policy event
 event_time= (np.cumsum(np.ones((MM.par.simN,MM.par.T)),axis=1)-1)-MM.par.policy_init[:,None]
@@ -174,7 +179,7 @@ event_time= (np.cumsum(np.ones((MM.par.simN,MM.par.T)),axis=1)-1)-MM.par.policy_
 idd=np.repeat(np.cumsum(np.ones(MM.par.simN))[:,None],MM.par.T,axis=1)
 
 #Age at marriage
-agei=np.repeat((age_initial)[:,None],MM.par.T,axis=1) 
+agei=np.repeat((age_marriage)[:,None],MM.par.T,axis=1) 
 
 #Age at which policy started
 agepolicy= np.repeat((MM.par.policy_init)[:,None],MM.par.T,axis=1) 
@@ -209,4 +214,4 @@ df = pd.DataFrame({
 }) 
  
 #Save to stata
-df.to_stata('simulated_did.dta')
+df.to_stata('simulated_did_noreform_mod.dta')
