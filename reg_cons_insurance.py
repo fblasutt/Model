@@ -133,7 +133,40 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     Δlovw=lovw[sample1]-lovw[sample]
     Δlovm=lovm[sample1]-lovm[sample]
     
-     
+
+    ##########################################################
+    # Variance decomposition of individual consumption volatility
+    ##########################################################
+    # Identity: Δlog c^g = Δlog C + Δlog s^g, where C = cw+cm (total private) and s^g = c^g/C.
+    # =>  Var(Δlog c^g) = Var(Δlog C) + Var(Δlog s^g) + 2 Cov(Δlog C, Δlog s^g).
+    # Under limited commitment Δlog s^g ≠ 0 only on rebargaining periods, so Var(Δlog s^g)
+    # isolates rebargaining. The covariance captures how rebargaining co-moves with aggregate
+    # HH private consumption (negative = within-household insurance; positive = amplification).
+
+    def _vardec(dC, ds, dc, cond):
+        """Variance decomposition of Var(Δlog c) into aggregate + rebargaining + covariance."""
+        dC_, ds_, dc_ = dC[cond], ds[cond], dc[cond]
+        V_total = dc_.var(ddof=1)
+        V_agg   = dC_.var(ddof=1)
+        V_reb   = ds_.var(ddof=1)
+        K       = np.cov(dC_, ds_, ddof=1)[0, 1]
+        return {
+            # Variance components (levels)
+            'V_total':        V_total,
+            'V_agg':          V_agg,            # aggregate HH private consumption
+            'V_reb':          V_reb,            # rebargaining (share change)
+            '2Cov':           2.0*K,
+            # Raw shares of total volatility (sum to 1, with 2·Cov as separate term)
+            'sh_agg':         V_agg / V_total,
+            'sh_reb':         V_reb / V_total,
+            'sh_cov':         2.0*K / V_total,
+            # Identity residual (should be ≈ 0; catches bugs)
+            'identity_resid': V_total - (V_agg + V_reb + 2.0*K),
+        }
+
+    # Δcp = Δlog(cw+cm) total private, Δs = Δlog(cw/cp) wife share, Δs1 = Δlog(cm/cp) husband share
+    vardec_wife    = _vardec(Δcp, Δs,  Δcw, sm)
+    vardec_husband = _vardec(Δcp, Δs1, Δcm, sm)     
     
 
     ##########################################
@@ -317,57 +350,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     
     
-    #Checks for durables
-    per_m=ols(Δzm,Δd,sm,cov=(Δzw,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
-    per_w=ols(Δzw,Δd,sm,cov=(Δzm,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
-    tra_w=ols(Δϵw,Δd,sm,cov=(Δzm,Δϵm,Δzw,Δlovw,Δlovm),take=1)
-    tra_m=ols(Δϵm,Δd,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δlovm),take=1)
-    
-    lov_m=ols(Δlovm,Δd,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δϵm),take=1)
-    lov_w=ols(Δlovw,Δd,sm,cov=(Δzm,Δϵw,Δzw,Δlovm,Δϵm),take=1)
-    
-    shocks=np.array([Δzm[sm],Δzw[sm],Δϵm[sm],Δϵw[sm],Δlovm[sm],Δlovw[sm]])
-    PAS_THR=np.array([per_m,per_w,tra_m,tra_w,lov_m,lov_w])
-    
-    ξd=Δd[sm]-(shocks.T@PAS_THR)
-    
-    print(np.sum(shocks.var(axis=1)*PAS_THR**2)+ξd.var(),Δd[sm].var())
-    
- 
-
-    #Checks for total consumption
-    per_m=ols(Δzm,ΔC,sm,cov=(Δzw,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
-    per_w=ols(Δzw,ΔC,sm,cov=(Δzm,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
-    tra_w=ols(Δϵw,ΔC,sm,cov=(Δzm,Δϵm,Δzw,Δlovw,Δlovm),take=1)
-    tra_m=ols(Δϵm,ΔC,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δlovm),take=1)
-    
-    lov_m=ols(Δlovm,ΔC,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δϵm),take=1)
-    lov_w=ols(Δlovw,ΔC,sm,cov=(Δzm,Δϵw,Δzw,Δlovm,Δϵm),take=1)
-    
-    shocks=np.array([Δzm[sm],Δzw[sm],Δϵm[sm],Δϵw[sm],Δlovm[sm],Δlovw[sm]])
-    PAS_THR=np.array([per_m,per_w,tra_m,tra_w,lov_m,lov_w])
-    
-    ξC=ΔC[sm]-(shocks.T@PAS_THR)
-    
-    print(np.sum(shocks.var(axis=1)*PAS_THR**2)+ξC.var(),ΔC[sm].var())
-    
-    #Checks for individual consumption
-    per_m=ols(Δzm,Δcm,sm,cov=(Δzw,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
-    per_w=ols(Δzw,Δcm,sm,cov=(Δzm,Δϵm,Δϵw,Δlovw,Δlovm),take=1)
-    tra_w=ols(Δϵw,Δcm,sm,cov=(Δzm,Δϵm,Δzw,Δlovw,Δlovm),take=1)
-    tra_m=ols(Δϵm,Δcm,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δlovm),take=1)
-    
-    lov_m=ols(Δlovm,Δcm,sm,cov=(Δzm,Δϵw,Δzw,Δlovw,Δϵm),take=1)
-    lov_w=ols(Δlovw,Δcm,sm,cov=(Δzm,Δϵw,Δzw,Δlovm,Δϵm),take=1)
-    
-    shocks=np.array([Δzm[sm],Δzw[sm],Δϵm[sm],Δϵw[sm],Δlovm[sm],Δlovw[sm]])
-    PAS_THR=np.array([per_m,per_w,tra_m,tra_w,lov_m,lov_w])
-    
-    ξcm=Δcm[sm]-(shocks.T@PAS_THR)
-    
-    print(np.sum(shocks.var(axis=1)*PAS_THR**2)+ξcm.var(),Δcm[sm].var())
-    
-    
+    #Variance decomposition
     
 
     ####################################################    
@@ -445,4 +428,5 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
   
 
-    return {'indc':indc,'w_sh':w_sh,'totc':totc,'dins':dins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,'wlp':wlp,'level':level,'ins_dec':ins_dec}
+    return {'indc':indc,'w_sh':w_sh,'totc':totc,'dins':dins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,'wlp':wlp,'level':level,'ins_dec':ins_dec,
+            'vardec_w':vardec_wife,'vardec_m':vardec_husband}

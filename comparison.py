@@ -506,4 +506,37 @@ table=r'Mean          & '+p33(mean['A'])+' & '+p33(mean['E'])+' & '+p33(mean['Cw
       r'Top 1\% share & '+p33(top1['A'])+' & '+p33(top1['E'])+' & '+p33(top1['Cw'])+' & '+p33(top1['Cm'])+' & '+p33(top1['X'])+'    \\\\\\bottomrule'
 with open(root+'/Output files/model/sum_stat.tex', 'w') as f: f.write(table); f.close() 
 
-    
+###############################################################
+# Event study around divorce
+###############################################################
+
+# Divorce event: first period power turns negative
+mask = (M.sim.power < 0) & (M.sim.power_lag >= 0)
+first_idx = np.where(mask.any(axis=1), np.argmax(mask, axis=1), -1)
+divorce_age = np.where(first_idx >= 0, age[np.arange(len(first_idx)), first_idx], np.nan)
+event_time = age - divorce_age[:, None]
+
+conshh = M.sim.dw + M.sim.Cw + M.sim.Cm*(M.sim.power >= 0)
+
+events = np.arange(-5, 6)
+conshh_agg  = np.array([np.nanmean(conshh[event_time == i]) for i in events])
+
+conshh_agg=conshh_agg/conshh_agg[0]
+
+import pandas as pd
+
+# Compare model with data
+df = pd.read_excel(root+'/Output files/divorce_penalty_consumption.xlsx').sort_values("event_time")
+t  = np.arange(-5, 6)
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.fill_between(df["event_time"], df["lb"], df["ub"], alpha=0.2, color="steelblue")
+ax.plot(df["event_time"], df["mean_share"], color="steelblue", lw=2, marker="o", ms=4, label="Data")
+ax.plot(t, conshh_agg, color="tomato", lw=2, ls="--", marker="s", ms=4, label="Model")
+ax.axvline(0, color="black", ls="--", lw=0.8)
+ax.axhline(1, color="gray",  ls=":",  lw=0.8)
+ax.set(xlabel="Years since first child", ylabel="Consumption (norm. t=−5)",
+       title="Divorce penalty in total consumption", xticks=t)
+ax.legend(); ax.spines[["top", "right"]].set_visible(False)
+plt.tight_layout(); plt.savefig(root+'/Output files/model/divorce_penalty_consumption.eps', dpi=150); plt.show()
+
