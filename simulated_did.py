@@ -55,11 +55,11 @@ year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 
-# Guess of internal parameters: [ν,σL,α,ρ,wedge,β]
+# Guess of internal parameters: [ω,σL,α,ρ,wedge,β]
 pt=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
-#Parametrize the model 
-par = {'simN':N,'ν': pt[0],'σL':pt[1],'α':pt[2],'ρ':pt[3],'wedge':pt[4],'sample_init':np.array(np.maximum(age_marriage-20,0),dtype=np.int_)}
+#Parametrize the model
+par = {'simN':N,'ω': pt[0],'σL':pt[1],'α':pt[2],'ρ':pt[3],'wedge':pt[4],'sample_init':np.array(np.maximum(age_marriage-20,0),dtype=np.int_)}
 model=brg.HouseholdModelClass(par=par)
 
 
@@ -104,7 +104,7 @@ age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 # Set up the model with the input parameters pt
 M_bef = model.copy(name='numba_new_copy')
    
-M_bef.par.ν=pt[0] 
+M_bef.par.ω=pt[0]
 M_bef.par.grid_lovew,M_bef.par.Πlw,M_bef.par.Πlw0= usr.rouw_nonst(M_bef.par.T,pt[1],pt[1]*0+0.03,M_bef.par.num_lovew) 
 M_bef.par.grid_lovem,M_bef.par.Πlm,M_bef.par.Πlm0= usr.rouw_nonst(M_bef.par.T,pt[1],pt[1]*0+0.03,M_bef.par.num_lovem) 
 
@@ -128,7 +128,7 @@ M_bef.simulate()
 M = M_bef.copy(name='numba_new_copy')  
 M.par.pens_reform=True #set up pension reform
 M.par.policy_init=age_policy
-M.par.ν=pt[0] 
+M.par.ω=pt[0]
 M.par.grid_lovew,M.par.Πlw,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],pt[1]*0+0.03,M.par.num_lovew) 
 M.par.grid_lovem,M.par.Πlm,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],pt[1]*0+0.03,M.par.num_lovem) 
 

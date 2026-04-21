@@ -165,7 +165,7 @@ def sensitivity_analysis(param_idx, xl, xu, n_points=11):
             
         # Set up the model with current parameters
         M = model.copy(name=f'sensitivity_{param_name}_{i}')
-        M.par.ν = params_current[0]
+        M.par.ω = params_current[0]
         M.par.grid_love, M.par.Πl, M.par.Πl0 = usr.addaco_nonst(M.par.T, params_current[1], params_current[1], M.par.num_love)
         M.par.α = params_current[2]
         M.par.χ = params_current[3]
@@ -324,9 +324,9 @@ h_income = final_sample[:, 3]
 w_income = final_sample[:, 4]
 age_marriage = final_sample[:, 5]
 
-# Baseline parameters: [ν,σL,α,χ,wedge]
+# Baseline parameters: [ω,σL,α,χ,wedge]
 xc = np.array([0.35870364, 0.00596541, 0.89223739, 2.5, 2.0]) #0.96875457
-param_names = ['ν', 'σL', 'α', 'χ', 'wedge']
+param_names = ['ω', 'σL', 'α', 'χ', 'wedge']
 
 # Parameter bounds
 xl = np.array([0.02, 0.001, 0.1, 0.8, 0.5])
@@ -334,7 +334,7 @@ xu = np.array([0.8, 0.2, 0.99, 2.0, 1.2])
 
 
 # Parametrize the baseline model
-par = {'simN': N, 'ν': xc[0], 'σL': xc[1], 'α': xc[2], 'χ': xc[3], 'wedge': xc[4]}
+par = {'simN': N, 'ω': xc[0], 'σL': xc[1], 'α': xc[2], 'χ': xc[3], 'wedge': xc[4]}
 model = brg.HouseholdModelClass(par=par)
 
 # Set the initial conditions for the couples based on baseline sample

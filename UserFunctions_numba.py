@@ -21,21 +21,21 @@ woman=setup.woman;man=setup.man
 @njit(cache=cache)
 def home_good(x,ν,ϕ,wedge,couple,ishom):
     """"
-    Home goods Q production
+    Home goods Q production. ν is the weight on home inputs vs. home time (Cobb-Douglas exponent).
     """
     home_time=(2*ϕ+ishom*(1-ϕ)) if couple else ϕ+(1-ϕ)*ishom
-    return home_time**(1-0.92)*x**0.92
+    return home_time**(1-ν)*x**ν
 
 @njit(cache=cache)
-def util(c_priv,d_pub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=0.0,ishom=0.0,female=False):
+def util(c_priv,d_pub,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
     """
-    Intra-temporal utility function
+    Intra-temporal utility function. ν: home-good exponent; ω: labor disutility; px: durables price (couples).
     """
-    
-    dd=d_pub/1.4375 if couple==1 else d_pub
+
+    dd=d_pub/px if couple==1 else d_pub
     Q=home_good(dd,ν,ϕ,wedge,couple=couple,ishom=ishom)
 
-    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge-ν*(1-ishom)
+    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge-ω*(1-ishom)
 
  
 @njit(cache=cache)  
@@ -99,28 +99,28 @@ def income_single(par,t,iD,ih,iz,assets,women=True):
     
     
 @njit(cache=cache)
-def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,ϕ,wedge):#function to minimize
+def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,ω,ϕ,wedge,px):#function to minimize
     """
-        Couple's utility given private (Cpriv np.array(float,float)) 
+        Couple's utility given private (Cpriv np.array(float,float))
         and total consumption Ctot (float). Note that love does
-        not matter here, as this fun is used for intra-period 
+        not matter here, as this fun is used for intra-period
         allocation of private and home consumption
     """
     Cpub=Ctot-np.sum(Cpriv) #if Ctot>np.sum(Cpriv) else 1e-15
-    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=True,ishom=ishom,female=True)
-    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=True,ishom=ishom,female=False)
-    
+    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=True)
+    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=False)
+
     return np.array([power*Vw +(1.0-power)*Vm, Vw, Vm])
 
-@njit(cache=cache) 
-def single_time_util(Ctot,ρ,χ,α,ν,ϕ,wedge,love=0.0,couple=0.0,ishom=0.0,female=False): 
+@njit(cache=cache)
+def single_time_util(Ctot,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
     """
     Single utility given resources Ctot allocated to consumption
     """
-     
-    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,ϕ,wedge,love,couple,ishom) 
-     
-    return util(c_priv,d_pub,ρ,χ,α,ν,ϕ,wedge,love,couple,ishom,female)
+
+    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom)
+
+    return util(c_priv,d_pub,ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom,female)
      
 
 
@@ -156,28 +156,28 @@ def intraperiod_allocation(C_tot,grid_Ctot,pre_Cw_priv,pre_Cm_priv):
         
 
 @njit(cache=cache)
-def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,ϕ,wedge,love,couple,ishom):
-    
+def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom):
+
     """
     Finds private and public expenditure to max util for singles
     """
-    args=(ρ,χ,α,ν,ϕ,wedge,love,couple,ishom)
+    args=(ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom)
     C_priv = optimizer(lambda x,y,args:-util(x,y-x,*args),1.0e-6, C_tot - 1.0e-6,args=(C_tot,args))[0]
-    
+
     return C_priv,C_tot - C_priv#=d_pub
 
 
-@njit 
-def couple_root(x,c,powe,ρ,χ,α,ν,ϕ,wedge,ishom): 
+@njit
+def couple_root(x,c,powe,ρ,χ,α,ν,ϕ,wedge,px,ishom):
     """
-    Finds the roote of the intra-period problem for couples
-
+    Finds the root of the intra-period problem for couples.
+    ω is absent here: it is linear in ishom and drops out of the FOC wrt d_pub.
     """
-    
-    m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))      
-    home_time = (2*ϕ+ishom*(1-ϕ)) 
 
-    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*0.92*home_time**((1-0.92)*(1-χ))*(1/1.4375)**((0.92)*(1-χ))*x**(0.92-0.92*χ-1)
+    m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))
+    home_time = (2*ϕ+ishom*(1-ϕ))
+
+    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*ν*home_time**((1-ν)*(1-χ))*(1/px)**(ν*(1-χ))*x**(ν-ν*χ-1)
  
  
 

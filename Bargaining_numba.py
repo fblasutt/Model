@@ -63,8 +63,10 @@ class HouseholdModelClass(EconModelClass):
         par.p_μ = 1.0/40.0   # Probability that  human capital depreciates
         
         # Home good production
-        par.ν = 0.08  # Weight on money vs. time to produce home good
-        par.ϕ = 0.326 # Time spend on public goods by singles
+        par.ν = 0.92   # Weight on money vs. time to produce home good (Cobb-Douglas exponent)
+        par.ω = 0.08   # Labor disutility from working
+        par.ϕ = 0.326  # Time spend on public goods by singles
+        par.px = 1.4375 # Price of durables for couples (equivalence scale on d_pub)
         
         # Taxes
         par.Λ=0.92                              # 1- tax level
@@ -315,15 +317,15 @@ def solve_intraperiod(sol,par):
         sol.pre_d_pub, sol.pre_Cw_priv, sol.pre_Cm_priv, par.grid_marg_u, par.grid_marg_u_for_inv, par.grid_marg_u_s,\
         par.grid_cpriv_s, par.grid_marg_uw, par.grid_marg_um
         
-    pars=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge) 
+    pars=(par.ρ,par.χ,par.α,par.ν,par.ω,par.ϕ,par.wedge,par.px)
     ϵ = 1e-8# delta increase in xs to compute numerical deratives
 
     ################ Singles part #####################
     for i,C_tot in enumerate(par.grid_Ctot):
         for ret in range(2):
-        
+
             home= 0.0 if ret==0 else 1.0
-            pars_sex=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,0.0,0.0,home)
+            pars_sex=(par.ρ,par.χ,par.α,par.ν,par.ω,par.ϕ,par.wedge,par.px,0.0,0.0,home)
             
             # optimize to get util from total consumption(m<->C_tot)=private cons(c)+public cons(m-c)
             grid_cpriv_s[i,ret] = usr.optimizer(lambda c,m,p:-usr.util(c,m-c,*p),ϵ,C_tot-ϵ,args=(C_tot,pars_sex))[0]
@@ -346,7 +348,7 @@ def solve_intraperiod(sol,par):
                     power=par.grid_power[iP]  
                     mult = power**(1/par.ρ)/(power**(1/par.ρ)+(1-power)**(1/par.ρ)) 
                      
-                    parss=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge)
+                    parss=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,par.px)
                    
                     home_time=2.0 if (ret==1) else 1-wlp
                     ress=bisect(usr.couple_root,1e-12,C_tot-1e-12, args=(C_tot,power,*parss,home_time))[0] 
@@ -435,7 +437,7 @@ def solve_single_egm(sol,par,t):
     def loop_savings_singles(par,grid_Ai,ci,Ei,cit,Eit,cip,vi,women,divorce):
         
         home=1.0-par.grid_wlp[-1] if women else 0.0
-        pars=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,0.0,0.0,home,women)
+        pars=(par.ρ,par.χ,par.α,par.ν,par.ω,par.ϕ,par.wedge,par.px,0.0,0.0,home,women)
         ret=1 if t>=par.Tr else 0
         
         for iz in range(par.num_z):
@@ -524,7 +526,7 @@ def solve_remain_couple_egm(par,sol,t):
     i_Vw,i_Vm,i_Vc,i_C_tot,wls=np.zeros((5,par.num_wlp,par.num_h,par.num_z,par.num_power,par.num_love,par.num_A)) 
     Vw,Vm=np.zeros((2,par.num_h,par.num_z,par.num_power,par.num_love,par.num_A)) 
         
-    pars=(par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge)     
+    pars=(par.ρ,par.χ,par.α,par.ν,par.ω,par.ϕ,par.wedge,par.px)
     for iL in prange(par.num_love): 
         for ih in range(par.num_h):
             for iz in range(par.num_z):
@@ -858,8 +860,8 @@ def simulate_lifecycle(sim,sol,par):
                 C_tot[i,t]  = Cw_tot[i,t] + Cm_tot[i,t]
                               
                 home=1 if t>=par.Tr else 0
-                Cw[i,t],dw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,0.0,0.0,home)
-                Cm[i,t],dm[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.ϕ,par.wedge,0.0,0.0,home)
+                Cw[i,t],dw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.ω,par.ϕ,par.wedge,par.px,0.0,0.0,home)
+                Cm[i,t],dm[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.ω,par.ϕ,par.wedge,par.px,0.0,0.0,home)
 
                 #Labor supply
                 wlp[i,t]=par.num_wlp-1 if t<par.Tr else 0
