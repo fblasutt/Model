@@ -319,9 +319,9 @@ if __name__ == '__main__':
     year         = final_sample[:, 6]
     assets       = final_sample[:, 7] * np.mean(np.exp(h_income))
 
-    xc = np.array([0.53315238, 0.1, 0.80884379, 1.15375904, 0.915, 1.0])
+    xc = np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
     par = {'simN': N, 'ν': xc[0], 'σL': xc[1], 'α': xc[2], 'ρ': xc[3],
-           'wedge': xc[4],
+           'wedge': xc[4], 'β': xc[5],
            'sample_init': np.array(age_marriage - 20, dtype=np.int_)}
     model = brg.HouseholdModelClass(par=par)
 

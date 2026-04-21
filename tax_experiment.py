@@ -48,11 +48,11 @@ assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 
 #target 0.065 + real pension function+love sd=0.15
-xc=np.array([0.53315238, 0.1      , 0.80884379, 1.15375904, 0.915     ,1.0    ])
+xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
 
 #Parametrize the model 
-par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
+par = {'simN':N,'ν': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
 model=brg.HouseholdModelClass(par=par)
 
 

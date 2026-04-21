@@ -113,18 +113,19 @@ class HouseholdModelClass(EconModelClass):
         ##########################################
         # Simulations parameters
         ##########################################
-        par.seed = 9211;par.simT = par.T;par.simN = 30_000
-        
+        par.seed = 9211;par.simT = par.T;par.simN = 10_000
+              
         # Simulations Grids
         par.women =np.ones(par.simN)#0: simumate men, 1 women
         par.sample_init=np.zeros(par.simN,dtype=np.int_)#in which period do we start simulating the sample?
         par.policy_init=np.zeros(par.simN,dtype=np.int_)#when does the pension policy (if pens_reform=True) kicks in?
-               
+      
         
     def setup_grids(self):
         par = self.par
     
         
+
 
         #Grid for the pr. of meeting a partner in each t
         par.λ_grid = np.ones(par.T)*par.meet

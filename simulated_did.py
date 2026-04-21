@@ -31,7 +31,7 @@ else:
 
 
 #Create sample with replacement 
-N=30_000#sample size 
+N=10_000#sample size 
 
 
 #Import information for the sample, then store the relevant variables
@@ -55,11 +55,8 @@ year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 
-
-# Guess of internal parameters: [ν,σL,α,χ,wedge]
-pt=np.array([0.406009,   0.00893523, 0.77535802, 1.02542591, 0.52330953])
-
-pt=np.array([0.51  , 0.00893523, 0.77535802, 1.02542591, 0.72])
+# Guess of internal parameters: [ν,σL,α,ρ,wedge,β]
+pt=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
 #Parametrize the model 
 par = {'simN':N,'ν': pt[0],'σL':pt[1],'α':pt[2],'ρ':pt[3],'wedge':pt[4],'sample_init':np.array(np.maximum(age_marriage-20,0),dtype=np.int_)}
@@ -170,7 +167,7 @@ the reform was never introduced
 """
 
 #Choose your model
-MM = M_bef.copy()
+MM = M.copy()
 
 #Time to policy event
 event_time= (np.cumsum(np.ones((MM.par.simN,MM.par.T)),axis=1)-1)-MM.par.policy_init[:,None]
@@ -192,8 +189,21 @@ poweri=np.repeat((param)[:,None],MM.par.T,axis=1)
 #Bargaining power
 power=MM.sim.power
 
-#Wife consumption share
+#Wife consumption share and ratio
 wife_share=MM.sim.Cw/(MM.sim.Cw+MM.sim.Cm)
+wife_ratio=MM.sim.Cw/(MM.sim.Cm)
+
+#Actual income of wife and husband
+incw_a=MM.sim.incw
+incm_a=MM.sim.incm 
+
+#Potential income of wife and husband
+incm_p=MM.par.grid_zm[np.arange(MM.par.T),MM.sim.ID,MM.sim.iz,MM.sim.ih]
+incw_p=MM.par.grid_zm[np.arange(MM.par.T),MM.sim.ID,MM.sim.iz,MM.sim.ih]
+
+#Marriage surplus of wife and husband
+Sw=MM.sim.Vcw-MM.sim.Vsw
+Sm=MM.sim.Vcm-MM.sim.Vsm
 
 #Time elaspsed since marriage
 time=age-agei
@@ -207,11 +217,18 @@ df = pd.DataFrame({
     "time":time.flatten(),
     "age_policy":agepolicy.flatten(),
     "wife_share":wife_share.flatten(), 
+    "wife_ratio":wife_ratio.flatten(), 
     "event_time":event_time.flatten(), 
+    "income_wife":incw_a.flatten(),
+    "income_husband":incm_a.flatten(),
+    "income_wife_potential":incw_p.flatten(),
+    "income_husband_potential":incm_p.flatten(),
+    "surplus_wife":Sw.flatten(),
+    "surplus_husband":Sm.flatten(),
     "izi":izi.flatten(),
     "idd":idd.flatten(), 
     "age":age.flatten()
 }) 
  
 #Save to stata
-df.to_stata('simulated_did_noreform_mod.dta')
+df.to_stata('simulated_did_mod.dta')
