@@ -203,6 +203,43 @@ AWE=ols(ΔYm,ΔWLP,sm)
 print("Change in WLP (p.p.) given a 1% increase in men's earnings: {}".format(AWE))
 
 ##########################################################################
+# Asymmetry test — two-slope spline of ΔWLP on ΔYm at ΔYm = 0
+# Pooled sm sample. Wald test of H0: β_neg = β_pos.
+##########################################################################
+from scipy.stats import chi2 as _chi2
+
+ΔYm_neg = ΔYm * (ΔYm <  0.0)
+ΔYm_pos = ΔYm * (ΔYm >  0.0)
+
+X_a = np.column_stack([np.ones(int(sm.sum())),
+                       ΔYm_neg[sm],
+                       ΔYm_pos[sm]])
+y_a = ΔWLP[sm]
+
+b_a, *_ = np.linalg.lstsq(X_a, y_a, rcond=None)
+β_neg, β_pos = b_a[1], b_a[2]
+
+resid_a = y_a - X_a @ b_a
+n_a, k_a = X_a.shape
+σ2_a = (resid_a @ resid_a) / (n_a - k_a)
+V_a  = σ2_a * np.linalg.inv(X_a.T @ X_a)
+se_neg, se_pos = float(np.sqrt(V_a[1, 1])), float(np.sqrt(V_a[2, 2]))
+
+# Wald test:  c'b = β_neg − β_pos = 0
+c_vec   = np.array([0.0, 1.0, -1.0])
+diff    = c_vec @ b_a
+var_d   = c_vec @ V_a @ c_vec
+wald    = float(diff**2 / var_d)
+p_value = float(1.0 - _chi2.cdf(wald, df=1))
+
+print("\n--- Asymmetry test: two-slope spline of ΔWLP on ΔYm at ΔYm = 0 ---")
+print("  Pooled stay-married sample (n={})".format(int(sm.sum())))
+print("  β_neg  (slope when Δlog y_m < 0)  : {:+.4f}   (s.e. {:.4f})".format(β_neg, se_neg))
+print("  β_pos  (slope when Δlog y_m >0)  : {:+.4f}   (s.e. {:.4f})".format(β_pos, se_pos))
+print("  Wald test  H0: β_neg = β_pos      : χ²(1) = {:.3f},   p-value = {:.4f}"
+      .format(wald, p_value))
+
+##########################################################################
 # Diagnostic plots: distribution of ΔYm, ΔWLP, and the joint scatter
 ##########################################################################
 
@@ -243,6 +280,35 @@ plt.tight_layout()
 plt.show()
 
 ##########################################################################
+# Binscatter — mean ΔWLP per decile of ΔYm (non-parametric look at asymmetry)
+##########################################################################
+n_decile = 20
+edges    = np.quantile(ΔYm[sm], np.linspace(0.0, 1.0, n_decile + 1))
+edges    = np.unique(edges)            # avoid duplicate edges if shocks tie
+n_bins   = len(edges) - 1
+
+x_bin = np.full(n_bins, np.nan)
+y_bin = np.full(n_bins, np.nan)
+for k in range(n_bins):
+    upper = (ΔYm <= edges[k+1]) if k == n_bins - 1 else (ΔYm < edges[k+1])
+    mask_k = sm & (ΔYm >= edges[k]) & upper
+    if mask_k.sum() > 0:
+        x_bin[k] = ΔYm[mask_k].mean()
+        y_bin[k] = ΔWLP[mask_k].mean()
+
+fig_bin, ax_bin = plt.subplots(figsize=(7, 5))
+ax_bin.plot(x_bin, y_bin, marker='o', linewidth=2, color='steelblue',
+            label="Mean ΔWLP per decile")
+ax_bin.axhline(0.0, color='gray', linewidth=0.5)
+ax_bin.axvline(0.0, color='gray', linewidth=0.5)
+ax_bin.set_xlabel(r"$\Delta \log y_m$ (decile mean)")
+ax_bin.set_ylabel(r"Mean $\Delta$WLP")
+ax_bin.set_title(r"Binscatter: $\Delta$WLP vs $\Delta \log y_m$ (sm sample)")
+ax_bin.legend()
+plt.tight_layout()
+plt.show()
+
+##########################################################################
 # Added Worker Effect (AWE) vs Subtracted Worker Effect (SWE)
 # -----------------------------------------------------------------------
 # Split the sample by the wife's labor force status in the *baseline* period t:
@@ -277,6 +343,39 @@ print("  SWE: a 1% rise in husband's earnings changes the probability that a")
 print("       wife who was WORKING at t-1 EXITS the labor force at t by {:.4f} pp"
       .format(-SWE_exit))
 print("       (note: -SWE_exit because ΔWLP=-1 on exit; positive value = more exits).")
+
+
+##########################################################################
+# Asymmetry test by t-1 LF status:
+# Two-slope spline of ΔWLP on ΔYm at ΔYm = 0,
+# separately on the AWE sample (OLF at t-1) and the SWE sample (working at t-1).
+##########################################################################
+def spline_asymmetry(mask, label):
+    X = np.column_stack([np.ones(int(mask.sum())),
+                         ΔYm_neg[mask],
+                         ΔYm_pos[mask]])
+    y = ΔWLP[mask]
+    b, *_ = np.linalg.lstsq(X, y, rcond=None)
+    βn, βp = b[1], b[2]
+    res = y - X @ b
+    n_, k_ = X.shape
+    σ2  = (res @ res) / (n_ - k_)
+    V   = σ2 * np.linalg.inv(X.T @ X)
+    se_n, se_p = float(np.sqrt(V[1, 1])), float(np.sqrt(V[2, 2]))
+    c   = np.array([0.0, 1.0, -1.0])
+    diff = c @ b
+    var_d = c @ V @ c
+    w   = float(diff**2 / var_d)
+    pv  = float(1.0 - _chi2.cdf(w, df=1))
+    print("  [{}]  n={}".format(label, n_))
+    print("    β_neg (Δlog y_m < 0) : {:+.4f}   (s.e. {:.4f})".format(βn, se_n))
+    print("    β_pos (Δlog y_m ≥ 0) : {:+.4f}   (s.e. {:.4f})".format(βp, se_p))
+    print("    Wald  H0: β_neg=β_pos: χ²(1) = {:.3f},  p = {:.4f}".format(w, pv))
+    return βn, βp
+
+print("\n--- Asymmetry of AWE / SWE: two-slope spline by t-1 LF status ---")
+spline_asymmetry(sm_outoflf, "AWE  — OLF at t-1, only entries possible (ΔWLP ∈ {0,+1})")
+spline_asymmetry(sm_working, "SWE  — working at t-1, only exits possible (ΔWLP ∈ {-1,0})")
 
 
 ##########################################################################
