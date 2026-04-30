@@ -5,14 +5,13 @@ Created on Thu Apr 16 11:31:42 2026
 @author: 32489
 """
 
-# %% 
+# %% Main analysis file for WLP response to husband's earnings
 
 import numpy as np 
 import Bargaining_numba as brg  
 import UserFunctions_numba as usr 
 import pandas as pd
 import getpass
-import statsmodels.api as sm 
 import matplotlib.pyplot as plt
 
 
@@ -30,6 +29,54 @@ elif user == "32489":
 else:
       raise RuntimeError(f"Unknown user: {user}")
 
+
+# Compact OLS regression code
+
+def ols(indep,dep,cond,take=1,cov=None):
+    """
+    Perform Ordinary Least Squares (OLS) regression on a filtered subsample of 1D arrays.
+    
+    Parameters:
+    -----------
+    indep : ndarray
+        Main independent variable (1D array).
+    dep : ndarray
+        Dependent variable (1D array).
+    cond : ndarray (boolean)
+        Boolean array used to select observations (e.g. based on a condition).
+    take : int, optional (default=1)
+        Index of the coefficient to return. 
+        - 0 corresponds to the intercept,
+        - 1 corresponds to the main independent variable,
+        - 2+ are for additional covariates (if any).
+    cov : list of ndarray, optional
+        List of additional 1D covariate arrays to include in the regression, stored in a tuple
+    
+    Returns:
+    --------
+    β : float
+        The `take`-th OLS coefficient from the regression. 
+
+    """
+    
+    intercept=np.ones(sample.shape)[sample][cond]
+    
+    X=np.hstack((intercept[:,None],indep[cond][:,None]))#explicative variables 
+    
+    if (cov!=None):
+     for j in range(len(cov)):
+         
+         X=np.hstack((X,cov[j][cond][:,None]))
+ 
+    try:  
+        #OLS on untreated observations 
+        β = (np.linalg.inv(X.T @ X) @ (X.T @ dep[cond].flatten()))[take]
+        
+    except:
+        
+        β=100000.0
+     
+    return β
 
 
 #estimating the model (True) or compute tables given paramters in xc below (BPP, paramters, fitt) (False)
@@ -60,27 +107,7 @@ age_marriage=final_sample[:,5]
 year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
-
-
-# Guess of internal parameters: [ω,σL,α,ρ,wedge,β]
-
-#xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
-
-# Higher disutility of working
-#xc=np.array([0.7, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
-
-# Lower disutility of working
-xc=np.array([0.1, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
-
-
-# No non-homotheticity in home production
-#xc=np.array([0.55, 0.1       , 0.85, 1.5, 0.929     ,1.        ])
-
-
-
-# Lower and higher bounds of parameters
-xl=np.array([0.00001,0.000082,0.1,0.5,0.01,0.9]) 
-xu=np.array([0.8,0.4,0.999,2.5,1.0,1.1]) 
+xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
 #Parametrize the model 
 par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
@@ -128,7 +155,6 @@ M.solve()
 M.simulate() 
 
 
-
 #Sample 
 sample= (age>age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple_lag==1) #& (M.sim.couple==1) 
 
@@ -147,60 +173,14 @@ sm   = (M.sim.couple[sample1]==1) & (M.sim.couple[sample]==1)
 # Change in WLP
 ΔWLP=np.array([(M.par.grid_wlp[M.sim.WLP][sample1]>0)],dtype=np.float64)[0]-np.array([(M.par.grid_wlp[M.sim.WLP][sample]>0)],dtype=np.float64)[0]
 
-##########################################
-# Compact OLS regression
-##########################################
-def ols(indep,dep,cond,take=1,cov=None):
-    """
-    Perform Ordinary Least Squares (OLS) regression on a filtered subsample of 1D arrays.
-    
-    Parameters:
-    -----------
-    indep : ndarray
-        Main independent variable (1D array).
-    dep : ndarray
-        Dependent variable (1D array).
-    cond : ndarray (boolean)
-        Boolean array used to select observations (e.g. based on a condition).
-    take : int, optional (default=1)
-        Index of the coefficient to return. 
-        - 0 corresponds to the intercept,
-        - 1 corresponds to the main independent variable,
-        - 2+ are for additional covariates (if any).
-    cov : list of ndarray, optional
-        List of additional 1D covariate arrays to include in the regression, stored in a tuple
-    
-    Returns:
-    --------
-    β : float
-        The `take`-th OLS coefficient from the regression. 
-
-    """
-    
-    intercept=np.ones(sample.shape)[sample][cond]
-    
-    X=np.hstack((intercept[:,None],indep[cond][:,None]))#explicative variables 
-    
-    if (cov!=None):
-     for j in range(len(cov)):
-         
-         X=np.hstack((X,cov[j][cond][:,None]))
- 
-    try:  
-        #OLS on untreated observations 
-        β = (np.linalg.inv(X.T @ X) @ (X.T @ dep[cond].flatten()))[take]
-        
-    except:
-        
-        β=100000.0
-     
-    return β
 
 # Regression:
 
 AWE=ols(ΔYm,ΔWLP,sm)
 
 print("Change in WLP (p.p.) given a 1% increase in men's earnings: {}".format(AWE))
+
+# %% Extra analysis and diagnostics
 
 ##########################################################################
 # Asymmetry test — two-slope spline of ΔWLP on ΔYm at ΔYm = 0
@@ -350,6 +330,7 @@ print("       (note: -SWE_exit because ΔWLP=-1 on exit; positive value = more e
 # Two-slope spline of ΔWLP on ΔYm at ΔYm = 0,
 # separately on the AWE sample (OLF at t-1) and the SWE sample (working at t-1).
 ##########################################################################
+
 def spline_asymmetry(mask, label):
     X = np.column_stack([np.ones(int(mask.sum())),
                          ΔYm_neg[mask],
@@ -500,6 +481,108 @@ print("  (iii) Elasticity of home GOOD    Q   :  {:+.4f}      |  {:+.4f}"
       .format(β_Q_ym_olf, β_Q_ym_w))
 print("  (iv)  Δ(α·Q^(1-χ)/(1-χ)) / Δlog y_m  :  {:+.4f}      |  {:+.4f}"
       .format(β_U_ym_olf, β_U_ym_w))
+
+
+# %% Parameter sweep over (ω, ν)
+
+##########################################################################
+# Parameter sweep over (ω, ν): cross-elasticity of wife participation
+#   ω : labor disutility from working               (calibrated, xc[0])
+#   ν : Cobb–Douglas weight on money in home good   (external, par.ν=0.92)
+##########################################################################
+
+def AWE_for_params(ω_val, ν_val):
+    """Build, solve, simulate the model at (ω, ν); return the pooled AWE slope."""
+
+    par_loop = {'simN': N,
+                'ω': ω_val, 'ν': ν_val,
+                'σL': xc[1], 'α': xc[2], 'ρ': xc[3],
+                'wedge': xc[4], 'β': xc[5],
+                'sample_init': np.array(age_marriage - 20, dtype=np.int_)}
+    m = brg.HouseholdModelClass(par=par_loop)
+
+    # initial conditions (mirror the baseline block)
+    pwr = (cw_cons_share / (1.0 - cw_cons_share))**m.par.ρ
+    m.sim.init_power = pwr / (1.0 + pwr)
+
+    gzw = m.par.grid_zw[:, :, np.linspace(0, m.par.num_z - 1, m.par.num_zm, dtype=np.int_)]
+    gzm = m.par.grid_zm[:, :, :m.par.num_zw]
+    izm_ = np.array([np.argmin(np.abs(np.log(gzm)[int(m.par.sample_init[i]), 0, :, 0] - h_income[i]))
+                     for i in range(m.par.simN)], dtype=np.int64)
+    izm_[np.isnan(h_income)] = (m.par.num_pm * m.par.num_ϵm) // 2
+    izw_ = np.array([np.argmin(np.abs(np.log(gzw)[int(m.par.sample_init[i]), 0, :, 0] - w_income[i]))
+                     for i in range(m.par.simN)], dtype=np.int64)
+    izw_[np.isnan(w_income)] = (m.par.num_pw * m.par.num_ϵw) // 2
+    m.sim.init_z = izm_ * m.par.num_zm + izw_
+    m.sim.init_A = assets
+
+    Mc = m.copy(name='loop_copy')
+    Mc.solve()
+    Mc.simulate()
+
+    samp  = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (Mc.sim.couple_lag == 1)
+    samp1 = np.roll(samp, 1, axis=1)
+    smm   = (Mc.sim.couple[samp1] == 1) & (Mc.sim.couple[samp] == 1)
+
+    ΔYm_  = np.log(Mc.sim.incmg[samp1] / Mc.sim.incmg[samp])
+    ΔWLP_ = (Mc.par.grid_wlp[Mc.sim.WLP][samp1] > 0).astype(np.float64) \
+          - (Mc.par.grid_wlp[Mc.sim.WLP][samp]  > 0).astype(np.float64)
+
+    x, y = ΔYm_[smm], ΔWLP_[smm]
+    X = np.column_stack([np.ones(x.size), x])
+    b, *_ = np.linalg.lstsq(X, y, rcond=None)
+    return b[1]
+
+
+# Parameter grids — works also if either has a single element
+omega_grid = np.array([0.15, 0.30, 0.55, 0.70])
+nu_grid    = np.array([0.50, 0.60,0.70, 0.92])
+
+# Baseline values used by the existing solve above (so we can skip recomputing)
+ω_baseline = xc[0]
+ν_baseline = 0.92                     # default par.ν in Bargaining_numba.py
+
+AWE_grid = np.full((len(omega_grid), len(nu_grid)), np.nan)
+
+for i, ω_val in enumerate(omega_grid):
+    for j, ν_val in enumerate(nu_grid):
+        is_baseline = (np.isclose(ω_val, ω_baseline) and np.isclose(ν_val, ν_baseline))
+        tag = " (using already-computed baseline)" if is_baseline else ""
+        print("Working on combination ω={:.3f}, ν={:.3f}...{}".format(ω_val, ν_val, tag))
+        AWE_grid[i, j] = AWE if is_baseline else AWE_for_params(ω_val, ν_val)
+        print("  → AWE = {:+.4f}".format(AWE_grid[i, j]))
+
+
+# Plot — handles single-value grids gracefully
+n_om, n_nu = len(omega_grid), len(nu_grid)
+if n_om == 1 and n_nu == 1:
+    print("\n(Only one (ω, ν) combination — no plot.)")
+else:
+    fig_sw, ax_sw = plt.subplots(figsize=(7, 5))
+    if n_om == 1:
+        ax_sw.plot(nu_grid, AWE_grid[0, :], marker='o', linewidth=2, color='steelblue')
+        ax_sw.set_xlabel(r"$\nu$ (CD weight on money in home good)")
+        ax_sw.set_title(r"AWE across $\nu$ at $\omega$ = {:.2f}".format(omega_grid[0]))
+    elif n_nu == 1:
+        ax_sw.plot(omega_grid, AWE_grid[:, 0], marker='o', linewidth=2, color='steelblue',
+                   label=r"$\nu$ = {:.2f}".format(nu_grid[0]))
+        ax_sw.set_xlabel(r"$\omega$ (labor disutility)")
+        ax_sw.set_title(r"AWE across $\omega$ at $\nu$ = {:.2f}".format(nu_grid[0]))
+        ax_sw.legend()
+    else:
+        for j, ν_val in enumerate(nu_grid):
+            ax_sw.plot(omega_grid, AWE_grid[:, j], marker='o', linewidth=2,
+                       label=r"$\nu$ = {:.2f}".format(ν_val))
+        ax_sw.set_xlabel(r"$\omega$ (labor disutility)")
+        ax_sw.set_title(r"AWE across $(\omega, \nu)$")
+        ax_sw.legend(title="CD weight on money\nin home production")
+
+    ax_sw.axhline(0.0, color='gray', linewidth=0.5)
+    ax_sw.set_ylabel(r"AWE: pp $\Delta\mathrm{WLP}$ per 1% $\Delta\log y_m$")
+    ax_sw.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
 
 
 # %%
