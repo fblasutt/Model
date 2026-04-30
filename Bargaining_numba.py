@@ -97,6 +97,7 @@ class HouseholdModelClass(EconModelClass):
         
         # Women's human capital states
         par.num_h = 1
+        #par.num_h = 2
 
         # love/match quality
         par.num_lovew = 3;par.num_lovem = 3;par.num_love=par.num_lovem*par.num_lovew
@@ -158,6 +159,18 @@ class HouseholdModelClass(EconModelClass):
 
         Πh_pt = np.eye(par.num_h) if par.num_h>1 else np.ones(par.num_h) # Perfect transition if full-time participation...
         Πh_nt = np.array([[1-par.p_μ, par.p_μ], [0, 1]]).T  if par.num_h>1 else np.ones(par.num_h)  # ...depreciation otherwise
+        # Here a fix that works with more than 2 human capital states, TOCHECK
+        # OLF transition: from state i stay with prob 1-p_μ, drop one step (i -> i+1) with prob p_μ; bottom rung absorbing.                                                                                                           
+        # Built in [from,to] convention then transposed to the [to,from] convention used downstream.               
+        # if par.num_h>1:                                                                                            
+        #     Πh_nt_ft = (1.0-par.p_μ)*np.eye(par.num_h)                                                             
+        #     for _i in range(par.num_h-1):                                                                          
+        #        Πh_nt_ft[_i, _i+1] = par.p_μ                                                                       
+        #     Πh_nt_ft[-1, -1] = 1.0                                                                                 
+        #     Πh_nt = Πh_nt_ft.T                                                                                     
+        # else:                                                                                                      
+        #     Πh_nt = np.ones(par.num_h)  # ...depreciation otherwise       
+
         par.Πh_t = np.array([w*Πh_pt + (1-w)*Πh_nt for w in par.grid_wlp])  if par.num_h>1 else np.array([np.eye(par.num_h) for w in par.grid_wlp])# Work-hour weighted transitions
         identity_block = np.tile(np.eye(par.num_h), (par.num_wlp, 1, 1))   #stops depreciating at retirement
         par.Πh = [par.Πh_t if t < par.Tr else identity_block for t in range(par.T)]
