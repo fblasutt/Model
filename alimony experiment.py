@@ -143,6 +143,8 @@ Names_line=['Baseline', 'Alimony, low', 'Alimony, high']
 #Obtain pass-throughs and do the decomposition calling function insurance
 for i in range(len(gridτ)):
     
+    sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1)
+   
     B=insurance(Bmodel[i],sample,
                 shock_type='permanent',
                 shock_gender='Male',

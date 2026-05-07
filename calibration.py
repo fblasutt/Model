@@ -71,7 +71,6 @@ assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
-
 # Lower and higher bounds of parameters
 xl=np.array([0.00001,0.000082,0.1,0.5,0.01,0.9]) 
 xu=np.array([0.8,0.4,0.999,2.5,1.0,1.1]) 

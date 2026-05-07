@@ -29,6 +29,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
 
     # Select different samples depending of WLP and being in a couple
     sm   = (m.sim.couple[sample1]==1) & (m.sim.couple[sample]==1)
+    sw  =  (sm) &  (m.sim.WLP[sample]>0) 
     smw  = (sm) & (m.sim.WLP[sample1]>0) & (m.sim.WLP[sample]>0) 
     sm1  = (sm) & (m.sim.couple[sample2]==1)
     smw1 = (smw) & (m.sim.couple[sample2]==1) & (m.sim.WLP[sample2]>0) 
@@ -166,8 +167,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
 
     # Δcp = Δlog(cw+cm) total private, Δs = Δlog(cw/cp) wife share, Δs1 = Δlog(cm/cp) husband share
     vardec_wife    = _vardec(Δcp, Δs,  Δcw, sm)
-    vardec_husband = _vardec(Δcp, Δs1, Δcm, sm)     
-    
+    vardec_husband = _vardec(Δcp, Δs1, Δcm, sm)
+
 
     ##########################################
     # Compact OLS regression
@@ -350,8 +351,83 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     
     
-    #Variance decomposition
-    
+    ##########################################################
+    # Shock-based variance decomposition of Var(Δlog target)
+    ##########################################################
+    # Project each target y ∈ {Δcw,Δcm,Δcp,ΔC,Δs,Δs1} on the six structural
+    # shocks x ∈ {Δzw,Δzm,Δϵw,Δϵm,Δlovw,Δlovm} and attribute variance:
+    #
+    #   Var(Δlog y) = Σ_x κ²_{y,x} · Var(x)
+    #               + 2 Σ_{x<x'} κ_{y,x} κ_{y,x'} · Cov(x, x')
+    #               + Var(η_y),
+    #
+    # where κ_{y,x} is the partial pass-through of shock x to target y (OLS
+    # with all other shocks as controls), and η_y is the residual. Cross
+    # terms are non-negligible only for ϵ^w - ϵ^m (which are correlated by
+    # construction); the others are near-zero in expectation but we include
+    # all of them so the identity holds exactly in-sample.
+
+    # List of (shock_name, innovation_array) pairs.
+    _shock_list = [('zeta_w', Δzw), ('zeta_m', Δzm),
+                   ('eps_w',  Δϵw), ('eps_m',  Δϵm),
+                   ('psi_w',  Δlovw), ('psi_m', Δlovm)]
+
+    def _shockdec(target, cond, shocks=_shock_list):
+        """
+        Decompose Var(target | cond) into own + cross + residual contributions
+        using OLS partial pass-throughs and sample moments of the shocks.
+        """
+        names = [s[0] for s in shocks]
+        arrs  = [s[1] for s in shocks]
+
+        # Partial pass-throughs κ_x : coefficient on x when target is regressed
+        # on all shocks simultaneously (other shocks as OLS controls).
+        κ = {}
+        for i, (nm, arr) in enumerate(shocks):
+            controls = tuple(a for j, a in enumerate(arrs) if j != i)
+            κ[nm] = ols(arr, target, cond, cov=controls, take=1)
+
+        # Sample second moments of shocks on the same cond
+        σ2    = {nm: float(np.var(arr[cond], ddof=1))     for nm, arr in shocks}
+        σcov  = {(nm_i, nm_j): float(np.cov(a_i[cond], a_j[cond], ddof=1)[0, 1])
+                 for i, (nm_i, a_i) in enumerate(shocks)
+                 for j, (nm_j, a_j) in enumerate(shocks) if j > i}
+
+        # Variance contributions
+        own   = {nm: κ[nm]**2 * σ2[nm] for nm in names}
+        cross = {(i, j): 2.0 * κ[i] * κ[j] * σcov[(i, j)] for (i, j) in σcov}
+
+        V_total     = float(target[cond].var(ddof=1))
+        V_explained = sum(own.values()) + sum(cross.values())
+        V_resid     = V_total - V_explained
+
+        return {
+            'κ':           κ,            # pass-throughs
+            'σ2':          σ2,           # shock variances
+            'σ_cross':     σcov,         # shock pairwise covariances
+            'own':         own,          # κ² · σ² per shock
+            'cross':       cross,        # 2·κ·κ' · σ_{xy} per pair
+            'V_total':     V_total,      # total Var(target)
+            'V_explained': V_explained,  # sum(own) + sum(cross)
+            'V_resid':     V_resid,      # Var(η_y)
+            # Shares of total variance (sum to 1 including residual)
+            'sh_own':      {nm: v / V_total for nm, v in own.items()},
+            'sh_cross':    {k:  v / V_total for k, v in cross.items()},
+            'sh_resid':    V_resid / V_total,
+            'R2':          V_explained / V_total,
+        }
+
+    # Run the decomposition for each target of interest
+    shockdec = {
+        'Cw'    : _shockdec(Δcw, sm),   # wife private consumption
+        'Cm'    : _shockdec(Δcm, sm),   # husband private consumption
+        'Cpriv' : _shockdec(Δcp, sm),   # within-couple private (cw+cm)
+        'Ctot'  : _shockdec(ΔC,  sm),   # total (private + public)
+        'sw'    : _shockdec(Δs,  sm),   # wife's private share
+        'sm'    : _shockdec(Δs1, sm),   # husband's private share
+    }
+
+
 
     ####################################################    
     # Decomposition of hh private consumption growth
@@ -377,23 +453,47 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     # Pass through from gross to net household earnings
     κynug=ols(ΔY,ΔY_net,sm)
     
-    # Share of earnings going to husband
+    # Share of earnings going to husband  and WLP
     sYm=np.mean(m.sim.incmg[sample][sm]/(m.sim.incmg[sample][sm]+m.sim.incwg[sample][sm]))
+    wpart=(m.sim.WLP[sample][sm]>0).mean()
     
-    # Find the different sources of insurance
-    K1=κymp
-    K2=sYm
-    K3=1+((1-sYm)*κywp)/(sYm*κymp)
-    K4=κyp/(K1*K2*K3)
-    K5=κynug
-    K6=ols(SHOCK,ΔC,sm,cov=CONTROLS,take=1)/(κyp*K5)
+    #Changes in women earnings reltive to household income
+    ΔsYw=np.mean((m.sim.incwg[sample1][sw]-m.sim.incwg[sample][sw])/(m.sim.incmg[sample][sw]+m.sim.incwg[sample][sw]))
     
-    # Finally the decomposition of household insurance   
-    Passive_insurance = 1-K1*K2
-    Active_insurance  = 1-K1*K2*K3*K4-(1-K1*K2)
-    Taxes             = 1-K1*K2*K3*K4*K5-(1-K1*K2*K3*K4)
-    Self_insurance    = 1-K1*K2*K3*K4*K5*K6-(1-K1*K2*K3*K4*K5)
-       
+    if shock_gender=='Male':
+        
+        # Find the different sources of insurance
+        K1=κymp
+        K2=sYm 
+        K3=1+((1-sYm)*κywp)/(sYm*κymp)
+        K4=κyp/(K1*K2*K3)
+        K5=κynug
+        K6=ols(SHOCK,ΔC,sm,cov=CONTROLS,take=1)/(κyp*K5)
+        
+        # Finally the decomposition of household insurance   
+        Passive_insurance = 1-K1*K2
+        Active_insurance  = 1-K1*K2*K3*K4-(1-K1*K2)
+        Taxes             = 1-K1*K2*K3*K4*K5-(1-K1*K2*K3*K4)
+        Self_insurance    = 1-K1*K2*K3*K4*K5*K6-(1-K1*K2*K3*K4*K5)
+           
+        
+    else:
+        
+        K1=κywp
+        K3=1-sYm
+        temp = (sYm*κymp)/((1-sYm)*κywp)
+        K2=κyp/(K1*K3)#κyp/(K1*K3)-temp
+        
+        K4=1#1+temp/K2
+        K5=κynug
+        K6=ols(SHOCK,ΔC,sm,cov=CONTROLS,take=1)/(κyp*K5)
+        
+        # Finally the decomposition of household insurance   
+        Active_insurance =  1-K1*K2
+        Passive_insurance = 1-K1*K2*K3*K4-(1-K1*K2)
+        Taxes             = 1-K1*K2*K3*K4*K5-(1-K1*K2*K3*K4)
+        Self_insurance    = 1-K1*K2*K3*K4*K5*K6-(1-K1*K2*K3*K4*K5)
+        
     ### B from hosehold to individual conusmption insurance
     
     κs1mp=ols(SHOCK,SHARE,sm,cov=CONTROLS,take=1) # pass-through from SHOCK to individual share of conusmption
@@ -402,7 +502,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     # Finally the decomposition of individual insurance
     HH_insurance=1-K1*K2*K3*K4*K5*K6
     private_shift=(1-HH_insurance-κspmp)-(1-HH_insurance)
-    bargaining_shift=(1-HH_insurance-κspmp-κs1mp)-(1-HH_insurance-κspmp)
+    bargaining_shift=(1-HH_insurance-κspmp-κs1mp)-(1-HH_insurance-κspmp)      
     
     # Total private consumption insurance
     ind_con_ins=1-ols(SHOCK,ΔCONS,sm,cov=CONTROLS,take=1)
@@ -429,4 +529,5 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
   
 
     return {'indc':indc,'w_sh':w_sh,'totc':totc,'dins':dins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,'wlp':wlp,'level':level,'ins_dec':ins_dec,
-            'vardec_w':vardec_wife,'vardec_m':vardec_husband}
+            'vardec_w':vardec_wife,'vardec_m':vardec_husband,
+            'shockdec':shockdec}
