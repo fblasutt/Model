@@ -287,7 +287,14 @@ class HouseholdModelClass(EconModelClass):
         sim.init_lovem = np.ones(par.simN,dtype=np.int_)*par.num_lovem//2#m's initial love 
         sim.init_love = sim.init_lovew*par.num_lovem+sim.init_lovem          #initial love 
         sim.init_z  = np.zeros(par.simN,dtype=np.int_)                  # Initial income index
-        
+
+        # Optional override of the initial-love draw at sample_init.
+        # -1 (default) = use the random Markov draw inside simulate_lifecycle;
+        # any non-negative value forces that agent's initial love to land on
+        # the specified grid index (useful for cross-regime fixed-policy
+        # counterfactuals where one wants to equalize the initial state).
+        sim.force_init_love = -np.ones(par.simN, dtype=np.int_)
+
                        
     def solve(self):
 
@@ -775,6 +782,11 @@ def simulate_lifecycle(sim,sol,par):
                 mat=mat/mat.sum(axis=0)
                     
                 initial[i]=usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
+
+                # Optional override: if the user pre-set sim.force_init_love[i]
+                # to a non-negative grid index, use it instead of the draw.
+                if sim.force_init_love[i] >= 0:
+                    initial[i] = sim.force_init_love[i]
 
             
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation) 

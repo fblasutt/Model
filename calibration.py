@@ -487,4 +487,4 @@ if __name__ == '__main__':
     else:
         
         # Commpute tables with with paramters, and BPP given parameter xc
-        q(xc,table=False)
+        q(xc,table=True)

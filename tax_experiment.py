@@ -155,16 +155,28 @@ for i in range(len(gridτ)):
  
 #Loop over gender wage gap grid and solve the model - full commitment
 for i in range(len(gridτ)):
-    
+
     # Set up the model - full commitment
-    Mf = model.copy(name='numba_new_copy')    
-    Mf.par.τ=gridτ[i]    
+    Mf = model.copy(name='numba_new_copy')
+    Mf.par.τ=gridτ[i]
     Mf.par.Λ=gridΛ[i]
-   
+
     Mf.par.full=True
 
-    Mf.solve() 
-    Mf.simulate() 
+    Mf.solve()
+
+    # Equalize the initial-love draw with the matching LC simulation so that
+    # cross-regime comparisons are apples-to-apples. (FC's mutual-consent PC
+    # at sample-init is laxer than LC's individual PC, so without this step
+    # FC ends up with a wider initial-love distribution than LC.)
+    init_love_lc = np.array(
+        [Bmodel[i].sim.love[k, int(Bmodel[i].par.sample_init[k])]
+         for k in range(Bmodel[i].par.simN)],
+        dtype=np.int_,
+    )
+    Mf.sim.force_init_love[:] = init_love_lc
+
+    Mf.simulate()
     Bfmodel.append(Mf)
 
 

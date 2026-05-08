@@ -106,26 +106,38 @@ for i in range(len(gridτ)):
  
 #Loop over gender wage gap grid and solve the model - full commitment
 for i in range(len(gridτ)):
-    
-    # Set up the model - full
-    Mf = model.copy(name='numba_new_copy')    
-    Mf.par.ι0w=gridτ[i]    
-    Mf.par.full=True
-    
-        
-    # income shocks grids: singles and couples
-    Mf.par.grid_zw,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
-        Mf.par.grid_zm,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
-                                    Mf.par.Π=usr.labor_income(Mf.par) 
-                                    
-                                    
-    # income shocks grids: singles and couples
-    Mf.par.grid_zw,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
-        Mf.par.grid_zm,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
-                                            Mf.par.Πs=usr.labor_income(Mf.par,single=True) 
 
-    Mf.solve() 
-    Mf.simulate()    
+    # Set up the model - full
+    Mf = model.copy(name='numba_new_copy')
+    Mf.par.ι0w=gridτ[i]
+    Mf.par.full=True
+
+
+    # income shocks grids: singles and couples
+    Mf.par.grid_zw,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
+        Mf.par.grid_zm,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
+                                    Mf.par.Π=usr.labor_income(Mf.par)
+
+
+    # income shocks grids: singles and couples
+    Mf.par.grid_zw,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
+        Mf.par.grid_zm,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
+                                            Mf.par.Πs=usr.labor_income(Mf.par,single=True)
+
+    Mf.solve()
+
+    # Equalize the initial-love draw with the matching LC simulation so that
+    # cross-regime comparisons are apples-to-apples. (FC's mutual-consent PC
+    # at sample-init is laxer than LC's individual PC, so without this step
+    # FC ends up with a wider initial-love distribution than LC.)
+    init_love_lc = np.array(
+        [Bmodel[i].sim.love[k, int(Bmodel[i].par.sample_init[k])]
+         for k in range(Bmodel[i].par.simN)],
+        dtype=np.int_,
+    )
+    Mf.sim.force_init_love[:] = init_love_lc
+
+    Mf.simulate()
     Bfmodel.append(Mf)
 
 

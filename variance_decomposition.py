@@ -115,12 +115,26 @@ m_LC.solve()
 m_LC.simulate()
 sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_LC.sim.couple_lag == 1)
 
+# Extract LC's per-agent initial-love grid index. We feed these into the FC
+# baseline simulation so both regimes start from the same per-agent love
+# state. (LC's PC check is stricter than FC's at sample-init, so without this
+# step FC ends up with a wider initial-love distribution, which contaminates
+# any cross-regime variance comparison.)
+init_love_lc = np.array(
+    [m_LC.sim.love[i, int(m_LC.par.sample_init[i])] for i in range(m_LC.par.simN)],
+    dtype=np.int_,
+)
+
 print("Solving FC model...")
 m_FC = model.copy(name='numba_new_copy')
 m_FC.par.full = True
 m_FC.solve()
+m_FC.sim.force_init_love[:] = init_love_lc      # transplant LC's draws
 m_FC.simulate()
 sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_FC.sim.couple_lag == 1)
+
+sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_LC.sim.couple_lag == 1) 
+sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_FC.sim.couple_lag == 1) & (m_LC.sim.couple_lag == 1)
 
 
 ###############################################################################
