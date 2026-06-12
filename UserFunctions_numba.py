@@ -19,23 +19,29 @@ woman=setup.woman;man=setup.man
 ############################
     
 @njit(cache=cache)
-def home_good(x,ν,ϕ,wedge,couple,ishom):
-    """"
-    Home goods Q production. ν is the weight on home inputs vs. home time (Cobb-Douglas exponent).
+def home_good(x,ν,θ,ϕ,wedge,couple,ishom):
+    """
+    Home goods Q production. Cobb-Douglas with exponent θ on home_time and
+    (1-θ) on home inputs x:
+        Q = home_time**θ * x**(1-θ)
+    The ν argument is currently unused (it appears in the signature for
+    compatibility with the CES variant — set par.ν freely without effect).
     """
     home_time=(2*ϕ+ishom*(1-ϕ)) if couple else ϕ+(1-ϕ)*ishom
-    return home_time**(1-ν)*x**ν
+    return home_time**θ * x**(1-θ)
 
 @njit(cache=cache)
-def util(c_priv,d_pub,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
+def util(c_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
     """
-    Intra-temporal utility function. ν: home-good exponent; ω: labor disutility; px: durables price (couples).
+    Intra-temporal utility function. ν: CES substitution in home production;
+    θ: weight on home_time vs. home inputs in home production; ω: labor
+    disutility; px: durables price (couples).
     """
 
     dd=d_pub/px if couple==1 else d_pub
-    Q=home_good(dd,ν,ϕ,wedge,couple=couple,ishom=ishom)
+    Q=home_good(dd,ν,θ,ϕ,wedge,couple=couple,ishom=ishom)
 
-    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge-ω*(1-ishom)
+    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge-ω*(1-ishom)*female#*couple
 
  
 @njit(cache=cache)  
@@ -82,13 +88,14 @@ def resources_couple(par,t,ih,iz,assets):
 
 
 @njit(cache=cache)  
-def income_single(par,t,iD,ih,iz,assets,women=True): 
+def income_single(par,t,iwls,iD,ih,iz,assets,women=True): 
     """"
     This gives gross and net labor income of singles income
     """ 
     
-    ws=1.0 if t>=par.Tr else par.grid_wlp[-1]
-    labor_income =  par.grid_zws[t,iD,iz,ih]*ws if women else par.grid_zms[t,iD,iz,ih]#without HC! 
+    ws=1.0 if t>=par.Tr else par.grid_wlp[iwls]
+    
+    labor_income =  par.grid_zws[t,iD,iz,ih]*ws+1e-5 if women else par.grid_zms[t,iD,iz,ih]#without HC! 
    
     tax_income = (labor_income) -par.Λ*(labor_income)**(1-par.τ)#taxes(labor_income,s=True)# 
   
@@ -99,7 +106,7 @@ def income_single(par,t,iD,ih,iz,assets,women=True):
     
     
 @njit(cache=cache)
-def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,ω,ϕ,wedge,px):#function to minimize
+def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,θ,ω,ϕ,wedge,px):#function to minimize
     """
         Couple's utility given private (Cpriv np.array(float,float))
         and total consumption Ctot (float). Note that love does
@@ -107,20 +114,20 @@ def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,ω,ϕ,wedge,px):#function to 
         allocation of private and home consumption
     """
     Cpub=Ctot-np.sum(Cpriv) #if Ctot>np.sum(Cpriv) else 1e-15
-    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=True)
-    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=False)
+    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=True)
+    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=False)
 
     return np.array([power*Vw +(1.0-power)*Vm, Vw, Vm])
 
 @njit(cache=cache)
-def single_time_util(Ctot,ρ,χ,α,ν,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
+def single_time_util(Ctot,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
     """
     Single utility given resources Ctot allocated to consumption
     """
 
-    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom)
+    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom)
 
-    return util(c_priv,d_pub,ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom,female)
+    return util(c_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom,female)
      
 
 
@@ -156,28 +163,39 @@ def intraperiod_allocation(C_tot,grid_Ctot,pre_Cw_priv,pre_Cm_priv):
         
 
 @njit(cache=cache)
-def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom):
+def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom):
 
     """
     Finds private and public expenditure to max util for singles
     """
-    args=(ρ,χ,α,ν,ω,ϕ,wedge,px,love,couple,ishom)
+    args=(ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom)
     C_priv = optimizer(lambda x,y,args:-util(x,y-x,*args),1.0e-6, C_tot - 1.0e-6,args=(C_tot,args))[0]
 
     return C_priv,C_tot - C_priv#=d_pub
 
 
 @njit
-def couple_root(x,c,powe,ρ,χ,α,ν,ϕ,wedge,px,ishom):
+def couple_root(x,c,powe,ρ,χ,α,ν,θ,ϕ,wedge,px,ishom):
     """
-    Finds the root of the intra-period problem for couples.
-    ω is absent here: it is linear in ishom and drops out of the FOC wrt d_pub.
+    Finds the root of the intra-period problem for couples under Cobb-Douglas
+    home production Q = ht^θ · (x/px)^(1-θ).
+
+    FOC (w.r.t. x = d_pub):
+        (1-α)·(c-x)^(-ρ) · Σ
+          - α·(1-θ)·ht^(θ(1-χ))·(1/px)^((1-θ)(1-χ))·x^((1-θ)(1-χ) - 1)  =  0,
+    where Σ = powe·m^(1-ρ) + (1-powe)·(1-m)^(1-ρ).
+
+    The ν argument is unused under Cobb-Douglas; retained for signature
+    compatibility with the CES variant.
+
+    ω is absent: linear in ishom, drops out of the FOC wrt d_pub.
     """
 
     m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))
     home_time = (2*ϕ+ishom*(1-ϕ))
 
-    return (1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ)) - α*ν*home_time**((1-ν)*(1-χ))*(1/px)**(ν*(1-χ))*x**(ν-ν*χ-1)
+    return ((1-α)*(c-x)**(-ρ)*(powe*m**(1-ρ)+(1.0-powe)*(1-m)**(1-ρ))
+            - α*(1-θ)*home_time**(θ*(1-χ))*(1/px)**((1-θ)*(1-χ))*x**((1-θ)*(1-χ)-1))
  
  
 
@@ -268,21 +286,24 @@ def labor_income(par,single=False,pens_reform=False):
         for i in range(len(par.grid_h)):
             for iD in range(par.num_perdiv):
 
-                #Individual pension
+                # # #Individual pension
                 Ind_M = XXmA[par.Tr-1,iD,:,i]
                 Ind_W = XXwA[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
                 
-                #Shared pension accumulated while married
-                Shared = (Ind_M+Ind_W)/2#(XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
+                # #Shared pension accumulated while married
+                # Shared = (Ind_M+Ind_W)/2#(XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
                 
-                #Weight of Shared vs.individual pension  depending on pension reform implementation                
-                ws=par.PW[iD] if pens_reform else 0.0
+                # #Weight of Shared vs.individual pension  depending on pension reform implementation                
+                # ws=par.PW[iD] if pens_reform else 0.0
                              
-                XXwA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_W,par.p_b,par.κ)
-                XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
+                # XXwA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_W,par.p_b,par.κ)
+                # XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
                 
                 
-                #Shared pension accumulated while married
+                # #Shared pension accumulated while married
+                
+                XXmA2[par.Tr-1,iD,:,i]= XXmA[par.Tr-1,iD,:,i].mean()
+                XXwA2[par.Tr-1,iD,:,i]=XXwA[par.Tr-1,iD,:,i].mean()
                 Shared = (XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
                 
                 lossm= XXmA2[par.Tr-1,iD,:,i] - Shared
@@ -353,7 +374,9 @@ def pension_share(par):
     A_w_t = np.array([age_weights[i]@ ((i-np.arange(par.Tr))/(par.Tr-1)) for i in range(par.Tr)])
     
     #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
-    A_w = np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
+    A_w=np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
+    A_w=np.linspace(0.0,A_w_t[-1],par.num_perdiv)
+  
     
     
     

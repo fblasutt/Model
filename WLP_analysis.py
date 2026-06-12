@@ -411,12 +411,12 @@ print("  transitory  ε_w : {:+.4f} pp per 1 log-point of Δlog ε_w".format(β_
 # Home production response to husband's earnings
 # ------------------------------------------------------------------------
 # (i)   d   = home inputs (money) -> M.sim.dw  (couples: produces with d/px)
-# (ii)  Q   = home good (output)  -> Q = home_time^(1-ν) * (d/px)^ν       , couples
+# (ii)  Q   = home good (output)  -> Cobb-Douglas:  Q = home_time^θ · (d/px)^(1-θ)
 #            with home_time = 2*ϕ + ishom*(1-ϕ),  ishom = 1 - wlp (or 2 if retired)
 # (iii) U_Q = utility from Q       -> α * Q^(1-χ) / (1-χ)
 ##########################################################################
 
-ϕ_p, ν_p, α_p, χ_p, px_p = M.par.ϕ, M.par.ν, M.par.α, M.par.χ, M.par.px
+ϕ_p, ν_p, θ_p, α_p, χ_p, px_p = M.par.ϕ, M.par.ν, M.par.θ, M.par.α, M.par.χ, M.par.px
 
 wlp_val = M.par.grid_wlp[M.sim.WLP]                        # (N, T) — fraction worked
 ret_t   = (np.arange(M.par.T) >= M.par.Tr)                  # (T,)   — retirement flag
@@ -426,7 +426,7 @@ ishom         = np.where(ret_t[None, :], 2.0, 1.0 - wlp_val)
 home_time_eff = 2.0*ϕ_p + ishom*(1.0 - ϕ_p)                 # (N, T)
 
 d   = M.sim.dw                                              # (N, T) — home-input expenditure
-Q   = home_time_eff**(1.0 - ν_p) * (d / px_p)**ν_p          # (N, T) — home good
+Q   = home_time_eff**θ_p * (d/px_p)**(1.0-θ_p)              # Cobb-Douglas home good
 U_Q = α_p * Q**(1.0 - χ_p) / (1.0 - χ_p)                    # (N, T) — utility from Q
 
 # Period-over-period changes on the sm subsample (aligned with ΔYm)

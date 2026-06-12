@@ -123,7 +123,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     ΔYY   =ΔY +ΔY1 +ΔY_1   
     
     # Change in WLP
-    ΔWLP=m.par.grid_wlp[m.sim.WLP][sample1]-m.par.grid_wlp[m.sim.WLP][sample]
+    ΔWLP=np.array([(m.par.grid_wlp[m.sim.WLP][sample1]>0)],dtype=np.float64)[0]-np.array([(m.par.grid_wlp[m.sim.WLP][sample]>0)],dtype=np.float64)[0]
+
     
     #Love shock changes
     lovw,lovm=np.zeros((2,m.par.simN,m.par.T))

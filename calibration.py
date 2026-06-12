@@ -20,6 +20,7 @@ import statsmodels.formula.api as smf
 import statsmodels.api as sm 
 from pyhdfe import create
 import matplotlib.pyplot as plt
+import TikTak 
 
 #Initialize seed 
 np.random.seed(10) 
@@ -71,9 +72,89 @@ assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
+xc=np.array([0.55 , 0.01  , 0.85 , 1.2  , 0.73, 1.   ])
+
+#Standard
+xc=np.array([0.54708787, 0.00793932, 0.85327886, 1.19289247, 0.73391667, 0.99895621])
+
+#Different retired time use
+xc=np.array([6.38681148e-01, 2.67948057e-04, 8.53420449e-01, 1.21649145e+00, 5.93578100e-01, 9.95464029e-01])
+
+xc=np.array([0.14708787, 0.05, 0.95327886, 1.19289247, 0.93, 0.99895621])
+
+xc=np.array([1.00000000e-05, 6.80780631e-02, 8.35411870e-01, 8.57024764e-01,
+       6.11520726e-01, 1.00400212e+00])
+
+xc=np.array([0.14311526, 0.06, 0.89018616, 0.82124284, .5,1.00290227])
+
+xc=np.array([0.14311526, 0.082      , 0.89018616, 0.82124284, 0.0  ,1.00290227])
+
+xc=np.array([-0.0, 0.11     , 0.89018616, 0.82124284, 0. ,1.0])
+
+
+#0.70
+xc=np.array([1.00000000e-05, 1.12196275e-02, 9.70627668e-01, 8.70065989e-01,
+       7.34883539e-01, 1.00687274e+00])
+
+xc=np.array([1.00000000e-05, 1.12196275e-02, 9.70627668e-01, 8.70065989e-01,
+       7.34883539e-01, 1.00687274e+00])
+
+#0.71
+
+#xc=np.array([-0.0, 1.12196275e-02, 0.9, 8.70065989e-01, 0.74, 1.00687274e+00])
+
+#0.72
+
+xc=np.array([0.28, 0.01, 0.91,1.1,0.58,.983])
+
+xc=np.array([0.33 , 0.06 , 0.91 , 1.1  , 0.0 , 0.974])
+
+xc=np.array([0.33 , 0.06 , 0.91 , 1.1  , 0.6   , 1.0])
+
+
+xc=np.array([0.38, 0.02, 0.91, 1.1 , 0.44 , .98  ])
+
+#nu 0.55
+xc=np.array([0.55 , 0.03 , 0.91 , 1.2  , 0.43 , 0.97])
+
+
+
+
+xc=np.array([0.18, 0.1, 0.93, 1.4 , 0.32, 0.982])
+
+
+xc=np.array([0.18 , 0.01  , 0.93 , 1.4  , 0.6 , 0.982])
+
+xc=np.array([0.18 , 0.04 , 0.93 , 1.4  , 0.38  , 0.982])
+
+
+xc=np.array([0.18 , 0.02 , 0.9 , 1.01  , 0.44 , 1.00])
+
+xc=np.array([2.0, 0.05, 0.9 , 1.01, 0.2, .993,0.5  ])
 # Lower and higher bounds of parameters
-xl=np.array([0.00001,0.000082,0.1,0.5,0.01,0.9]) 
-xu=np.array([0.8,0.4,0.999,2.5,1.0,1.1]) 
+
+xc=np.array([1.9   , 0.05 , 0.86  , 1.15 , 0.275  , 1.0, 0.1  ])
+
+xc=np.array([2.3  , 0.05 , 0.86 , 1.15 , 0.275, 1.   , 0.1  ])
+
+xc=np.array([2.1  , 0.05 , 0.86 , 1.15 , 0.29, 1.   , 0.1  ])
+
+xc=np.array([2.1 , 0.05, 0.86, 1.15, 0.40, 1.  , 0.1 ])
+            
+xc=np.array([2.1 , 0.055, 0.86, 1.15, 1.05 , 1.  ])
+
+
+xc=np.array([1.85  , 0.055, 0.86 , 1.3 , 1.1 , 1.   ])
+
+xc=np.array([1.90811501, 0.06891494, 0.78456669, 1.30666382, 1.10040571,
+       0.99808006])
+
+xc=np.array([1.89207021, 0.07435303, 0.89704808, 1.2524448 , 1.12680064,
+       0.99812169])
+
+
+xl=np.array([1.3,0.00001,0.1,0.85,0.01,0.98]) 
+xu=np.array([3.0,0.4,0.999,1.4,1.5,1.02]) 
 
 #Parametrize the model 
 par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
@@ -110,6 +191,26 @@ policy=np.maximum(calendar_year[:,0],2007)
 age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 
 
+# pt=xc
+# # Set up the model with the input parameters pt
+# M_bef = model.copy(name='numba_new_copy')
+   
+# M_bef.par.ω=pt[0]
+# M_bef.par.grid_lovew,M_bef.par.Πlw,M_bef.par.Πlw0= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
+# M_bef.par.grid_lovem,M_bef.par.Πlm,M_bef.par.Πlm0= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovem) 
+
+
+# M_bef.par.Πl=[np.kron(M_bef.par.Πlw[t],M_bef.par.Πlm[t])  if t<M_bef.par.Tr else np.eye(M_bef.par.num_lovew*M_bef.par.num_lovem)  for t in range(M_bef.par.T-1)] # couples trans matrix
+# M_bef.par.Πl0=[np.kron(M_bef.par.Πlw0[t],M_bef.par.Πlm0[t])  if t<M_bef.par.Tr else np.eye(M_bef.par.num_lovew*M_bef.par.num_lovem)  for t in range(M_bef.par.T-1)] # couples trans matrix 
+# M_bef.par.α=pt[2] 
+# M_bef.par.ρ=pt[3]
+# M_bef.par.wedge=pt[4]    
+# M_bef.par.β=pt[5]
+
+# # Solve and simulate the model
+# M_bef.solve() 
+# M_bef.simulate() 
+        
 #Function to minimize 
 def q(pt,table=False): 
  
@@ -132,12 +233,14 @@ def q(pt,table=False):
         M_bef.par.grid_lovem,M_bef.par.Πlm,M_bef.par.Πlm0= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovem) 
         
         
-        M_bef.par.Πl=[np.kron(M_bef.par.Πlw[t],M_bef.par.Πlm[t]) for t in range(M_bef.par.T-1)] # couples trans matrix
+        M_bef.par.Πl=[np.kron(M_bef.par.Πlw[t],M_bef.par.Πlm[t])   for t in range(M_bef.par.T-1)] # couples trans matrix
         M_bef.par.Πl0=[np.kron(M_bef.par.Πlw0[t],M_bef.par.Πlm0[t]) for t in range(M_bef.par.T-1)] # couples trans matrix 
         M_bef.par.α=pt[2] 
         M_bef.par.ρ=pt[3]
         M_bef.par.wedge=pt[4]    
         M_bef.par.β=pt[5]
+       
+        
     
         # Solve and simulate the model
         M_bef.solve() 
@@ -157,8 +260,10 @@ def q(pt,table=False):
         M.par.grid_lovem,M.par.Πlm,M.par.Πlw0= usr.rouw_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovem) 
         
         
-        M.par.Πl=[np.kron(M.par.Πlw[t],M.par.Πlm[t]) for t in range(M.par.T-1)] # couples trans matrix 
-        M.par.Πl0=[np.kron(M.par.Πlw0[t],M.par.Πlm0[t]) for t in range(M.par.T-1)] # couples trans matrix 
+        M.par.Πl=[np.kron(M.par.Πlw[t],M.par.Πlm[t])  for t in range(M.par.T-1)] # couples trans matrix 
+        M.par.Πl0=[np.kron(M.par.Πlw0[t],M.par.Πlm0[t])   for t in range(M.par.T-1)] # couples trans matrix 
+        
+
         
         # Income shocks grids: couples
         M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
@@ -172,7 +277,8 @@ def q(pt,table=False):
         M.par.α=pt[2] 
         M.par.ρ=pt[3]
         M.par.wedge=pt[4]
-        M.par.β=pt[5]        
+        M.par.β=pt[5]   
+       
     
         # Solve and simulate the model
         M.solve() 
@@ -181,86 +287,190 @@ def q(pt,table=False):
         #toc=time.time()
         #print('Time elapsed for model solution is {}'.format(toc-tic))
         
-        aaa=M_bef.sim.power[age==age_marriage[:,None]]
-        print(np.mean(aaa==model.sim.init_power))
+        aaa=M_bef.sim.power[age==age_marriage[:,None]]!=M_bef.sim.power_lag[age==age_marriage[:,None]]
+        print(np.mean(aaa))
         
         #############################################
         #Event Study: policy and consumption ratio
         ############################################
       
-        #Covariates
+        # #Covariates
         time_to_policy= (np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)-M.par.policy_init[:,None]
-        event_time=time_to_policy.copy()
-        idd=np.repeat(np.cumsum(np.ones(M.par.simN))[:,None],M.par.T,axis=1)   
-        policy_init= np.repeat((M.par.policy_init)[:,None],M.par.T,axis=1) 
-        agei=np.repeat((age_marriage)[:,None],M.par.T,axis=1) 
-        time=age-agei
+        # event_time=time_to_policy.copy()
+        # idd=np.repeat(np.cumsum(np.ones(M.par.simN))[:,None],M.par.T,axis=1)   
+        # policy_init= np.repeat((M.par.policy_init)[:,None],M.par.T,axis=1) 
+        # agei=np.repeat((age_marriage)[:,None],M.par.T,axis=1) 
+        # time=age-agei
         
-        #Event-study specific variables
-        treat_group=np.repeat((M.par.policy_init>=15)[:,None],M.par.T,axis=1) 
-        event_time[event_time<=-5]=-5
-        event_time[event_time>=5]=5
-        event_time_PER_treat=event_time*treat_group 
-        wife_ratio=M.sim.Cw/(M.sim.Cm)
+        # #Event-study specific variables
+        # treat_group=np.repeat((M.par.policy_init>=15)[:,None],M.par.T,axis=1) 
+        # event_time[event_time<=-5]=-5
+        # event_time[event_time>=5]=5
+        # event_time_PER_treat=event_time*treat_group 
+        # wife_ratio=M.sim.Cw/(M.sim.Cm+M.sim.Cw)
 
-        #Sample
-        subset=   (age>=age_marriage[:,None]) & (M.sim.power>=0) & (age_policy>age_marriage-20+5)[:,None] 
+        # #Sample
+        # subset=   (age>=age_marriage[:,None]) & (M.sim.power>=0) & (age_policy>age_marriage-20+5)[:,None] 
     
-        # Combine into a DataFrame 
-        df = pd.DataFrame({ 
-            "time":time[subset],
-            "policy_init":policy_init[subset],
-            "post":(event_time>=0)[subset],
-            "inter":(treat_group*(event_time>=0))[subset],
-            "wife_ratio":wife_ratio[subset], 
-            "event_time":event_time[subset], 
-            "idd":idd[subset], 
-            "age":age[subset], 
-            "treat_group":treat_group[subset],
-            "event_time_PER_treat":event_time_PER_treat[subset] 
-        }) 
+        # # Combine into a DataFrame 
+        # df = pd.DataFrame({ 
+        #     "time":time[subset],
+        #     "policy_init":policy_init[subset],
+        #     "post":(event_time>=0)[subset],
+        #     "inter":(treat_group*(event_time>=0))[subset],
+        #     "wife_ratio":wife_ratio[subset], 
+        #     "event_time":event_time[subset], 
+        #     "idd":idd[subset], 
+        #     "age":age[subset], 
+        #     "treat_group":treat_group[subset],
+        #     "event_time_PER_treat":event_time_PER_treat[subset] 
+        # }) 
          
        
-        reference_value=-1
-        event_cats = sorted(df['event_time'].unique()) 
-        if reference_value in event_cats: 
-            event_cats.remove(reference_value) 
-            event_cats = [reference_value] + event_cats 
+        # reference_value=-1
+        # event_cats = sorted(df['event_time'].unique()) 
+        # if reference_value in event_cats: 
+        #     event_cats.remove(reference_value) 
+        #     event_cats = [reference_value] + event_cats 
              
  
-        # Step 1: Create the fixed effects structure 
-        fe_df = df[[ 'event_time','idd','age']].astype('category')
+        # # Step 1: Create the fixed effects structure 
+        # fe_df = df[[ 'event_time','idd','age']].astype('category')
 
          
-        # Step 2: Create the HDFE projector 
-        hdfe = create(fe_df) 
+        # # Step 2: Create the HDFE projector 
+        # hdfe = create(fe_df) 
          
-        # Create categorical with this ordering 
-        df['event_cat'] = pd.Categorical(df['event_time_PER_treat'], categories=event_cats) 
+        # # Create categorical with this ordering 
+        # df['event_cat'] = pd.Categorical(df['event_time_PER_treat'], categories=event_cats) 
      
-        # Create dummies, drop_first will now drop your reference group 
-        event_dummies = pd.get_dummies(df['event_cat'], prefix='event', drop_first=True) 
+        # # Create dummies, drop_first will now drop your reference group 
+        # event_dummies = pd.get_dummies(df['event_cat'], prefix='event', drop_first=True) 
          
         
-        # Residualize both y and X 
-        y_resid = hdfe.residualize(df[['wife_ratio']].values) 
-        X_resid = hdfe.residualize(event_dummies.values) 
-        #X2_resid = hdfe.residualize(df[['inter']].values) 
+        # # Residualize both y and X 
+        # y_resid = hdfe.residualize(df[['wife_ratio']].values) 
+        # X_resid = hdfe.residualize(event_dummies.values) 
+        # #X2_resid = hdfe.residualize(df[['inter']].values) 
          
-        # OLS on residuals 
-        model_ = sm.OLS(y_resid, X_resid) 
-        results = model_.fit() 
+        # # OLS on residuals 
+        # model_ = sm.OLS(y_resid, X_resid) 
+        # results = model_.fit() 
         
-        params=np.insert(results.params, 4, 0)
-        plt.plot(np.linspace(-4,4,9),params[1:-1])
+        # params=np.insert(results.params, 4, 0)
+        # plt.plot(np.linspace(-4,4,9),params[1:-1])
         
-        policy_effect_wife_ratio=params[5:-1].mean()#sm.OLS(y_resid, X2_resid).fit().params[0] 
-        if np.isnan(policy_effect_wife_ratio):policy_effect_wife_ratio=10.0
+        # policy_effect_wife_ratio=params[5:-1].mean()#sm.OLS(y_resid, X2_resid).fit().params[0] 
+        # if np.isnan(policy_effect_wife_ratio):policy_effect_wife_ratio=10.0
          
         ######################################
         #Other moments here
-        ######################################  
-     
+        ###################################### 
+        # from consav import linear_interp,upperenvelope
+        # Vcw=np.zeros(M.par.simN)
+        # for i in range(M.par.simN):
+            
+            
+            
+        #     idx = (44,M.sim.ih[i,44],M.sim.iz[i,44],slice(None),M.sim.love[i,44])
+            
+        #     Vcw[i]=linear_interp.interp_2d(M.par.grid_power,M.par.grid_A,M.sol.Vw_remain_couple[idx],M_bef.sim.power[i,44],M_bef.sim.A[i,44])
+            
+            
+        
+         
+        #Wife share of consumption
+        event_time=np.arange(-5,5)
+       
+        
+        baseb=(age>=age_marriage[:,None]) & (M_bef.sim.power>=0) & (age_policy>age_marriage-20+5)[:,None]#   & (M.sim.incw/(M.sim.incw+M.sim.incm)>0.5) 
+        basea=(age>=age_marriage[:,None]) & (M.sim.power>=0)    & (age_policy>age_marriage-20+5)[:,None]#  & (M_bef.sim.incw/(M_bef.sim.incw+M_bef.sim.incm)>0.5)
+      
+        
+        sya=(basea) & (M.par.policy_init[:,None]<15) 
+        soa=(basea) & (M.par.policy_init[:,None]>=15) 
+        
+        syb=(baseb) & (M.par.policy_init[:,None]<15) 
+        sob=(baseb) & (M.par.policy_init[:,None]>=15) 
+        
+        
+        
+        ws_yb=np.array([((M_bef.sim.Vcw-M_bef.sim.Vsw)*0+M_bef.sim.WLP+0*M_bef.sim.Cw/(M_bef.sim.Cm+M_bef.sim.Cw))[(syb)    & (time_to_policy==i)].mean() for i in event_time])
+        ws_ob=np.array([((M_bef.sim.Vcw-M_bef.sim.Vsw)*0+M_bef.sim.WLP+0*M_bef.sim.Cw/(M_bef.sim.Cm+M_bef.sim.Cw))[(sob)    & (time_to_policy==i)].mean() for i in event_time])
+
+        ws_ya=np.array([((M.sim.Vcw-M.sim.Vsw)*0+M.sim.WLP+0*M.sim.Cw/(M.sim.Cm+M.sim.Cw))[(sya)    & (time_to_policy==i)].mean() for i in event_time])
+        ws_oa=np.array([((M.sim.Vcw-M.sim.Vsw)*0+M.sim.WLP+0*M.sim.Cw/(M.sim.Cm+M.sim.Cw))[(soa)    & (time_to_policy==i)].mean() for i in event_time])
+               
+        effect=(ws_oa-ws_ob)-(ws_ya-ws_yb)
+        # plt.plot(event_time,effect)
+        # plt.show()
+             
+       
+        policy_effect_wife_ratio=effect[5:].mean()
+        
+        SA=(age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1)
+        SB=(age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==1)
+        
+        Swa=M.sim.Vcw-M.sim.Vsw# < 0.01
+        Sma=M.sim.Vcm-M.sim.Vsm# < 0.01
+        
+        Swb=M_bef.sim.Vcw-M_bef.sim.Vsw #< 0.01
+        Smb=M_bef.sim.Vcm-M_bef.sim.Vsm# < 0.01
+        
+        # plt.plot(np.mean(Swa,where=SA,axis=0),label="after")
+        # plt.plot(np.mean(Swb,where=SB,axis=0),label="before")
+        # plt.legend()
+        # plt.show()
+        
+
+        #Share binding by age
+        sample_empla =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M.par.policy_init[:,None]>=15)
+        sample_emplb =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==1) & (M.par.policy_init[:,None]>=15)
+        
+        
+        bindwb=np.nanmean(Swb ,where=sample_emplb,axis=0)
+        bindmb=np.nanmean(Smb ,where=sample_emplb,axis=0)
+        
+        bindw_eb=np.array([(Swb)[(sample_emplb)    & (time_to_policy==i)].mean() for i in event_time])
+        bindm_eb=np.array([(Smb)[(sample_emplb)    & (time_to_policy==i)].mean() for i in event_time])
+
+        bindwa=np.nanmean(Swa ,where=sample_empla,axis=0)
+        bindma=np.nanmean(Sma,where=sample_empla,axis=0)
+        
+        bindw_ea=np.array([(Swa)[(sample_empla)    & (time_to_policy==i)].mean() for i in event_time])
+        bindm_ea=np.array([(Sma)[(sample_empla)    & (time_to_policy==i)].mean() for i in event_time])
+
+        
+        BPa=np.array([(M.sim.power)[(sample_empla)   & (time_to_policy==i)].mean() for i in event_time])
+        BPb=np.array([(M_bef.sim.power)[(sample_emplb)   & (time_to_policy==i)].mean() for i in event_time])
+        
+        # plt.plot(bindma,label="Men")
+        # plt.plot(bindwa,label="Women")
+        # plt.ylabel('Percent binding')
+        # plt.legend()
+        # plt.show()
+        
+        # plt.plot(event_time,bindm_ea-bindm_eb,label="Men")
+        # plt.plot(event_time,bindw_ea-bindw_eb,label="Women")
+        # plt.ylabel('Percent binding')
+        # plt.legend()
+        # plt.show()
+        
+        
+        # plt.plot(event_time,BPa,label="after")
+        # plt.plot(event_time,BPb,label="before")
+        # plt.ylabel('Womens power')
+        # plt.legend()
+        # plt.show()
+        
+        
+        
+        # plt.plot(np.mean(M_bef.sim.power<0,where=(M_bef.sim.power_lag>0),axis=0),label="before")
+        # plt.plot(np.mean(M.sim.power<0,where=(M.sim.power_lag>0),axis=0),label="after")
+        # plt.ylabel('Divrce')
+        # plt.legend()
+        # plt.show()
+        
         #Compute samples relevant for moments
         
         # Sample used for divorce moments and employment/expenditures moments
@@ -286,9 +496,16 @@ def q(pt,table=False):
         
         # Average household income
         couple_assets = M.sim.A[sample_empl].mean()/M.sim.incm[sample_empl].mean()
+        
+        print(111)
+        #AWE
+        # B=insurance(M,sample_reg)
+        # AWE=B['wlp']['all_m']
+        
+        # print('AWE is {}'.format(AWE))
            
     
-        fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.065)/.065)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-2.967)/2.967)**2
+        fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.01)/.01)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-3.3)/3.3)**2#+((AWE+0.03)/0.03)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
         print('Simulated moments are {}'.format([wife_empl,policy_effect_wife_ratio,divorce_rate,expenditure_x_share,βdC,couple_assets]))
         
@@ -305,7 +522,7 @@ def q(pt,table=False):
         if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time)
       
         #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
-        fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.065)/.065),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-2.967)/2.967)]   
+        fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.01)/.01),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-3.3)/3.3)]#,(AWE+0.03)/0.03]   
 
         if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]#   
         return fitt#fit#
@@ -474,15 +691,35 @@ if __name__ == '__main__':
    
     if ESTIMATE:
         
-        # Estimate the model
-        res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
-                    npt=len(xc)+5,scaling_within_bounds=True,   
-                    user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
-                                  'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
-                    objfun_has_noise=False,print_progress=True) 
+        computation_options = { "num_workers" : 7,        # use four processes in parallel 
+                                "working_dir" : "working" # where to save results in progress (in case interrupted) 
+                                } 
+         
+        global_search_options = { "num_points" : 10}  # number of points in global pre-test 
+         
+        local_search_options = {  "algorithm"    : "dfols", # local search algorithm 
+                                                              # can be either BOBYQA from NLOPT or NelderMead from scipy 
+                                  "num_restarts" : 1,      # how many local searches to do 
+                                  "shrink_after" : 1,       # after the first [shrink_after] restarts we begin searching 
+                                                              # near the best point we have found so far 
+                                  "xtol_rel"     : 1e-6,     # relative tolerance on x 
+                                  "ftol_rel"     : 1e-6     # relative tolerance on f 
+                                } 
+         
+        opt = TikTak.TTOptimizer(computation_options, global_search_options, local_search_options, skip_global=False) 
+        x,fx = opt.minimize(q,xl,xu) 
+        print(f'The minimizer is {x}') 
+        print(f'The objective value at the min is {fx}') 
         
-        # Obtain tables
-        q(res.x,table=True)
+        # # Estimate the model
+        # res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-4, maxfun=100, bounds=(xl,xu),  
+        #             npt=len(xc)+5,scaling_within_bounds=True,   
+        #             user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
+        #                           'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  
+        #             objfun_has_noise=False,print_progress=True) 
+        
+        # # Obtain tables
+        # q(res.x,table=True)
         
     else:
         

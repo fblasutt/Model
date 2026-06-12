@@ -4,6 +4,10 @@
 import os
 os.environ["NUMBA_PARFOR_MAX_TUPLE_SIZE"] = "110"
 
+# import warnings
+# warnings.simplefilter("error")          # all warnings now raise
+
+
 parallel=True
 nojit=False
 cache=False
