@@ -8,7 +8,7 @@ os.environ["NUMBA_PARFOR_MAX_TUPLE_SIZE"] = "110"
 # warnings.simplefilter("error")          # all warnings now raise
 
 
-parallel=True
+parallel=False
 nojit=False
 cache=False
 woman = 1

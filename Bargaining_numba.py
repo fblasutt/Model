@@ -44,7 +44,8 @@ class HouseholdModelClass(EconModelClass):
         par.χ = 1.5    # Risk aversion home goods
         par.α = 0.35    # Weight on home good
         par.σ = 0.00003 # Taste shock for employment decitions. !!! We might drop this
-        par.wedge=0.1   #Single-couple utility wedge
+        par.wedge=0.0#35   #Single-couple utility wedge
+        par.Ω=0.0
         
         # Income processes: tren and shocks (sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks)
         par.ι0m= -0.224; par.ι1m=0.046   ;par.ι2m=-0.00075858 #trend for husband
@@ -67,7 +68,7 @@ class HouseholdModelClass(EconModelClass):
         par.θ = 0.08 # Weight on home_time (vs. money) in home production
         par.ω = 0.08   # Labor disutility from working
         par.ϕ = 0.326  # Time spend on public goods by singles
-        par.px = 1.0#1.4375 # Price of durables for couples (equivalence scale on d_pub)
+        par.px = 1.4375 # Price of durables for couples (equivalence scale on d_pub)
         
         # Taxes
         par.Λ=0.92                              # 1- tax level
@@ -86,7 +87,7 @@ class HouseholdModelClass(EconModelClass):
         ##########################################
         
         #Divorce period and grid
-        par.num_perdiv = 3
+        par.num_perdiv = 45
         par.Dper = int(par.Tr/par.num_perdiv)
         
         # Wealth
@@ -101,8 +102,9 @@ class HouseholdModelClass(EconModelClass):
         #par.num_h = 2
 
         # love/match quality
-        par.num_lovew = 3;par.num_lovem = 3;par.num_love=par.num_lovem*par.num_lovew
-        par.σL = 0.1; par.σL0 = 0.5
+        par.num_lovew = 5;par.num_lovem = 5;
+        par.num_love=par.num_lovem*2
+        par.σL = 0.1; par.σL0 = 0.00001
         
         # productivity of men and women: gridpoints
         par.num_ϵw=2;par.num_ϵm=2#transitory
@@ -144,14 +146,19 @@ class HouseholdModelClass(EconModelClass):
         par.num_wlp=len(par.grid_wlp)
         
         # Match quality shock grid and transition matrices  
-        par.grid_lovew,par.Πlw,par.Πlw0= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovew) 
-        par.grid_lovem,par.Πlm,par.Πlm0= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovem) 
+        par.grid_love_,par.Πl_,par.Πl0_= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovew) 
         
-          
-        par.Πl=[np.kron(par.Πlw[t],par.Πlm[t])  for t in range(par.T-1)] # couples trans matrix 
+  
         
+        disagw=np.array([-par.Ω,0.0])
+        disagm=np.array([0.0,-par.Ω])
+        trans_y=np.array([[0.5,0.5],[0.5,0.5]])
         
-        par.Πl0=[np.kron(par.Πlw0[t],par.Πlm0[t])  for t in range(par.T-1)] # couples trans matrix 
+        par.grid_lovew=[(par.grid_love_[t][:,None]+disagw[None,:]).ravel() for t in range(par.T)]
+        par.grid_lovem=[(par.grid_love_[t][:,None]+disagm[None,:]).ravel() for t in range(par.T)]
+        
+        par.Πl=[np.kron(par.Πl_[t],trans_y)  for t in range(par.T-1)]
+        par.Πl0=[np.kron(par.Πl0_[t],trans_y)  for t in range(par.T-1)]
  
         
         # Bargaining power grid. non-linear grid with more mass in both tails.        
@@ -647,7 +654,7 @@ def solve_remain_couple_egm(par,sol,t):
                     resources,a,b,c,d,e=usr.resources_couple(par,t,ih,iz,par.grid_A) 
                     
                     #love shocks
-                    love = (par.grid_lovew[t][iL//par.num_lovem], par.grid_lovem[t][iL%par.num_lovew]) 
+                    love = (par.grid_lovew[t][iL], par.grid_lovem[t][iL]) 
                     
                     
                     # continuation values 
@@ -671,24 +678,25 @@ def solve_remain_couple_egm(par,sol,t):
               
                 #if (t<par.Tr):  #Eventual rebargaining + separation decisions happen below, *if not retired* 
                     #Eventual rebargaining happens below
-                    
-    for iL in prange(par.num_love): 
-        for ih in range(par.num_h):
-            for iz in range(par.num_z):
-                                
-                    for iA in range(par.num_A):        
-                        
-                        tt=np.minimum(t//par.Dper, (par.Tr-1)//par.Dper)
-                        idx_s = (t,tt,ih,iz,iA)
-                        idxx = [(t,ih,iz,i,iL,iA) for i in range(par.num_power)]               
-                        list_couple = (sol.Vw_couple, sol.Vm_couple)                 #couple        list
-                        list_raw    = (Vw[ih,iz,:,iL,iA],Vm[ih,iz,:,iL,iA])          #remain-couple list
-                        list_single = (sol.Vw_single[idx_s],sol.Vm_single[idx_s])    #single        list
-                        iswomen     = (True,False)                                   #iswomen? in   list
-                        
-                        check_participation_constraints(par,sol.power,par.grid_power,list_raw,list_single,idxx,list_couple,iswomen)   
-                       
-                                                   
+           
+    if (t<par.Tr):
+        for iL in prange(par.num_love): 
+            for ih in range(par.num_h):
+                for iz in range(par.num_z):
+                                    
+                        for iA in range(par.num_A):        
+                            
+                            tt=np.minimum(t//par.Dper, (par.Tr-1)//par.Dper)
+                            idx_s = (t,tt,ih,iz,iA)
+                            idxx = [(t,ih,iz,i,iL,iA) for i in range(par.num_power)]               
+                            list_couple = (sol.Vw_couple, sol.Vm_couple)                 #couple        list
+                            list_raw    = (Vw[ih,iz,:,iL,iA],Vm[ih,iz,:,iL,iA])          #remain-couple list
+                            list_single = (sol.Vw_single[idx_s],sol.Vm_single[idx_s])    #single        list
+                            iswomen     = (True,False)                                   #iswomen? in   list
+                            
+                            check_participation_constraints(par,sol.power,par.grid_power,list_raw,list_single,idxx,list_couple,iswomen)   
+                           
+    if (t>=par.Tr):sol.Vw_couple[t] = Vw.copy(); sol.Vm_couple[t]= Vm.copy() #copy utility if retired                                                   
     return (Vw,Vm,i_Vw,i_Vm,i_C_tot,wls) # return a tuple
        
 @njit    
@@ -886,7 +894,7 @@ def simulate_lifecycle(sim,sol,par):
                 
                 #I now determine the probability to have the smallest
                     
-                initial[i]=usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
+                initial[i]=4#usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
                 
               
                 # initial[i]=8

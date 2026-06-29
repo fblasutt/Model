@@ -290,14 +290,14 @@ def labor_income(par,single=False,pens_reform=False):
                 Ind_M = XXmA[par.Tr-1,iD,:,i]
                 Ind_W = XXwA[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
                 
-                # #Shared pension accumulated while married
-                # Shared = (Ind_M+Ind_W)/2#(XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
+                #Shared pension accumulated while married
+                Shared = (Ind_M+Ind_W)/2#(XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
                 
-                # #Weight of Shared vs.individual pension  depending on pension reform implementation                
-                # ws=par.PW[iD] if pens_reform else 0.0
+                #Weight of Shared vs.individual pension  depending on pension reform implementation                
+                ws=par.PW[iD] if pens_reform else 0.0
                              
-                # XXwA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_W,par.p_b,par.κ)
-                # XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
+                XXwA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_W,par.p_b,par.κ)
+                XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
                 
                 
                 # #Shared pension accumulated while married
