@@ -207,8 +207,8 @@ def labor_income(par,single=False,pens_reform=False):
     
     
     # Persistent shocks
-    Pw, PiPw, Pi0Pw =rouw_nonst(par.T,par.σzw,par.σ0w,par.num_pw) 
-    Pm, PiPm, Pi0Pm =rouw_nonst(par.T,par.σzm,par.σ0m,par.num_pm) 
+    Pw, PiPw, Pi0Pw =addaco_nonst(par.T,par.σzw,par.σ0w,par.num_pw) 
+    Pm, PiPm, Pi0Pm =addaco_nonst(par.T,par.σzm,par.σ0m,par.num_pm) 
     
     # Transitory shocks
     ρ=par.σϵwm/(par.σϵw*par.σϵm)#correlation between trasitory shocks
@@ -300,20 +300,20 @@ def labor_income(par,single=False,pens_reform=False):
                 XXmA[t,iD,:,i]=pens(Shared*ws+(1.0-ws)*Ind_M,par.p_b,par.κ)
                 
                 
-                # #Shared pension accumulated while married
+                # # #Shared pension accumulated while married
                 
-                XXmA2[par.Tr-1,iD,:,i]= XXmA[par.Tr-1,iD,:,i].mean()
-                XXwA2[par.Tr-1,iD,:,i]=XXwA[par.Tr-1,iD,:,i].mean()
-                Shared = (XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
+                # XXmA2[par.Tr-1,iD,:,i]= XXmA[par.Tr-1,iD,:,i].mean()
+                # XXwA2[par.Tr-1,iD,:,i]=XXwA[par.Tr-1,iD,:,i].mean()
+                # Shared = (XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
                 
-                lossm= XXmA2[par.Tr-1,iD,:,i] - Shared
-                gainw= Shared - XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
+                # lossm= XXmA2[par.Tr-1,iD,:,i] - Shared
+                # gainw= Shared - XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
                 
-                #Weight of Shared vs.individual pension  depending on pension reform implementation                
-                ws=par.PW[iD] if pens_reform else 0.0
+                # #Weight of Shared vs.individual pension  depending on pension reform implementation                
+                # ws=par.PW[iD] if pens_reform else 0.0
                              
-                XXwA[t,iD,:,i]=pens(Ind_W+gainw*ws,par.p_b,par.κ)
-                XXmA[t,iD,:,i]=pens(Ind_M-lossm*ws,par.p_b,par.κ)
+                # XXwA[t,iD,:,i]=pens(Ind_W+gainw*ws,par.p_b,par.κ)
+                # XXmA[t,iD,:,i]=pens(Ind_M-lossm*ws,par.p_b,par.κ)
         
         
 
@@ -375,7 +375,7 @@ def pension_share(par):
     
     #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
     A_w=np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
-    A_w=np.linspace(0.0,A_w_t[-1],par.num_perdiv)
+    #A_w=np.linspace(0.0,A_w_t[-1],par.num_perdiv)
   
     
     

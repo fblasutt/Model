@@ -61,152 +61,41 @@ pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
 indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
 final_sample= baseline_sample[:,1:][indexes] 
 
-age_initial=final_sample[:,0]
+age_initial=final_sample[:,0]*0+25
 age_final=final_sample[:,1]
 cw_cons_share=final_sample[:,2]
 h_income=final_sample[:,3]
 w_income=final_sample[:,4]
-age_marriage=final_sample[:,5]
+age_marriage=final_sample[:,5]*0+25
 year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
-
+marr_durr_pol=final_sample[:,8]
 
 
 # Guess of internal parameters: [ω,σL,α,ρ,wedge,β]
 
-xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
-xc=np.array([0.55 , 0.01  , 0.85 , 1.2  , 0.73, 1.   ])
+xc=np.array([2.89403908, 0.01631669, 0.80448221, 1.14807094, 4.9500289 ,
+       1.00024952])
 
-#Standard
-xc=np.array([0.54708787, 0.00793932, 0.85327886, 1.19289247, 0.73391667, 0.99895621])
+#no human capital depreciation
+xc=np.array([2.81482379, 0.01442621, 0.85,       1.2,        4.67585959, 0.9995961])
 
-#Different retired time use
-xc=np.array([6.38681148e-01, 2.67948057e-04, 8.53420449e-01, 1.21649145e+00, 5.93578100e-01, 9.95464029e-01])
 
-xc=np.array([0.14708787, 0.05, 0.95327886, 1.19289247, 0.93, 0.99895621])
+#human capital depreciation
+xc=np.array([7.5, 0.01, 0.85      , 1.2       , 0.6, 0.985 ])
 
-xc=np.array([1.00000000e-05, 6.80780631e-02, 8.35411870e-01, 8.57024764e-01,
-       6.11520726e-01, 1.00400212e+00])
+#human capital depreciation*5
+xc=np.array([3.11977397, 0.0640818,  0.8625346,  1.24148261, 1.15719644, 0.995])
 
-xc=np.array([0.14311526, 0.06, 0.89018616, 0.82124284, .5,1.00290227])
+xc=np.array([2.67430472, 0.04822307, 0.88551032, 1.1       , 2.45443896,
+       0.995     ])
 
-xc=np.array([0.14311526, 0.082      , 0.89018616, 0.82124284, 0.0  ,1.00290227])
+xc=np.array([2.74      , 0.045     , 0.88551032, 1.1       , 3.4       ,
+       0.9905    ])
 
-xc=np.array([-0.0, 0.11     , 0.89018616, 0.82124284, 0. ,1.0])
-
-
-#0.70
-xc=np.array([1.00000000e-05, 1.12196275e-02, 9.70627668e-01, 8.70065989e-01,
-       7.34883539e-01, 1.00687274e+00])
-
-xc=np.array([1.00000000e-05, 1.12196275e-02, 9.70627668e-01, 8.70065989e-01,
-       7.34883539e-01, 1.00687274e+00])
-
-#0.71
-
-#xc=np.array([-0.0, 1.12196275e-02, 0.9, 8.70065989e-01, 0.74, 1.00687274e+00])
-
-#0.72
-
-xc=np.array([0.28, 0.01, 0.91,1.1,0.58,.983])
-
-xc=np.array([0.33 , 0.06 , 0.91 , 1.1  , 0.0 , 0.974])
-
-xc=np.array([0.33 , 0.06 , 0.91 , 1.1  , 0.6   , 1.0])
-
-
-xc=np.array([0.38, 0.02, 0.91, 1.1 , 0.44 , .98  ])
-
-#nu 0.55
-xc=np.array([0.55 , 0.03 , 0.91 , 1.2  , 0.43 , 0.97])
-
-
-
-
-xc=np.array([0.18, 0.1, 0.93, 1.4 , 0.32, 0.982])
-
-
-xc=np.array([0.18 , 0.01  , 0.93 , 1.4  , 0.6 , 0.982])
-
-xc=np.array([0.18 , 0.04 , 0.93 , 1.4  , 0.38  , 0.982])
-
-
-xc=np.array([0.18 , 0.02 , 0.9 , 1.01  , 0.44 , 1.00])
-
-xc=np.array([2.0, 0.05, 0.9 , 1.01, 0.2, .993,0.5  ])
-# Lower and higher bounds of parameters
-
-xc=np.array([1.9   , 0.05 , 0.86  , 1.15 , 0.275  , 1.0, 0.1  ])
-
-xc=np.array([2.3  , 0.05 , 0.86 , 1.15 , 0.275, 1.   , 0.1  ])
-
-xc=np.array([2.1  , 0.05 , 0.86 , 1.15 , 0.29, 1.   , 0.1  ])
-
-xc=np.array([2.1 , 0.05, 0.86, 1.15, 0.40, 1.  , 0.1 ])
-            
-xc=np.array([2.1 , 0.055, 0.86, 1.15, 1.05 , 1.  ])
-
-
-xc=np.array([1.85  , 0.055, 0.86 , 1.3 , 1.1 , 1.   ])
-
-xc=np.array([1.90811501, 0.06891494, 0.78456669, 1.30666382, 1.10040571,
-       0.99808006])
-
-xc=np.array([1.89207021, 0.07435303, 0.89704808, 1.2524448 , 1.12680064,
-       0.99812169])
-
-#->1.22e-02
-xc=np.array([2.55922852 ,0.11738988 ,0.8539209  ,1.08713379 ,0.4923584 , 1.00248047])
-
-
-xc=np.array([2.53017578, 0.16211532, 0.91948242 ,1.25874023, 0.53819336, 1.00300781])
-
-
-xc=np.array([2.00888672 ,0.00352554,0.87, 0.95795898, 0.42760742,1.0])
-
-
-xc=np.array([1.70899537, 0.0120668 , 0.85423516, 1.00474054, 0.45232539,
-       1.00203175])
-
-xc=np.array([1.77521973, 0.06475448,0.87, 1.35286865,1.10021729,1.0])
-# xc=np.array([2.00888672, 0.00352554,0.87, 0.95795898, 0.42760742,1.0])
-
-
-# xc=np.array([2.22802734, 0.04571198,0.87, 1.31245117, 1.06202148,1.0])
-
-xc=np.array([2.00888672, 0.00352554,0.87, 0.95795898, 0.42760742,1.0])
-
-
-xc=np.array([1.72250977, 0.15176402,0.87, 1.14621582 ,0.45452637,1.0])
-
-
-xc=np.array([1.76, 0.14, 0.87      , 1.25, 0.43,.998        ])
-
-xc=np.array([1.85 , 0.05 , 0.87 , 1.25 , 0.9  , 1.003])
-
-xc=np.array([1.85 , 0.05 , 0.87 , 1.25 , 0.0  , 1.003])
-
-xc=np.array([0.0 , 0.0001 , 0.87 , 1.25 , 0.7   , 1.00])
-
-xc=np.array([0.0 , 0.0001 , 0.87 , 1.25 , 0.7   , .97])
-
-xc=np.array([0.00e+00, 0.05, 8.70e-01, 1.25e+00, 6.50e-01,1.0])
-
-xc=np.array([0.00e+00, 0.03, 8.70e-01, 1.25e+00, 1.8,1.0])
-
-xc=np.array([0.00e+00, 0.03, 8.70e-01, 1.25e+00, 2.0,1.0])
-
-xc=np.array([0.  , 0.005, 0.87, 1.25, .4*0  , 1.  ])
-
-xc=np.array([2.25   , 0.05, 0.87 , 1.25 , 0.3   , 1.   ])
-
-
-xc=np.array([2.75, 0.01, 0.87, 1.25, 4.5 , 1.  ])
-
-
-xl=np.array([1.3,0.001,0.7,0.85,0.01,0.98]) 
-xu=np.array([3.0,0.4,0.99,1.4,5.5,1.02]) 
+xl=np.array([2.0,0.001,0.78 ,1.1,0.01,0.995]) 
+xu=np.array([3.5,0.1 ,0.92 ,1.3 ,5.5 ,1.005]) 
 
 #Parametrize the model 
 par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'Ω':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
@@ -240,7 +129,7 @@ age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh
 calendar_year=age-age_initial[:,None]+year[:,None]
 
 policy=np.maximum(calendar_year[:,0],2007)
-age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
+age_policy=5+np.array(marr_durr_pol,dtype=np.int32)#np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 
 
 # pt=xc
@@ -290,10 +179,12 @@ def q(pt,table=False):
     
     M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
 
-    disagw=np.array([-pt[4],pt[4]])
-    disagm=np.array([pt[4],-pt[4]])
-    trans_y=np.array([[0.5,0.5],[0.5,0.5]])
+
     
+    disagw=np.array([-pt[4],-pt[4], pt[4],pt[4]])
+    disagm=np.array([-pt[4], pt[4],-pt[4],pt[4]])
+    trans_y=np.array([[0.0,0.0,0.0,0.0],[0.5,0.5,0.5,0.5],[0.5,0.5,0.5,0.5],[0.0,0.0,0.0,0.0]])
+    trans_y=np.array([[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25]])
 
     
     M_bef.par.grid_lovew=[(M_bef.par.grid_love_[t][:,None]+disagw[None,:]).ravel()  for t in range(M_bef.par.T)]
@@ -326,9 +217,12 @@ def q(pt,table=False):
     
     M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.rouw_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) 
     
-    disagw=np.array([-pt[4],pt[4]])
-    disagm=np.array([pt[4],-pt[4]])
-    trans_y=np.array([[0.5,0.5],[0.5,0.5]])
+
+    
+    disagw=np.array([-pt[4],-pt[4], pt[4],pt[4]])
+    disagm=np.array([-pt[4], pt[4],-pt[4],pt[4]])
+    trans_y=np.array([[0.0,0.0,0.0,0.0],[0.5,0.5,0.5,0.5],[0.5,0.5,0.5,0.5],[0.0,0.0,0.0,0.0]])
+    trans_y=np.array([[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25]])
     
     M.par.grid_lovew=[(M.par.grid_love_[t][:,None]+disagw[None:,]).ravel()  for t in range(M.par.T)]
     M.par.grid_lovem=[(M.par.grid_love_[t][:,None]+disagm[None:,]).ravel()  for t in range(M.par.T)]
@@ -372,14 +266,18 @@ def q(pt,table=False):
     time=age-agei
     
     #Event-study specific variables
-    treat_group=np.repeat((M.par.policy_init>=20)[:,None],M.par.T,axis=1) 
+    treat_group=np.repeat((M.par.policy_init-(age_marriage-20)>=15)[:,None],M.par.T,axis=1) 
+   
+    #treat_group=np.repeat((M.par.policy_init>=20)[:,None],M.par.T,axis=1) 
+        
+   
     event_time[event_time<=-5]=-5
     event_time[event_time>=5]=5
     event_time_PER_treat=event_time*treat_group 
     wife_ratio=M.sim.Cw/(M.sim.Cm+M.sim.Cw)
 
     #Sample
-    subset=   (age>=age_marriage[:,None]) & (M.sim.power>=0) & (age_policy>age_marriage-20+5)[:,None] 
+    subset= (age>=np.maximum(age_marriage,age_initial)[:,None])  & (age<=age_final[:,None])  & (M.sim.power>=0)  &(age_policy>np.maximum(age_marriage,age_initial)-20)[:,None] 
 
     # Combine into a DataFrame 
     df = pd.DataFrame({ 
@@ -390,7 +288,10 @@ def q(pt,table=False):
         "wife_ratio":wife_ratio[subset], 
         "event_time":event_time[subset], 
         "idd":idd[subset], 
-        "age":age[subset], 
+        "age":age[subset],
+        "agesq":age[subset]**2,
+        "ageth":age[subset]**3,
+        "duration":(age-age_marriage[:,None])[subset],
         "treat_group":treat_group[subset],
         "event_time_PER_treat":event_time_PER_treat[subset] 
     }) 
@@ -403,9 +304,8 @@ def q(pt,table=False):
         event_cats = [reference_value] + event_cats 
          
  
-    # Step 1: Create the fixed effects structure 
-    fe_df = df[[ 'post','idd','age']].astype('category')
-
+   # Step 1: Create the fixed effects structure (age removed)
+    fe_df = df[['post','idd']].astype('category')
      
     # Step 2: Create the HDFE projector 
     hdfe = create(fe_df) 
@@ -416,21 +316,26 @@ def q(pt,table=False):
     # Create dummies, drop_first will now drop your reference group 
     event_dummies = pd.get_dummies(df['event_cat'], prefix='event', drop_first=True) 
      
-    
-    # Residualize both y and X 
+    # Continuous age controls (replace age dummies)
+    age_controls = df[['age','agesq','ageth']].astype(float).values
+
+    # Residualize y and X (event dummies + age, age2) on the FEs
     y_resid = hdfe.residualize(df[['wife_ratio']].values) 
-    X_resid = hdfe.residualize(event_dummies.values) 
-    X_resid = hdfe.residualize(df[['inter']].values) 
+    #X_event_resid = hdfe.residualize(event_dummies.values.astype(float)) 
+    X_event_resid = hdfe.residualize(df[['inter']].values) 
+    X_age_resid   = hdfe.residualize(age_controls)
+
+    # Stack event dummies and age controls into one design matrix
+    X_resid = np.hstack([X_event_resid, X_age_resid])
      
     # OLS on residuals 
     model_ = sm.OLS(y_resid, X_resid) 
     results = model_.fit() 
     
-    policy_effect_wife_ratio=results.params[0]#np.insert(results.params, 4, 0)
-    # plt.plot(np.linspace(-4,4,9),params[1:-1])
+    policy_effect_wife_ratio = results.params[0]
     
-    # policy_effect_wife_ratio=params[5:-1].mean()#sm.OLS(y_resid, X2_resid).fit().params[0] 
-    # if np.isnan(policy_effect_wife_ratio):policy_effect_wife_ratio=10.0
+
+    #plt.plot(np.insert(results.params[1:-4], 3, 0))
      
     ######################################
     #Other moments here
@@ -452,15 +357,15 @@ def q(pt,table=False):
     event_time=np.arange(-5,20)
    
     
-    baseb=(age>=age_marriage[:,None]) & (M_bef.sim.power>=0)  & (M.sim.power>=0) #& (age_policy>age_marriage-20+5)[:,None]#   & (M.sim.incw/(M.sim.incw+M.sim.incm)>0.5) 
-    basea=(age>=age_marriage[:,None]) & (M.sim.power>=0) & (M_bef.sim.power>=0)  #& (age_policy>age_marriage-20+5)[:,None]#  & (M_bef.sim.incw/(M_bef.sim.incw+M_bef.sim.incm)>0.5)
+    baseb=(age>=np.maximum(age_marriage,age_initial)[:,None])& (M.sim.couple==1)   & (age<=age_final[:,None])  & (age_policy>=np.maximum(age_marriage,age_initial)-20)[:,None]#   & (M.sim.incw/(M.sim.incw+M.sim.incm)>0.5) 
+    basea=(age>=np.maximum(age_marriage,age_initial)[:,None]) &  (M_bef.sim.couple==1)  & (age<=age_final[:,None]) & (age_policy>=np.maximum(age_marriage,age_initial)-20)[:,None]#  & (M_bef.sim.incw/(M_bef.sim.incw+M_bef.sim.incm)>0.5)
   
     
-    sya=(basea) & (M.par.policy_init[:,None]<20) 
-    soa=(basea) & (M.par.policy_init[:,None]>=20) 
+    sya=(basea) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)<15) 
+    soa=(basea) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15) 
     
-    syb=(baseb) & (M.par.policy_init[:,None]<20) 
-    sob=(baseb) & (M.par.policy_init[:,None]>=20) 
+    syb=(baseb) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)<15) 
+    sob=(baseb) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15) 
     
     
     
@@ -473,12 +378,19 @@ def q(pt,table=False):
     effect=(ws_oa-ws_ob)-(ws_ya-ws_yb)
     plt.plot(event_time,effect)
     plt.show()
-         
-   
-    #policy_effect_wife_ratio=effect[5:].mean()
     
-    SA=(age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1)  & (M_bef.sim.couple==1)
-    SB=(age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1)  & (M_bef.sim.couple==1)
+    Aws_yb=(M_bef.sim.Cw/(M_bef.sim.Cm+M_bef.sim.Cw))[(syb)    & (time_to_policy>=0)].mean() 
+    Aws_ob=(M_bef.sim.Cw/(M_bef.sim.Cm+M_bef.sim.Cw))[(sob)    & (time_to_policy>=0)].mean()
+
+    Aws_ya=(M.sim.Cw/(M.sim.Cm+M.sim.Cw))[(sya)    & (time_to_policy>=0)].mean()
+    Aws_oa=(M.sim.Cw/(M.sim.Cm+M.sim.Cw))[(soa)    & (time_to_policy>=0)].mean()
+           
+         
+    print("aggregate eff is {}".format((Aws_oa-Aws_ob)-(Aws_ya-Aws_yb)))
+  
+    
+    SA=(age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1)  & (M_bef.sim.couple==1)
+    SB=(age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1)  & (M_bef.sim.couple==1)
     
     Swa=M.sim.Vcw-M.sim.Vsw < 0.01
     Sma=M.sim.Vcm-M.sim.Vsm < 0.01
@@ -498,8 +410,8 @@ def q(pt,table=False):
     
 
     #Share binding by age
-    sample_empla =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M_bef.sim.couple==1)  & (M.par.policy_init[:,None]>=20)
-    sample_emplb =  (age>=age_initial[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==1) & (M.sim.couple==1) & (M.par.policy_init[:,None]>=20)
+    sample_empla =  (age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M_bef.sim.couple==1)  & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15)
+    sample_emplb =  (age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==1) & (M.sim.couple==1) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15)
     
     
     bindwb=np.nanmean(Swb ,where=sample_emplb,axis=0)
@@ -764,7 +676,7 @@ if __name__ == '__main__':
    
     if ESTIMATE:
         
-        # computation_options = { "num_workers" : 1,        # use four processes in parallel 
+        # computation_options = { "num_workers" : 9,        # use four processes in parallel 
         #                         "working_dir" : root # where to save results in progress (in case interrupted) 
         #                         } 
          
@@ -772,8 +684,8 @@ if __name__ == '__main__':
          
         # local_search_options = {  "algorithm"    : "dfols", # local search algorithm 
         #                                                       # can be either BOBYQA from NLOPT or NelderMead from scipy 
-        #                           "num_restarts" : 1,      # how many local searches to do 
-        #                           "shrink_after" : 1,       # after the first [shrink_after] restarts we begin searching 
+        #                           "num_restarts" : 18,      # how many local searches to do 
+        #                           "shrink_after" : 9,       # after the first [shrink_after] restarts we begin searching 
         #                                                       # near the best point we have found so far 
         #                           "xtol_rel"     : 1e-6,     # relative tolerance on x 
         #                           "ftol_rel"     : 1e-6     # relative tolerance on f 
@@ -781,11 +693,11 @@ if __name__ == '__main__':
          
         # opt = TikTak.TTOptimizer(computation_options, global_search_options, local_search_options, skip_global=True) 
         # x,fx = opt.minimize(q,xl,xu) 
-        # print(f'The minimizer is {x}') 
+        # print(f'The minimizer is s{x}') 
         # print(f'The objective value at the min is {fx}') 
         
         # Estimate the model
-        res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
+        res=dfols.solve(q, xc, rhobeg = 0.3, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
                     npt=len(xc)+5,scaling_within_bounds=True,   
                     user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
                                   'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  

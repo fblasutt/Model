@@ -60,8 +60,8 @@ class HouseholdModelClass(EconModelClass):
         par.κ=0.319    #proportional part of pension
         
         # Depreciation of human capital
-        par.μ = 1.195        # Human capital depreciation drift
-        par.p_μ = 1.0/40.0   # Probability that  human capital depreciates
+        par.μ = 1.195/5        # Human capital depreciation drift
+        par.p_μ = 5.0/40.0   # Probability that  human capital depreciates
         
         # Home good production:  Q = (θ·home_time^ν + (1-θ)·x^ν)^(1/ν)
         par.ν = 0.5#-0.6   # CES substitution parameter in home production
@@ -87,7 +87,7 @@ class HouseholdModelClass(EconModelClass):
         ##########################################
         
         #Divorce period and grid
-        par.num_perdiv = 45
+        par.num_perdiv = 5
         par.Dper = int(par.Tr/par.num_perdiv)
         
         # Wealth
@@ -99,11 +99,11 @@ class HouseholdModelClass(EconModelClass):
         
         # Women's human capital states
         par.num_h = 1
-        #par.num_h = 2
+        par.num_h = 2
 
         # love/match quality
         par.num_lovew = 5;par.num_lovem = 5;
-        par.num_love=par.num_lovem*2
+        par.num_love=par.num_lovem*4
         par.σL = 0.1; par.σL0 = 0.00001
         
         # productivity of men and women: gridpoints
@@ -123,8 +123,8 @@ class HouseholdModelClass(EconModelClass):
               
         # Simulations Grids
         par.women =np.ones(par.simN)#0: simumate men, 1 women
-        par.sample_init=np.zeros(par.simN,dtype=np.int_)#in which period do we start simulating the sample?
-        par.policy_init=np.zeros(par.simN,dtype=np.int_)#when does the pension policy (if pens_reform=True) kicks in?
+        par.sample_init=np.zeros(par.simN,dtype=np.int32)#in which period do we start simulating the sample?
+        par.policy_init=np.zeros(par.simN,dtype=np.int32)#when does the pension policy (if pens_reform=True) kicks in?
       
         
     def setup_grids(self):
@@ -265,8 +265,8 @@ class HouseholdModelClass(EconModelClass):
         sim.Vcw = np.nan + np.ones(shape_sim)       # before-ren value function w
         sim.Vcm = np.nan + np.ones(shape_sim)       # before-ren value function m
         
-        sim.iz = np.ones(shape_sim,dtype=np.int_)   # index of income shocks 
-        sim.ID = np.zeros(shape_sim,dtype=np.int_) #index period at divorce
+        sim.iz = np.ones(shape_sim,dtype=np.int32)   # index of income shocks 
+        sim.ID = np.zeros(shape_sim,dtype=np.int32) #index period at divorce
         sim.A = np.zeros(shape_sim)                 # total assets (m+w)
         sim.Aw = np.zeros(shape_sim)                # w's assets
         sim.Am = np.zeros(shape_sim)                # m's assets
@@ -274,13 +274,13 @@ class HouseholdModelClass(EconModelClass):
         sim.couple_lag = np.ones(shape_sim,dtype=bool)    # In a couple previous period? True/False
         sim.power = -100.0*np.ones(shape_sim)             # Bargaining power θ
         sim.power_lag = -100.0*np.ones(shape_sim)         # Bargaining power θ previous period
-        sim.love = np.ones(shape_sim,dtype=np.int_)       # Match quality
+        sim.love = np.ones(shape_sim,dtype=np.int32)       # Match quality
         sim.incw = np.nan + np.ones(shape_sim)            # w's net income
         sim.incm = np.nan + np.ones(shape_sim)            # m's net income
         sim.incwg = np.nan + np.ones(shape_sim)           # w's gross income
         sim.incmg = np.nan + np.ones(shape_sim)           # m's gross income
-        sim.WLP = np.ones(shape_sim,dtype=np.int_)        # w's labor supply index
-        sim.ih = np.zeros(shape_sim,dtype=np.int_)         # w's human capital 
+        sim.WLP = np.ones(shape_sim,dtype=np.int32)        # w's labor supply index
+        sim.ih = np.zeros(shape_sim,dtype=np.int32)         # w's human capital 
         sim.tax = np.zeros(shape_sim)                     # Taxes paid by the couple or divorces (sum w+m)
 
         # Shocks
@@ -292,21 +292,21 @@ class HouseholdModelClass(EconModelClass):
         sim.shock_h=np.random.random_sample((par.simN,par.simT))      # Human capital draws
 
         # Initial distribution (this will be overwritten by user input)
-        sim.init_ih = np.zeros(par.simN,dtype=np.int_)                  # Initial w's human capital
+        sim.init_ih = np.zeros(par.simN,dtype=np.int32)                  # Initial w's human capital
         sim.init_couple = np.ones(par.simN,dtype=bool)                  # State (couple=1/single=0)
         sim.init_power =  np.random.random_sample(par.simN)             # Barg power 
         sim.init_A =  np.zeros(par.simN)                               # Assets 
-        sim.init_lovew = np.ones(par.simN,dtype=np.int_)*par.num_lovew//2#w's initial love 
-        sim.init_lovem = np.ones(par.simN,dtype=np.int_)*par.num_lovem//2#m's initial love 
+        sim.init_lovew = np.ones(par.simN,dtype=np.int32)*par.num_lovew//2#w's initial love 
+        sim.init_lovem = np.ones(par.simN,dtype=np.int32)*par.num_lovem//2#m's initial love 
         sim.init_love = sim.init_lovew*par.num_lovem+sim.init_lovem          #initial love 
-        sim.init_z  = np.zeros(par.simN,dtype=np.int_)                  # Initial income index
+        sim.init_z  = np.zeros(par.simN,dtype=np.int32)                  # Initial income index
 
         # Optional override of the initial-love draw at sample_init.
         # -1 (default) = use the random Markov draw inside simulate_lifecycle;
         # any non-negative value forces that agent's initial love to land on
         # the specified grid index (useful for cross-regime fixed-policy
         # counterfactuals where one wants to equalize the initial state).
-        sim.force_init_love = -np.ones(par.simN, dtype=np.int_)
+        sim.force_init_love = -np.ones(par.simN, dtype=np.int32)
 
                        
     def solve(self):
@@ -894,7 +894,7 @@ def simulate_lifecycle(sim,sol,par):
                 
                 #I now determine the probability to have the smallest
                     
-                initial[i]=4#usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
+                initial[i]=9#usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
                 
               
                 # initial[i]=8
