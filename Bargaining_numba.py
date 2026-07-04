@@ -91,10 +91,10 @@ class HouseholdModelClass(EconModelClass):
         par.Dper = int(par.Tr/par.num_perdiv)
         
         # Wealth
-        par.num_A = 11;par.max_A = 75.0
+        par.num_A = 15;par.max_A = 75.0
         
         # Bargaining power
-        par.num_power = 5
+        par.num_power = 7
         par.power_min=1e-3;par.power_max=1.0-par.power_min
         
         # Women's human capital states
@@ -102,7 +102,7 @@ class HouseholdModelClass(EconModelClass):
         par.num_h = 2
 
         # love/match quality
-        par.num_lovew = 5;par.num_lovem = 5;
+        par.num_lovew = 3;par.num_lovem = 3;
         par.num_love=par.num_lovem*4
         par.σL = 0.1; par.σL0 = 0.00001
         
@@ -149,16 +149,15 @@ class HouseholdModelClass(EconModelClass):
         par.grid_love_,par.Πl_,par.Πl0_= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovew) 
         
   
-        
-        disagw=np.array([-par.Ω,0.0])
-        disagm=np.array([0.0,-par.Ω])
-        trans_y=np.array([[0.5,0.5],[0.5,0.5]])
+        disagw=np.array([-par.Ω,-par.Ω, par.Ω,par.Ω])
+        disagm=np.array([-par.Ω, par.Ω,-par.Ω,par.Ω])
+        par.trans_love=np.array([[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25]])
         
         par.grid_lovew=[(par.grid_love_[t][:,None]+disagw[None,:]).ravel() for t in range(par.T)]
         par.grid_lovem=[(par.grid_love_[t][:,None]+disagm[None,:]).ravel() for t in range(par.T)]
         
-        par.Πl=[np.kron(par.Πl_[t],trans_y)  for t in range(par.T-1)]
-        par.Πl0=[np.kron(par.Πl0_[t],trans_y)  for t in range(par.T-1)]
+        par.Πl=[np.kron(par.Πl_[t],par.trans_love)  for t in range(par.T-1)]
+        par.Πl0=[np.kron(par.Πl0_[t],par.trans_love)  for t in range(par.T-1)]
  
         
         # Bargaining power grid. non-linear grid with more mass in both tails.        
@@ -857,62 +856,9 @@ def simulate_lifecycle(sim,sol,par):
                 #Initial condition for assets
                 A[i,t] = sim.init_A[i]; Aw[i,t] =  par.div_A_share * A[i,t];  Am[i,t] =  (1.0-par.div_A_share) * A[i,t]
                 
-                delete=np.ones(power.shape)
-                
-                #Store before renegotiations utilities
-                Vsw_=linear_interp.interp_1d(par.grid_Aw,sol.Vw_single[t,t//par.Dper,sim.init_ih[i],sim.init_z[i]],Aw[i,t])
-                Vsm_=linear_interp.interp_1d(par.grid_Am,sol.Vm_single[t,t//par.Dper,sim.init_ih[i],sim.init_z[i]],Am[i,t])
-                
-                # value of transitioning into singlehood
-                list_single = (Vsw_,Vsm_)
-                
-               
-          
-                mat=par.Πl0[t].copy()#*0+1/par.num_love#.copy()   #(np.ones(par.Πl0[0].shape)/par.num_love)#          
-                for j in range(par.num_love-1):
-                    
-                    idxx = (t,sim.init_ih[i],sim.init_z[i],slice(None),j)
-                    
-            
-                    list_raw    = (np.array([linear_interp.interp_1d(par.grid_A,sol.Vw_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]),
-                                   np.array([linear_interp.interp_1d(par.grid_A,sol.Vm_remain_couple[idxx][iP],A[i,t]) for iP in range(par.num_power)]))
-            
-                    check_participation_constraints(par,delete,np.array([sim.init_power[i]]),list_raw,list_single,[(i,t)],nosim=False)
-                    
-                    
-                    if (delete[i,t] <= 0.0):#(not ((np.allclose(delete[i,t],sim.init_power[i])) & (delete[i,t] >= 0.0))):#####n##:#
-                        mat[j,:]=0.0
-                    
-               
-             
-                        
-              
-                
- 
-                #Now create the initial matrix
-                mat=mat/mat.sum(axis=0)
-                
-                #I now determine the probability to have the smallest
-                    
-                initial[i]=9#usr.mc_simulate(par.num_love//2,mat,shock_love[i,t])#
-                
-              
-                # initial[i]=8
+                #Initial love shock: common love is central value, treansitory shocks are drawn
+                initial[i]=par.num_lovem//2*par.num_love//par.num_lovem-1+usr.mc_simulate(0,par.trans_love,shock_love[i,t])#
 
-                # if mat[4,0]>0.0:
-                    
-                #     if mat[0,0]>0.0:
-                #         initial[i]=0
-                #     else:
-                #         initial[i]=4
-                
-
-                # Optional override: if the user pre-set sim.force_init_love[i]
-                # to a non-negative grid index, use it instead of the draw.
-                # if sim.force_init_love[i] >= 0:
-                #     initial[i] = sim.force_init_love[i]
-
-            
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation) 
             # copy determines when to copy from previous period or use initial condition. This matters because
             # when the policy changed, we want to copy the values in t-1 when reform was not it place

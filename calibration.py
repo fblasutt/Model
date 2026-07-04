@@ -94,8 +94,10 @@ xc=np.array([2.67430472, 0.04822307, 0.88551032, 1.1       , 2.45443896,
 xc=np.array([2.74      , 0.045     , 0.88551032, 1.1       , 3.4       ,
        0.9905    ])
 
-xl=np.array([2.0,0.001,0.78 ,1.1,0.01,0.995]) 
-xu=np.array([3.5,0.1 ,0.92 ,1.3 ,5.5 ,1.005]) 
+
+xc=np.array([4.29925418, 0.06859209, 0.86320761, 1.22985068 ,3.31640893, 0.99019778])
+xl=np.array([3.5,0.001,0.78 ,1.1,0.01,0.985]) 
+xu=np.array([5.2,0.1 ,0.9 ,1.3 ,5.9 ,1.00]) 
 
 #Parametrize the model 
 par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'Ω':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
@@ -132,26 +134,6 @@ policy=np.maximum(calendar_year[:,0],2007)
 age_policy=5+np.array(marr_durr_pol,dtype=np.int32)#np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 
 
-# pt=xc
-# # Set up the model with the input parameters pt
-# M_bef = model.copy(name='numba_new_copy')
-   
-# M_bef.par.ω=pt[0]
-# M_bef.par.grid_lovew,M_bef.par.Πlw,M_bef.par.Πlw0= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
-# M_bef.par.grid_lovem,M_bef.par.Πlm,M_bef.par.Πlm0= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovem) 
-
-
-# M_bef.par.Πl=[np.kron(M_bef.par.Πlw[t],M_bef.par.Πlm[t])  if t<M_bef.par.Tr else np.eye(M_bef.par.num_lovew*M_bef.par.num_lovem)  for t in range(M_bef.par.T-1)] # couples trans matrix
-# M_bef.par.Πl0=[np.kron(M_bef.par.Πlw0[t],M_bef.par.Πlm0[t])  if t<M_bef.par.Tr else np.eye(M_bef.par.num_lovew*M_bef.par.num_lovem)  for t in range(M_bef.par.T-1)] # couples trans matrix 
-# M_bef.par.α=pt[2] 
-# M_bef.par.ρ=pt[3]
-# M_bef.par.wedge=pt[4]    
-# M_bef.par.β=pt[5]
-
-# # Solve and simulate the model
-# M_bef.solve() 
-# M_bef.simulate() 
-        
 #Function to minimize 
 def q(pt,table=False): 
  
@@ -177,21 +159,16 @@ def q(pt,table=False):
     M_bef.par.Ω=pt[4]    
     M_bef.par.β=pt[5]
     
-    M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
+    M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.addaco_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
 
 
     
     disagw=np.array([-pt[4],-pt[4], pt[4],pt[4]])
     disagm=np.array([-pt[4], pt[4],-pt[4],pt[4]])
-    trans_y=np.array([[0.0,0.0,0.0,0.0],[0.5,0.5,0.5,0.5],[0.5,0.5,0.5,0.5],[0.0,0.0,0.0,0.0]])
-    trans_y=np.array([[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25]])
-
-    
     M_bef.par.grid_lovew=[(M_bef.par.grid_love_[t][:,None]+disagw[None,:]).ravel()  for t in range(M_bef.par.T)]
-    M_bef.par.grid_lovem=[(M_bef.par.grid_love_[t][:,None]+disagm[None,:]).ravel()  for t in range(M_bef.par.T)]
-    
-    M_bef.par.Πl=[np.kron(M_bef.par.Πl_[t],trans_y) for t in range(M_bef.par.T-1)]
-    M_bef.par.Πl0=[np.kron(M_bef.par.Πl0_[t],trans_y)  for t in range(M_bef.par.T-1)]
+    M_bef.par.grid_lovem=[(M_bef.par.grid_love_[t][:,None]+disagm[None,:]).ravel()  for t in range(M_bef.par.T)]    
+    M_bef.par.Πl=[np.kron(M_bef.par.Πl_[t],M_bef.par.trans_love) for t in range(M_bef.par.T-1)]
+    M_bef.par.Πl0=[np.kron(M_bef.par.Πl0_[t],M_bef.par.trans_love)  for t in range(M_bef.par.T-1)]
            
             
 
@@ -215,20 +192,16 @@ def q(pt,table=False):
     M.par.β=pt[5]   
     
     
-    M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.rouw_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) 
+    M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.addaco_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) 
     
 
     
     disagw=np.array([-pt[4],-pt[4], pt[4],pt[4]])
     disagm=np.array([-pt[4], pt[4],-pt[4],pt[4]])
-    trans_y=np.array([[0.0,0.0,0.0,0.0],[0.5,0.5,0.5,0.5],[0.5,0.5,0.5,0.5],[0.0,0.0,0.0,0.0]])
-    trans_y=np.array([[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25]])
-    
     M.par.grid_lovew=[(M.par.grid_love_[t][:,None]+disagw[None:,]).ravel()  for t in range(M.par.T)]
     M.par.grid_lovem=[(M.par.grid_love_[t][:,None]+disagm[None:,]).ravel()  for t in range(M.par.T)]
-    
-    M.par.Πl=[np.kron(M.par.Πl_[t],trans_y) for t in range(M.par.T-1)]
-    M.par.Πl0=[np.kron(M.par.Πl0_[t],trans_y) for t in range(M.par.T-1)]
+    M.par.Πl=[np.kron(M.par.Πl_[t],M.par.trans_love) for t in range(M.par.T-1)]
+    M.par.Πl0=[np.kron(M.par.Πl0_[t],M.par.trans_love) for t in range(M.par.T-1)]
 
     
     # Income shocks grids: couples
@@ -491,7 +464,7 @@ def q(pt,table=False):
     # print('AWE is {}'.format(AWE))
        
 
-    fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.013)/.013)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-3.3)/3.3)**2#+((AWE+0.03)/0.03)**2
+    fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.0139)/.0139)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-3.3)/3.3)**2#+((AWE+0.03)/0.03)**2
     print('Point is {}, fit is {}'.format(pt,fit))  
     print('Simulated moments are {}'.format([wife_empl,policy_effect_wife_ratio,divorce_rate,expenditure_x_share,βdC,couple_assets]))
     
@@ -508,7 +481,7 @@ def q(pt,table=False):
     #if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time)
   
     #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
-    fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.013)/.013),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-3.3)/3.3)]#,(AWE+0.03)/0.03]   
+    fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.0139)/.0139),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-3.3)/3.3)]#,(AWE+0.03)/0.03]   
 
     if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]#   
     return fitt#fit#
@@ -676,25 +649,25 @@ if __name__ == '__main__':
    
     if ESTIMATE:
         
-        # computation_options = { "num_workers" : 9,        # use four processes in parallel 
-        #                         "working_dir" : root # where to save results in progress (in case interrupted) 
-        #                         } 
+        computation_options = { "num_workers" : 9,        # use four processes in parallel 
+                                "working_dir" : root # where to save results in progress (in case interrupted) 
+                                } 
          
-        # global_search_options = { "num_points" : 10}  # number of points in global pre-test 
+        global_search_options = { "num_points" : 10}  # number of points in global pre-test 
          
-        # local_search_options = {  "algorithm"    : "dfols", # local search algorithm 
-        #                                                       # can be either BOBYQA from NLOPT or NelderMead from scipy 
-        #                           "num_restarts" : 18,      # how many local searches to do 
-        #                           "shrink_after" : 9,       # after the first [shrink_after] restarts we begin searching 
-        #                                                       # near the best point we have found so far 
-        #                           "xtol_rel"     : 1e-6,     # relative tolerance on x 
-        #                           "ftol_rel"     : 1e-6     # relative tolerance on f 
-        #                         } 
+        local_search_options = {  "algorithm"    : "dfols", # local search algorithm 
+                                                              # can be either BOBYQA from NLOPT or NelderMead from scipy 
+                                  "num_restarts" : 18,      # how many local searches to do 
+                                  "shrink_after" : 9,       # after the first [shrink_after] restarts we begin searching 
+                                                              # near the best point we have found so far 
+                                  "xtol_rel"     : 1e-6,     # relative tolerance on x 
+                                  "ftol_rel"     : 1e-6     # relative tolerance on f 
+                                } 
          
-        # opt = TikTak.TTOptimizer(computation_options, global_search_options, local_search_options, skip_global=True) 
-        # x,fx = opt.minimize(q,xl,xu) 
-        # print(f'The minimizer is s{x}') 
-        # print(f'The objective value at the min is {fx}') 
+        opt = TikTak.TTOptimizer(computation_options, global_search_options, local_search_options, skip_global=True) 
+        x,fx = opt.minimize(q,xl,xu) 
+        print(f'The minimizer is s{x}') 
+        print(f'The objective value at the min is {fx}') 
         
         # Estimate the model
         res=dfols.solve(q, xc, rhobeg = 0.3, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
