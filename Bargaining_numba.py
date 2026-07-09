@@ -32,7 +32,7 @@ class HouseholdModelClass(EconModelClass):
        
         
         # Demographics
-        par.T = 63+5 # terminal age: https://www.mortality.org/File/GetDocument/hmd.v6/JPN/STATS/fltper_1x1.txt 
+        par.T = 65+5 # terminal age: https://www.mortality.org/File/GetDocument/hmd.v6/JPN/STATS/fltper_1x1.txt 
         par.Tr = 40+5 # age at retirement
          
         # Prices
@@ -41,7 +41,7 @@ class HouseholdModelClass(EconModelClass):
         # Preferences
         par.β = 1.0   # Discount factor
         par.ρ = 1.5     # Risk avresion private goods
-        par.χ = 1.5    # Risk aversion home goods
+        par.χ = 2.0    # Risk aversion home goods
         par.α = 0.35    # Weight on home good
         par.σ = 0.00003 # Taste shock for employment decitions. !!! We might drop this
         par.wedge=0.0#35   #Single-couple utility wedge
@@ -60,8 +60,8 @@ class HouseholdModelClass(EconModelClass):
         par.κ=0.319    #proportional part of pension
         
         # Depreciation of human capital
-        par.μ = 1.195/5        # Human capital depreciation drift
-        par.p_μ = 5.0/40.0   # Probability that  human capital depreciates
+        par.μ = 1.195/2 #1.195/5        # Human capital depreciation drift
+        par.p_μ = 2/40.0#5.0/40.0   # Probability that  human capital depreciates
         
         # Home good production:  Q = (θ·home_time^ν + (1-θ)·x^ν)^(1/ν)
         par.ν = 0.5#-0.6   # CES substitution parameter in home production
@@ -94,7 +94,7 @@ class HouseholdModelClass(EconModelClass):
         par.num_A = 15;par.max_A = 75.0
         
         # Bargaining power
-        par.num_power = 7
+        par.num_power = 9
         par.power_min=1e-3;par.power_max=1.0-par.power_min
         
         # Women's human capital states
@@ -171,21 +171,21 @@ class HouseholdModelClass(EconModelClass):
         # Here a fix that works with more than 2 human capital states, TOCHECK
         # OLF transition: from state i stay with prob 1-p_μ, drop one step (i -> i+1) with prob p_μ; bottom rung absorbing.                                                                                                           
         # Built in [from,to] convention then transposed to the [to,from] convention used downstream.               
-        # if par.num_h>1:                                                                                            
-        #     Πh_nt_ft = (1.0-par.p_μ)*np.eye(par.num_h)                                                             
-        #     for _i in range(par.num_h-1):                                                                          
-        #        Πh_nt_ft[_i, _i+1] = par.p_μ                                                                       
-        #     Πh_nt_ft[-1, -1] = 1.0                                                                                 
-        #     Πh_nt = Πh_nt_ft.T                                                                                     
-        # else:                                                                                                      
-        #     Πh_nt = np.ones(par.num_h)  # ...depreciation otherwise       
+        if par.num_h>1:                                                                                            
+            Πh_nt_ft = (1.0-par.p_μ)*np.eye(par.num_h)                                                             
+            for _i in range(par.num_h-1):                                                                          
+                Πh_nt_ft[_i, _i+1] = par.p_μ                                                                       
+            Πh_nt_ft[-1, -1] = 1.0                                                                                 
+            Πh_nt = Πh_nt_ft.T                                                                                     
+        else:                                                                                                      
+            Πh_nt = np.ones(par.num_h)  # ...depreciation otherwise       
 
         par.Πh_t = np.array([w*Πh_pt + (1-w)*Πh_nt for w in par.grid_wlp])  if par.num_h>1 else np.array([np.eye(par.num_h) for w in par.grid_wlp])# Work-hour weighted transitions
         identity_block = np.tile(np.eye(par.num_h), (par.num_wlp, 1, 1))   #stops depreciating at retirement
         par.Πh = [par.Πh_t if t < par.Tr else identity_block for t in range(par.T)]
         
         # Grid of total consumption, used in the intra-period problem
-        par.grid_Ctot = nonlinspace(1.0e-6,par.max_Ctot,par.num_Ctot,1.8)
+        par.grid_Ctot = nonlinspace(1.0e-3,par.max_Ctot,par.num_Ctot,1.4)
         
         # % of shared pension in case of policy change, for given divorce period
         par.PW=usr.pension_share(par)
@@ -445,35 +445,36 @@ def integrate_single(sol, par, t):
         - Minimize creation of temporaries inside loops.
     """
     
-    # Output arrays: Ew_nomeet[ih, iz, iA] and Em_nomeet[ih, iz, iA]
-    Ew_nomeet  = np.zeros((par.num_perdiv, par.num_h, par.num_z, par.num_A))
-    Em_nomeet  = np.zeros((par.num_perdiv, par.num_h, par.num_z, par.num_A))
+    # Output arrays are indexed by the CURRENT labor choice iwlp, because the
+    # human-capital transition depends on it: a single woman who does not work
+    # risks losing human capital (Πh_nt depreciation with prob p_μ), while full-time
+    # work preserves it (Πh_pt). Men have no labor-dependent HC dynamics, so their
+    # continuation value is identical for every iwlp (identity transition).
+    Ew_nomeet  = np.zeros((par.num_wlp, par.num_perdiv, par.num_h, par.num_z, par.num_A))
+    Em_nomeet  = np.zeros((par.num_wlp, par.num_perdiv, par.num_h, par.num_z, par.num_A))
 
-    # -------------------------
-    # Precompute contiguous versions of Πh and Πs for fast column access
-    # -------------------------
-
-    # Make column access fast once per call (Fortran-order = contiguous columns)
-    H = np.asfortranarray(par.Πh[t][-1, :, :])   # (2, 2)
-    S = np.asfortranarray(par.Πs[t])             # (81, 81)
+    # Single income transition (Fortran-order = contiguous columns) and men's
+    # labor-independent human-capital transition (the full-time / identity slot).
+    S  = np.asfortranarray(par.Πs[t])              # (num_z, num_z)
+    Hm = np.asfortranarray(par.Πh[t][-1, :, :])    # men: identity
 
     # Parallelize across iA
     for iA in prange(par.num_A):
         for iD in range(par.num_perdiv):
-            
+
             # Ensure fast row access for V* (C-order = contiguous rows)
-            Vw = np.ascontiguousarray(sol.Vw_single[t+1,iD, :, :, iA])  # (2, 81)
-            Vm = np.ascontiguousarray(sol.Vm_single[t+1,iD, :, :, iA])  # (2, 81)
-    
-            # Step (a): collapse h (2) -> produce per-z vectors for each ih in one go
-            # V*.T: (81, 2) @ H: (2, 2) -> Uw/Um: (81, 2)
-            Uw = Vw.T @ H
-            Um = Vm.T @ H
-    
-            # Step (b): collapse z with one GEMM
-            # Uw.T: (2, 81) @ S: (81, 81) -> (2, 81)
-            Ew_nomeet[iD,:, :, iA] = Uw.T @ S
-            Em_nomeet[iD,:, :, iA] = Um.T @ S
+            Vw = np.ascontiguousarray(sol.Vw_single[t+1,iD, :, :, iA])  # (num_h, num_z)
+            Vm = np.ascontiguousarray(sol.Vm_single[t+1,iD, :, :, iA])  # (num_h, num_z)
+
+            # Men: continuation value is the same for every labor choice.
+            Em_here = (Vm.T @ Hm).T @ S
+
+            for iwlp in range(par.num_wlp):
+                # Women: human-capital transition for THIS labor choice
+                # (par.Πh[t][iwlp] = wlp*Πh_pt + (1-wlp)*Πh_nt -> depreciation when not working).
+                Hw = np.asfortranarray(par.Πh[t][iwlp, :, :])
+                Ew_nomeet[iwlp, iD, :, :, iA] = (Vw.T @ Hw).T @ S
+                Em_nomeet[iwlp, iD, :, :, iA] = Em_here
 
     return Ew_nomeet, Em_nomeet
     
@@ -481,8 +482,8 @@ def integrate_single(sol, par, t):
 def solve_single_egm(sol,par,t):
 
     #Integrate to get continuation value unless if you are in the last period
-    Ew,Em=np.zeros((2,par.num_perdiv,par.num_h,par.num_zw,par.num_A))
-    if t<par.T-1:Ew,Em = integrate_single(sol,par,t) #if t<par.T-1 else 
+    Ew,Em=np.zeros((2,par.num_wlp,par.num_perdiv,par.num_h,par.num_zw,par.num_A))
+    if t<par.T-1:Ew,Em = integrate_single(sol,par,t) #if t<par.T-1 else
              
     #Pre-define outcomes (if update .sol directly, parallelization go crazy)
     ciw,cim,viw,vim,cwt,Ewt,cwp,cmt,Emt,cmp=np.ones((10,2,par.num_perdiv,par.num_h,par.num_z,par.num_A))
@@ -539,7 +540,7 @@ def solve_single_egm(sol,par,t):
                             pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.ω,par.ϕ,par.wedge,par.px,0.0,0.0,home,women)
                         
                             # marginal utility of assets next period
-                            βEid=par.β*usr.deriv(grid_Ai,Ei[iD,ih,iz,:])
+                            βEid=par.β*usr.deriv(grid_Ai,Ei[iwlp,iD,ih,iz,:])
                             
                             # first get toatl -consumption out of grid using FOCs
                             linear_interp.interp_1d_vec(np.flip(par.grid_marg_u_s[:,iwlp,g]),par.grid_inv_marg_u,βEid,cit[iwlp,iD,ih,iz,:])
@@ -548,7 +549,7 @@ def solve_single_egm(sol,par,t):
                             Ri_now = grid_Ai.flatten() + cit[iwlp,iD,ih,iz,:]
                                    
                             # use the upper envelope algorithm to get optimal consumption and util
-                            upp_env_single(grid_Ai,Ri_now,cit[iwlp,iD,ih,iz,:],par.β*Ei[iD,ih,iz,:],resi,ci[iwlp,iD,ih,iz,:],vi[iwlp,iD,ih,iz,:],*pars)
+                            upp_env_single(grid_Ai,Ri_now,cit[iwlp,iD,ih,iz,:],par.β*Ei[iwlp,iD,ih,iz,:],resi,ci[iwlp,iD,ih,iz,:],vi[iwlp,iD,ih,iz,:],*pars)
                 
                     if (women==False) & (t<par.Tr): vi[0,iD,ih,iz,:]=-10000000 
                     if (t>=par.Tr)                : vi[1,iD,ih,iz,:]=-10000000 
@@ -857,7 +858,7 @@ def simulate_lifecycle(sim,sol,par):
                 A[i,t] = sim.init_A[i]; Aw[i,t] =  par.div_A_share * A[i,t];  Am[i,t] =  (1.0-par.div_A_share) * A[i,t]
                 
                 #Initial love shock: common love is central value, treansitory shocks are drawn
-                initial[i]=par.num_lovem//2*par.num_love//par.num_lovem-1+usr.mc_simulate(0,par.trans_love,shock_love[i,t])#
+                initial[i]=par.num_lovem//2*par.num_love//par.num_lovem+usr.mc_simulate(0,par.trans_love,shock_love[i,t])#
 
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation) 
             # copy determines when to copy from previous period or use initial condition. This matters because

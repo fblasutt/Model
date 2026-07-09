@@ -207,8 +207,8 @@ def labor_income(par,single=False,pens_reform=False):
     
     
     # Persistent shocks
-    Pw, PiPw, Pi0Pw =addaco_nonst(par.T,par.σzw,par.σ0w,par.num_pw) 
-    Pm, PiPm, Pi0Pm =addaco_nonst(par.T,par.σzm,par.σ0m,par.num_pm) 
+    Pw, PiPw, Pi0Pw =rouw_nonst(par.T,par.σzw,par.σ0w,par.num_pw) 
+    Pm, PiPm, Pi0Pm =rouw_nonst(par.T,par.σzm,par.σ0m,par.num_pm) 
     
     # Transitory shocks
     ρ=par.σϵwm/(par.σϵw*par.σϵm)#correlation between trasitory shocks
@@ -439,39 +439,41 @@ def pens(value,p_b,κ):
 # Uncertainty below       #
 ###########################
  
-def sd_rw(T,sigma_persistent,sigma_init):
-    
-    if isinstance(sigma_persistent,np.ndarray):
-        return np.sqrt([sigma_init**2 + t*sigma_persistent[t]**2 for t in range(T)])
+def sd_rw(T, sigma_persistent, sigma_init):
+    """Marginal std of the random walk at each age t = 0,...,T-1.
+ 
+    sd_z[t]^2 = sigma_init^2 + (sum of per-step innovation variances up to t).
+    If sigma_persistent is an array, sigma_persistent[s] is the std of the
+    innovation entering the state at age s+1 (i.e. the step s -> s+1).
+    """
+    if isinstance(sigma_persistent, np.ndarray):
+        # cumulative innovation variance: step s->s+1 uses sigma_persistent[s]
+        var = np.concatenate(([0.0], np.cumsum(sigma_persistent[:T - 1] ** 2)))
+        return np.sqrt(sigma_init ** 2 + var)
     else:
-        return np.sqrt(sigma_init**2 + np.arange(0,T)*(sigma_persistent**2))
-    
-def sd_rw_trans(T,sigma_persistent,sigma_init,sigma_transitory):
+        return np.sqrt(sigma_init ** 2 + np.arange(0, T) * (sigma_persistent ** 2))
+ 
+ 
+def sd_rw_trans(T, sigma_persistent, sigma_init, sigma_transitory):
+    # Transitory shocks are an iid layer handled separately, not part of the
+    # persistent RW grid. Kept for interface compatibility.
     return sd_rw(T, sigma_persistent, sigma_init)
-
-    
-    
-def normcdf_tr(z,nsd=5):
-        
-        z = np.minimum(z, nsd*np.ones_like(z))
-        z = np.maximum(z,-nsd*np.ones_like(z))
-            
-        pup = norm.cdf(nsd,0.0,1.0)
-        pdown = norm.cdf(-nsd,0.0,1.0)
-        const = pup - pdown
-        
-        return (norm.cdf(z,0.0,1.0)-pdown)/const
-    
-    
-def normcdf_ppf(z): return norm.ppf(z,0.0,1.0)       
+ 
+ 
+def normcdf_tr(z, nsd=5):
+    z = np.minimum(z, nsd * np.ones_like(z))
+    z = np.maximum(z, -nsd * np.ones_like(z))
+    pup = norm.cdf(nsd, 0.0, 1.0)
+    pdown = norm.cdf(-nsd, 0.0, 1.0)
+    const = pup - pdown
+    return (norm.cdf(z, 0.0, 1.0) - pdown) / const
+ 
+ 
+def normcdf_ppf(z):
+    return norm.ppf(z, 0.0, 1.0)    
         
 def addaco_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=50,mean=np.array([0.0],)):
   
-    """
-    Creates the grid and transiton matrices of a non-stationary AR(1) process using
-    the Adda and Cooper methodology
-    """
-     
     if mean.shape[0]!=T-1:mean=np.zeros(T-1) 
     # start with creating list of points
     sd_z = sd_rw(T,sigma_persistent,sigma_init)
@@ -522,6 +524,8 @@ def addaco_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=50,mean=np.array
         Pi0 = Pi0 + [Pi_here0.T]
         
     return X, Pi, Pi0   
+
+
 
 def rouw_nonst(T=40,sigma_persistent=0.05,sigma_init=0.2,npts=10): 
     """

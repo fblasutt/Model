@@ -75,29 +75,20 @@ marr_durr_pol=final_sample[:,8]
 # Guess of internal parameters: [ω,σL,α,ρ,wedge,β]
 
 
-xc=np.array([2.89403908, 0.01631669, 0.80448221, 1.14807094, 4.9500289 ,
-       1.00024952])
+# love 3+ chi=2 + more precision in asset and power grids
+xc=np.array([3.0, 0.09, 0.91995009, 1.55216023, 6.55501769,1.00228576])
 
-#no human capital depreciation
-xc=np.array([2.81482379, 0.01442621, 0.85,       1.2,        4.67585959, 0.9995961])
-
-
-#human capital depreciation
-xc=np.array([7.5, 0.01, 0.85      , 1.2       , 0.6, 0.985 ])
-
-#human capital depreciation*5
-xc=np.array([3.11977397, 0.0640818,  0.8625346,  1.24148261, 1.15719644, 0.995])
-
-xc=np.array([2.67430472, 0.04822307, 0.88551032, 1.1       , 2.45443896,
-       0.995     ])
-
-xc=np.array([2.74      , 0.045     , 0.88551032, 1.1       , 3.4       ,
-       0.9905    ])
+# love 3+ chi=2 + more precision in asset and power grids+ depreciation
+xc=np.array([4.56781138, 0.09464625, 0.91267594, 1.57330182, 4.70416388, 0.99288005])
 
 
-xc=np.array([4.29925418, 0.06859209, 0.86320761, 1.22985068 ,3.31640893, 0.99019778])
-xl=np.array([3.5,0.001,0.78 ,1.1,0.01,0.985]) 
-xu=np.array([5.2,0.1 ,0.9 ,1.3 ,5.9 ,1.00]) 
+# love 3+ chi=2 + more precision in asset and power grids+ depreciation+average BP
+xc=np.array([4.45714936, 0.0985309,  0.93201454, 1.67710395, 1.46097524, 0.98351993])
+
+
+
+xl=np.array([2.2,0.001,0.78 ,1.0,0.01,0.975]) 
+xu=np.array([6.2,0.15 ,0.96 ,1.75 ,7.5 ,1.005]) 
 
 #Parametrize the model 
 par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'Ω':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
@@ -159,7 +150,7 @@ def q(pt,table=False):
     M_bef.par.Ω=pt[4]    
     M_bef.par.β=pt[5]
     
-    M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.addaco_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
+    M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
 
 
     
@@ -192,7 +183,7 @@ def q(pt,table=False):
     M.par.β=pt[5]   
     
     
-    M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.addaco_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) 
+    M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.rouw_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) 
     
 
     
@@ -456,12 +447,12 @@ def q(pt,table=False):
     # Average household income
     couple_assets = M.sim.A[sample_empl].mean()/M.sim.incm[sample_empl].mean()
     
-    print(111)
+    # print(111)
     #AWE
-    # B=insurance(M,sample_reg)
-    # AWE=B['wlp']['all_m']
+    B=insurance(M,sample_reg)
+    AWE=B['wlp']['all_m']
     
-    # print('AWE is {}'.format(AWE))
+    print('AWE is {}'.format(AWE))
        
 
     fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.0139)/.0139)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-3.3)/3.3)**2#+((AWE+0.03)/0.03)**2
@@ -649,25 +640,25 @@ if __name__ == '__main__':
    
     if ESTIMATE:
         
-        computation_options = { "num_workers" : 9,        # use four processes in parallel 
-                                "working_dir" : root # where to save results in progress (in case interrupted) 
-                                } 
+        # computation_options = { "num_workers" : 9,        # use four processes in parallel 
+        #                         "working_dir" : root # where to save results in progress (in case interrupted) 
+        #                         } 
          
-        global_search_options = { "num_points" : 10}  # number of points in global pre-test 
+        # global_search_options = { "num_points" : 10}  # number of points in global pre-test 
          
-        local_search_options = {  "algorithm"    : "dfols", # local search algorithm 
-                                                              # can be either BOBYQA from NLOPT or NelderMead from scipy 
-                                  "num_restarts" : 18,      # how many local searches to do 
-                                  "shrink_after" : 9,       # after the first [shrink_after] restarts we begin searching 
-                                                              # near the best point we have found so far 
-                                  "xtol_rel"     : 1e-6,     # relative tolerance on x 
-                                  "ftol_rel"     : 1e-6     # relative tolerance on f 
-                                } 
+        # local_search_options = {  "algorithm"    : "dfols", # local search algorithm 
+        #                                                       # can be either BOBYQA from NLOPT or NelderMead from scipy 
+        #                           "num_restarts" : 18,      # how many local searches to do 
+        #                           "shrink_after" : 9,       # after the first [shrink_after] restarts we begin searching 
+        #                                                       # near the best point we have found so far 
+        #                           "xtol_rel"     : 1e-6,     # relative tolerance on x 
+        #                           "ftol_rel"     : 1e-6     # relative tolerance on f 
+        #                         } 
          
-        opt = TikTak.TTOptimizer(computation_options, global_search_options, local_search_options, skip_global=True) 
-        x,fx = opt.minimize(q,xl,xu) 
-        print(f'The minimizer is s{x}') 
-        print(f'The objective value at the min is {fx}') 
+        # opt = TikTak.TTOptimizer(computation_options, global_search_options, local_search_options, skip_global=True) 
+        # x,fx = opt.minimize(q,xl,xu) 
+        # print(f'The minimizer is s{x}') 
+        # print(f'The objective value at the min is {fx}') 
         
         # Estimate the model
         res=dfols.solve(q, xc, rhobeg = 0.3, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  

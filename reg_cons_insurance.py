@@ -85,16 +85,24 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
             zw[i,t]=par.grid_pw[t,ID[i,t],izw[i,t],m.sim.ih[i,t]]
             ϵw[i,t]=par.grid_ϵw[t,ID[i,t],izw[i,t],m.sim.ih[i,t]]
                 
-    Δzm=zm[sample1]-zm[sample] # persisten shocks husband
-    Δϵm=ϵm[sample1]-ϵm[sample] # transitory shocks husband
-    Δzw=zw[sample1]-zw[sample] # persistent shocks wife
-    Δϵw=ϵw[sample1]-ϵw[sample] # transitory shocks wife
+    Δzm=zm[sample1]-zm[sample] # persistent innovation husband (= contemporaneous persistent shock)
+    Δzw=zw[sample1]-zw[sample] # persistent innovation wife
+
+    # Transitory shock needs TWO non-interchangeable versions:
+    #  * contemporaneous level ε_{t+1} (var σϵ²): the NEW shock -> pass-through/response
+    #    regressions (this is what BPP_MPC estimates).
+    #  * first difference ε_{t+1}-ε_t (var 2σϵ²): how it enters income growth ΔY ->
+    #    Δtm/Δtw, the shock-variance decomposition, and ξ.
+    ϵm_c=ϵm[sample1]            # contemporaneous transitory shock husband (level)
+    ϵw_c=ϵw[sample1]            # contemporaneous transitory shock wife
+    Δϵm=ϵm[sample1]-ϵm[sample]  # transitory CHANGE husband (difference)
+    Δϵw=ϵw[sample1]-ϵw[sample]  # transitory CHANGE wife
         
     # Total shocks, aggregated by type (transitory+persistent) or within couple
     Δz=Δzm+Δzw
-    Δϵ=Δϵm+Δϵw
-    Δtm=Δzm+Δϵm
-    Δtw=Δzw+Δϵw
+    Δϵ=ϵm_c+ϵw_c              # total contemporaneous transitory shock (pass-throughs only)
+    Δtm=Δzm+Δϵm              # husband income-growth shock content (difference transitory)
+    Δtw=Δzw+Δϵw              # wife income-growth shock content
     
     # Log income growth. It is gross, unless _net, denoting net income, is attached
     ΔYm    = np.log(m.sim.incmg[sample1]/m.sim.incmg[sample]) # husband gross income
@@ -134,7 +142,49 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     Δlovw=lovw[sample1]-lovw[sample]
     Δlovm=lovm[sample1]-lovm[sample]
-    
+
+    ##########################################################
+    # BPP first stage: purge each variable of observables
+    ##########################################################
+    # As in Blundell-Pistaferri-Preston, replace each variable by the residual of an
+    # OLS on observables (age polynomial + wife-employment dummy at the base period;
+    # add more columns to Zobs as needed, e.g. human capital m.sim.ih). Fit on the
+    # couple sample (sm) over finite obs; non-finite entries (wrap-around / log of 0)
+    # are left untouched and get masked out by the regression conditions downstream.
+    # (ΔWLP is intentionally NOT cleaned: employment is itself one of the observables.)
+    _age  = np.broadcast_to(np.arange(par.T)/par.T, (par.simN, par.T))[sample].astype(float)
+    _empl = (m.par.grid_wlp[m.sim.WLP] > 0)[sample].astype(float)   # wife employed, base period
+    Zobs  = np.column_stack([np.ones_like(_age), _age, _age**2, _age**3, _empl])
+
+    def _residualize(y, Z=Zobs, base=sm):
+        """y minus its OLS projection on observables Z (β fit on finite obs within base)."""
+        y = np.asarray(y, dtype=float); r = y.copy()
+        ok  = np.isfinite(y) & np.isfinite(Z).all(axis=1)
+        fit = ok & base
+        if fit.sum() > Z.shape[1]:
+            b = np.linalg.lstsq(Z[fit], y[fit], rcond=None)[0]
+            r[ok] = y[ok] - Z[ok] @ b
+        return r
+
+    # Single source of truth: every variable purged of observables (edit this list freely).
+    _clean = ['Δcm','Δcw','Δcp','Δd','ΔC','Δs','Δs1','Δsp','Δws',
+              'ΔYm','ΔYw','ΔY','ΔY_net','ΔY1m','ΔY1w','ΔY1','ΔY_1m','ΔY_1w','ΔY_1',
+              'ΔYYm','ΔYYw','ΔYY',
+              'ΔLCm','ΔLCw','ΔLws','ΔLC','ΔLd','ΔLYm','ΔLYw','ΔLY',
+              'Δzm','Δzw','ϵm_c','ϵw_c','Δϵm','Δϵw','Δz','Δϵ','Δtm','Δtw',
+              'Δlovm','Δlovw']
+    # NB: must be a plain for-loop, NOT a dict comprehension -- a comprehension has its
+    # own scope, so eval(nm) there can't see this function's locals (Δcm, ...).
+    _R = {}
+    for nm in _clean:
+        _R[nm] = _residualize(eval(nm))
+    (Δcm,Δcw,Δcp,Δd,ΔC,Δs,Δs1,Δsp,Δws,
+     ΔYm,ΔYw,ΔY,ΔY_net,ΔY1m,ΔY1w,ΔY1,ΔY_1m,ΔY_1w,ΔY_1,
+     ΔYYm,ΔYYw,ΔYY,
+     ΔLCm,ΔLCw,ΔLws,ΔLC,ΔLd,ΔLYm,ΔLYw,ΔLY,
+     Δzm,Δzw,ϵm_c,ϵw_c,Δϵm,Δϵw,Δz,Δϵ,Δtm,Δtw,
+     Δlovm,Δlovw) = (_R[nm] for nm in _clean)
+
 
     ##########################################################
     # Variance decomposition of individual consumption volatility
@@ -236,10 +286,10 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
          'per_w_p':ols(Δzw,Δcp,sm),
          'per_w_m':ols(Δzw,Δcm,smw),
          'per_w_w':ols(Δzw,Δcw,smw),
-         'tra_m_m':ols(Δϵm,Δcm,sm),
-         'tra_m_w':ols(Δϵm,Δcw,sm),
-         'tra_w_m':ols(Δϵw,Δcm,smw),
-         'tra_w_w':ols(Δϵw,Δcw,smw)}
+         'tra_m_m':ols(ϵm_c,Δcm,sm),
+         'tra_m_w':ols(ϵm_c,Δcw,sm),
+         'tra_w_m':ols(ϵw_c,Δcm,smw),
+         'tra_w_w':ols(ϵw_c,Δcw,smw)}
     
     # Similar to above but in levels
     level={'all_m_m':ols(ΔLYm,ΔLCm,sm),
@@ -253,8 +303,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
           'all_w':ols(ΔYw,Δws,smw),
           'per_m':ols(Δzm,Δws,sm),
           'per_w':ols(Δzw,Δws,smw),
-          'tra_m':ols(Δϵm,Δws,sm),
-          'tra_w':ols(Δϵw,Δws,smw),
+          'tra_m':ols(ϵm_c,Δws,sm),
+          'tra_w':ols(ϵw_c,Δws,smw),
           'level_m':ols(ΔLYm,ΔLws,sm),        
           'level_w':ols(ΔLYw,ΔLws,sm)}
     
@@ -263,8 +313,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
           'all_w':ols(Δtw,ΔWLP,sm),
           'per_m':ols(Δzm,ΔWLP,sm),
           'per_w':ols(Δzw,ΔWLP,sm),
-          'tra_m':ols(Δϵm,ΔWLP,sm),
-          'tra_w':ols(Δϵw,ΔWLP,sm)}
+          'tra_m':ols(ϵm_c,ΔWLP,sm),
+          'tra_w':ols(ϵw_c,ΔWLP,sm)}
 
     #Pass-throughs of various components of income on total consumption
     totc={'all':ols(ΔY,ΔC,sm),  
@@ -272,10 +322,10 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
           'tra':ols(Δϵ,ΔC,sm),         
           'all_m':ols(ΔYm,ΔC,sm),         
           'per_m':ols(Δzm,ΔC,sm),
-          'tra_m':ols(Δϵm,ΔC,sm),
+          'tra_m':ols(ϵm_c,ΔC,sm),
           'all_w':ols(ΔYw,ΔC,smw),         
           'per_w':ols(Δzw,ΔC,smw),
-          'tra_w':ols(Δϵw,ΔC,smw),
+          'tra_w':ols(ϵw_c,ΔC,smw),
           'level_s':ols(ΔLY,ΔLC,sm),
           'level_m':ols(ΔLYm,ΔLC,sm),     
           'level_w':ols(ΔLYw,ΔLC,sm)}
@@ -288,8 +338,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
           'all_w':ols(ΔYw,Δd,smw),
           'per_m':ols(Δzm,Δd,sm),
           'per_w':ols(Δzw,Δd,smw),
-          'tra_m':ols(Δϵm,Δd,sm),
-          'tra_w':ols(Δϵw,Δd,smw),
+          'tra_m':ols(ϵm_c,Δd,sm),
+          'tra_w':ols(ϵw_c,Δd,smw),
           'level_s':ols(ΔLY,ΔLd,sm),  
           'level_m':ols(ΔLYm,ΔLd,sm),   
           'level_w':ols(ΔLYw,ΔLd,sm)}
@@ -348,7 +398,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     plt.show()
     
     # Innovation in consumption
-    ξ=ΔC-(Δzm*totc['per_m']+Δzw*totc['per_w']+Δϵm*totc['tra_m']+Δϵw.var()*totc['tra_w'])
+    ξ=ΔC-(Δzm*totc['per_m']+Δzw*totc['per_w']+Δϵm*totc['tra_m']+Δϵw*totc['tra_w'])
     
     
     
@@ -435,10 +485,10 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     ##################################################
     
     # Which shock should I consider?
-    if    (shock_type=='permanent') & (shock_gender=='Male'): SHOCK = Δzm; CONTROLS = (Δzw,Δϵm,Δϵw)
-    elif  (shock_type=='permanent') & (shock_gender!='Male'): SHOCK = Δzw; CONTROLS = (Δzm,Δϵm,Δϵw)
-    elif  (shock_type!='permanent') & (shock_gender=='Male'): SHOCK = Δϵm; CONTROLS = (Δzw,Δzm,Δϵw)
-    elif  (shock_type!='permanent') & (shock_gender!='Male'): SHOCK = Δϵw; CONTROLS = (Δzw,Δϵm,Δzm)  
+    if    (shock_type=='permanent') & (shock_gender=='Male'): SHOCK = Δzm;  CONTROLS = (Δzw,ϵm_c,ϵw_c)
+    elif  (shock_type=='permanent') & (shock_gender!='Male'): SHOCK = Δzw;  CONTROLS = (Δzm,ϵm_c,ϵw_c)
+    elif  (shock_type!='permanent') & (shock_gender=='Male'): SHOCK = ϵm_c; CONTROLS = (Δzw,Δzm,ϵw_c)
+    elif  (shock_type!='permanent') & (shock_gender!='Male'): SHOCK = ϵw_c; CONTROLS = (Δzw,ϵm_c,Δzm)
        
     # Which consumption should I consider?
     if   consumption_gender=='Male': ΔCONS= Δcm;SHARE=Δs1
