@@ -75,23 +75,15 @@ marr_durr_pol=final_sample[:,8]
 # Guess of internal parameters: [ω,σL,α,ρ,wedge,β]
 
 
-# love 3+ chi=2 + more precision in asset and power grids
-xc=np.array([3.0, 0.09, 0.91995009, 1.55216023, 6.55501769,1.00228576])
 
-# love 3+ chi=2 + more precision in asset and power grids+ depreciation
-xc=np.array([4.56781138, 0.09464625, 0.91267594, 1.57330182, 4.70416388, 0.99288005])
+xc=np.array([9.59993703, 0.03871525, 0.93100763, 1.72343712, 1.2026561 ,
+       0.973201  ])
 
-
-# love 3+ chi=2 + more precision in asset and power grids+ depreciation+average BP
-xc=np.array([4.45714936, 0.0985309,  0.93201454, 1.67710395, 1.46097524, 0.98351993])
-
-
-
-xl=np.array([2.2,0.001,0.78 ,1.0,0.01,0.975]) 
-xu=np.array([6.2,0.15 ,0.96 ,1.75 ,7.5 ,1.005]) 
+xl=np.array([2.2,0.001,0.78 ,1.0,0.01,0.96]) 
+xu=np.array([12.2,0.15 ,0.96 ,2.5 ,7.5 ,1.005]) 
 
 #Parametrize the model 
-par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'Ω':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
+par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'Ω':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
 model=brg.HouseholdModelClass(par=par)
 
 
@@ -118,11 +110,11 @@ model.sim.init_A=assets
 
 
 #Create variable for policy change
-age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh  
+age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+25#age of hh  
 calendar_year=age-age_initial[:,None]+year[:,None]
 
 policy=np.maximum(calendar_year[:,0],2007)
-age_policy=5+np.array(marr_durr_pol,dtype=np.int32)#np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
+age_policy=np.array(marr_durr_pol,dtype=np.int32)#np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 
 
 #Function to minimize 
@@ -144,13 +136,13 @@ def q(pt,table=False):
     # Set up the model with the input parameters pt
     M_bef = model.copy(name='numba_new_copy')
    
-    M_bef.par.ω=pt[0]
+    M_bef.par.η=pt[0]
     M_bef.par.α=pt[2] 
     M_bef.par.ρ=pt[3]
     M_bef.par.Ω=pt[4]    
     M_bef.par.β=pt[5]
     
-    M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) 
+    M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) # initial sd absorbs 5 unmodeled years (age-25 start)
 
 
     
@@ -176,14 +168,14 @@ def q(pt,table=False):
     M = M_bef.copy(name='numba_new_copy')  
     M.par.pens_reform=True #set up pension reform
     M.par.policy_init=age_policy
-    M.par.ω=pt[0]
+    M.par.η=pt[0]
     M.par.α=pt[2] 
     M.par.ρ=pt[3]
     M.par.Ω=pt[4]
     M.par.β=pt[5]   
     
     
-    M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.rouw_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) 
+    M.par.grid_love_,M.par.Πl_,M.par.Πl0_= usr.rouw_nonst(M.par.T,pt[1],M.par.σL0,M.par.num_lovew) # initial sd absorbs 5 unmodeled years (age-25 start)
     
 
     
@@ -230,7 +222,7 @@ def q(pt,table=False):
     time=age-agei
     
     #Event-study specific variables
-    treat_group=np.repeat((M.par.policy_init-(age_marriage-20)>=15)[:,None],M.par.T,axis=1) 
+    treat_group=np.repeat((M.par.policy_init-(age_marriage-25)>=15)[:,None],M.par.T,axis=1) 
    
     #treat_group=np.repeat((M.par.policy_init>=20)[:,None],M.par.T,axis=1) 
         
@@ -241,7 +233,7 @@ def q(pt,table=False):
     wife_ratio=M.sim.Cw/(M.sim.Cm+M.sim.Cw)
 
     #Sample
-    subset= (age>=np.maximum(age_marriage,age_initial)[:,None])  & (age<=age_final[:,None])  & (M.sim.power>=0)  &(age_policy>np.maximum(age_marriage,age_initial)-20)[:,None] 
+    subset= (event_time>=-5) & (age>=np.maximum(age_marriage,age_initial)[:,None])  & (age<=age_final[:,None])  & (M.sim.power>=0)  &(age_policy>=5+np.maximum(age_marriage,age_initial)-25)[:,None] 
 
     # Combine into a DataFrame 
     df = pd.DataFrame({ 
@@ -298,6 +290,7 @@ def q(pt,table=False):
     
     policy_effect_wife_ratio = results.params[0]
     
+    print(policy_effect_wife_ratio)
 
     #plt.plot(np.insert(results.params[1:-4], 3, 0))
      
@@ -321,15 +314,15 @@ def q(pt,table=False):
     event_time=np.arange(-5,20)
    
     
-    baseb=(age>=np.maximum(age_marriage,age_initial)[:,None])& (M.sim.couple==1)   & (age<=age_final[:,None])  & (age_policy>=np.maximum(age_marriage,age_initial)-20)[:,None]#   & (M.sim.incw/(M.sim.incw+M.sim.incm)>0.5) 
-    basea=(age>=np.maximum(age_marriage,age_initial)[:,None]) &  (M_bef.sim.couple==1)  & (age<=age_final[:,None]) & (age_policy>=np.maximum(age_marriage,age_initial)-20)[:,None]#  & (M_bef.sim.incw/(M_bef.sim.incw+M_bef.sim.incm)>0.5)
+    baseb=(age>=np.maximum(age_marriage,age_initial)[:,None])& (M.sim.couple==1)   & (age<=age_final[:,None])  & (age_policy>=5+np.maximum(age_marriage,age_initial)-25)[:,None]#   & (M.sim.incw/(M.sim.incw+M.sim.incm)>0.5) 
+    basea=(age>=np.maximum(age_marriage,age_initial)[:,None]) &  (M_bef.sim.couple==1)  & (age<=age_final[:,None]) & (age_policy>=5+np.maximum(age_marriage,age_initial)-25)[:,None]#  & (M_bef.sim.incw/(M_bef.sim.incw+M_bef.sim.incm)>0.5)
   
     
-    sya=(basea) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)<15) 
-    soa=(basea) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15) 
+    sya=(basea) & (M.par.policy_init[:,None]-(age_marriage[:,None]-25)<15) 
+    soa=(basea) & (M.par.policy_init[:,None]-(age_marriage[:,None]-25)>=15) 
     
-    syb=(baseb) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)<15) 
-    sob=(baseb) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15) 
+    syb=(baseb) & (M.par.policy_init[:,None]-(age_marriage[:,None]-25)<15) 
+    sob=(baseb) & (M.par.policy_init[:,None]-(age_marriage[:,None]-25)>=15) 
     
     
     
@@ -374,8 +367,8 @@ def q(pt,table=False):
     
 
     #Share binding by age
-    sample_empla =  (age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M_bef.sim.couple==1)  & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15)
-    sample_emplb =  (age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==1) & (M.sim.couple==1) & (M.par.policy_init[:,None]-(age_marriage[:,None]-20)>=15)
+    sample_empla =  (age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M.sim.couple==1) & (M_bef.sim.couple==1)  & (M.par.policy_init[:,None]-(age_marriage[:,None]-25)>=15)
+    sample_emplb =  (age>=np.maximum(age_marriage,age_initial)[:,None]) & (age<=age_final[:,None]) & (M_bef.sim.couple==1) & (M.sim.couple==1) & (M.par.policy_init[:,None]-(age_marriage[:,None]-25)>=15)
     
     
     bindwb=np.nanmean(Swb ,where=sample_emplb,axis=0)
@@ -445,7 +438,7 @@ def q(pt,table=False):
     βdC=np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
     
     # Average household income
-    couple_assets = M.sim.A[sample_empl].mean()/M.sim.incm[sample_empl].mean()
+    couple_assets = M.sim.A[sample_empl].mean()/M.sim.incmg[sample_empl].mean()
     
     # print(111)
     #AWE
@@ -455,7 +448,7 @@ def q(pt,table=False):
     print('AWE is {}'.format(AWE))
        
 
-    fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.0139)/.0139)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-3.3)/3.3)**2#+((AWE+0.03)/0.03)**2
+    fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.0139)/.0139)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-2.634)/2.634)**2#+((AWE+0.03)/0.03)**2
     print('Point is {}, fit is {}'.format(pt,fit))  
     print('Simulated moments are {}'.format([wife_empl,policy_effect_wife_ratio,divorce_rate,expenditure_x_share,βdC,couple_assets]))
     
@@ -472,7 +465,7 @@ def q(pt,table=False):
     #if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time)
   
     #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
-    fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.0139)/.0139),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-3.3)/3.3)]#,(AWE+0.03)/0.03]   
+    fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.0139)/.0139),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-2.634)/2.634)]#,(AWE+0.03)/0.03]   
 
     if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]#   
     return fitt#fit#
@@ -586,12 +579,12 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
           r'\begin{tabular}{lccc} \toprule '+\
           r'Estimated Parameters &  & Value & Target Moment  \\ '+\
           r' \midrule '+\
-          r'Match quality shock, St. dev.         & $\sigma_{\psi}$   & '+p42(pt[1])+' & Divorce rate, all women'+' \\\\'+\
-          r'Single-Couple wedge                     & $Wedge$          & '+p42(pt[4])+' & Divorce rate, younger women'+'  \\\\'+\
-          r'Private goods utility curvature                      & $\sigma$         & '+p42(pt[3])+' & Consumption to home goods pass-through'+' \\\\'+\
-          r'Weight on home goods                              & $\alpha$          & '+p42(pt[2])+' & Women employment rate'+'  \\\\'+\
-          r'Home input weight            & $\nu$            & '+p42(pt[0])+' &  Expenditure share on common goods'+' \\\\'+\
-          r'Discount factor            & $\beta$            & '+p42(pt[5])+' &  Wealth to (husband) earnings ratio'+' \\\\'+\
+          r'Match-quality shock (persistent), std.\ dev.       & $\sigma_{\psi}$   & '+p42(pt[1])+' & Annual divorce rate'+' \\\\'+\
+          r'Match-quality shock (transitory), std.\ dev.       & $\sigma_{\xi}$   & '+p42(pt[4])+r" & Effect of pension reform on wife's consumption share"+' \\\\'+\
+          r'Risk aversion, private goods                       & $\rho$         & '+p42(pt[3])+' & Total consumption to home-good expenditure elasticity'+' \\\\'+\
+          r'Weight on home goods                               & $\alpha$          & '+p42(pt[2])+' & Expenditure share of home goods'+'  \\\\'+\
+          r'Disutility of employment                           & $\eta$            & '+p42(pt[0])+' & Employment rate of married women'+' \\\\'+\
+          r'Discount factor                                    & $\beta$            & '+p42(pt[5])+r" & Wealth to husband's earnings ratio"+' \\\\'+\
           r' \bottomrule '+\
           r'\end{tabular}'+\
           r'\end{table}'
@@ -605,20 +598,19 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
     # MODEL FIT
     ############################
     table=r'\begin{table}[H]\caption{Model fit and validation}\label{table:fit}\centering'+\
-         r'\begin{tabular}{lccc}\toprule '+\
-        r'Target Moments & Data  & Model  \\ \midrule '+\
-        r'Divorce rate, all women              & '+p43(0.010)+' & '+p43(divorce_rate)+'  \\\\'+\
-        r'Reform effect on consumtion ratio               & '+p43(0.065)+' & '+p43(policy_effect_wife_ratio)+' \\\\'+\
-        r'Total to public cons pass-through        & '+p43(.979)+' & '+p43(βdC)+' \\\\'+\
-        r'Women employment rate                   & '+p43(0.588)+' & '+p43(wife_empl)+'  \\\\'+\
-        r'Expenditure share on common goods                & '+p43(0.812)+' & '+p43(expenditure_x_share)+'  \\\\'+\
-        r'Wealth to (husband) earnings ratio                & '+p43(2.967)+' & '+p43(couple_assets)+'  \\\\'+\
+         r'\begin{tabular}{lcc}\toprule '+\
+        r'Targeted Moments & Data  & Model  \\ \midrule '+\
+        r'Annual divorce rate              & '+p43(0.010)+' & '+p43(divorce_rate)+'  \\\\'+\
+        r"Effect of pension reform on wife's consumption share & "+p43(0.014)+' & '+p43(policy_effect_wife_ratio)+' \\\\'+\
+        r'Pass-through of total consumption to home-good expenditure & '+p43(.979)+' & '+p43(βdC)+' \\\\'+\
+        r'Employment rate of married women        & '+p43(0.588)+' & '+p43(wife_empl)+'  \\\\'+\
+        r'Expenditure share of home goods         & '+p43(0.812)+' & '+p43(expenditure_x_share)+'  \\\\'+\
+        r"Wealth to husband's earnings ratio      & "+p43(2.634)+' & '+p43(couple_assets)+'  \\\\'+\
         r'\midrule '+\
-        r'External Moments & Data  & Model \\'+\
+        r'Non-targeted Moments & Data  & Model \\'+\
         r'\midrule '+\
-        r'Gender earnings gap                                       & '+p43(0.50)+' & '+p43(gender_gap_earnings)+'\\\\'+\
-        r'Share of women working full-time                          & '+p43(0.443)+' &  '+p43(share_full_time)+'\\\\'+\
-        r'Cross-elasticity of women employment                          & '+p43(-0.026)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
+        r'Female-to-male earnings ratio, workers  & '+p43(0.532)+' & '+p43(gender_gap_earnings)+'\\\\'+\
+        r"Wife's employment response to husband's income shocks & "+p43(-0.041)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
         r'\bottomrule '+\
         r'\end{tabular}'+\
         r'\end{table}'

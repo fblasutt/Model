@@ -55,7 +55,7 @@ xl=np.array([0.00001,0.000082,0.1,0.5,0.01])
 xu=np.array([0.8,0.4,0.999,2.5,1.0]) 
 
 #Parametrize the model 
-par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
+par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
 model=brg.HouseholdModelClass(par=par)
 
 
@@ -82,7 +82,7 @@ model.sim.init_A=assets
 
 
 #Create variable for policy change
-age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh  
+age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+25#age of hh  
 calendar_year=age-age_initial[:,None]+year[:,None]
 
 policy=np.maximum(calendar_year[:,0],2007)
@@ -119,7 +119,7 @@ for i in range(len(gridτ)):
 
 
 #We take individuals that stays married across spefifications
-age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh   
+age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh   
 alwayscouple=np.array([Bmodel[i].sim.couple_lag==1  for i in range(len(gridτ))])
 alwayscouplep=np.array([Bmodel[i].sim.couple==1  for i in range(len(gridτ))])
 

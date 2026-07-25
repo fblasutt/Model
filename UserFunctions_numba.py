@@ -288,7 +288,7 @@ def labor_income(par,single=False,pens_reform=False):
 
                 # # #Individual pension
                 Ind_M = XXmA[par.Tr-1,iD,:,i]
-                Ind_W = XXwA[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1]
+                Ind_W = XXwA[par.Tr-1,iD,:,i]*0.598*par.grid_wlp[-1]
                 
                 #Shared pension accumulated while married
                 Shared = (Ind_M+Ind_W)/2#(XXmA2[par.Tr-1,iD,:,i]+XXwA2[par.Tr-1,iD,:,i]*0.715*par.grid_wlp[-1])/2#
@@ -371,11 +371,18 @@ def pension_share(par):
 
 
     # Create array A_w_t where, for each year, you have the weight of the shared pension
-    A_w_t = np.array([age_weights[i]@ ((i-np.arange(par.Tr))/(par.Tr-1)) for i in range(par.Tr)])
+    # Denominator = contribution years: pension credits accrue from age 20, but the
+    # model starts at age 25 (t=0), so the 5 unmodeled years are added back.
+    # (Marriage durations i-j are timing-invariant; only the denominator needs the +5.)
+    A_w_t = np.array([age_weights[i]@ ((i-np.arange(par.Tr))/(par.Tr-1+5)) for i in range(par.Tr)])
     
     #A_w_t contains the average weight A_w_t for a period which pools togerther par.Dper years
     A_w=np.array([np.mean(A_w_t[par.Dper*i:par.Dper*i+par.Dper]) for i in range(par.num_perdiv)])
     #A_w=np.linspace(0.0,A_w_t[-1],par.num_perdiv)
+    
+    
+    #UNcomment if not everyone marries in t=0!!! Otherwise, you get a share depening on time spent together
+    A_w=np.arange(par.Tr)/par.Tr
   
     
     

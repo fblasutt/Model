@@ -43,7 +43,7 @@ age_marriage=final_sample[:,5]
 xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
 
 #Parametrize the model
-par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]}
+par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]}
 model = brg.HouseholdModelClass(par=par)  
 
 
@@ -53,7 +53,7 @@ model = brg.HouseholdModelClass(par=par)
 #####################################################################
 
 #We start simulating the agent at age_initial
-model.par.sample_init=age_initial-20
+model.par.sample_init=age_initial-25
 
 #Given the parameters, set the initial pareto weight for couples
 param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
@@ -146,7 +146,7 @@ for i in range(len(gridτ)):
 ########################################
 
 #We take individuals that stays married across spefifications
-age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+20#age of hh   
+age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh   
 
 alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
 alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])

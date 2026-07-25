@@ -110,7 +110,7 @@ assets=final_sample[:,7]*np.mean(np.exp(h_income))
 xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
 
 #Parametrize the model 
-par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
+par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
 model=brg.HouseholdModelClass(par=par)
 
 
@@ -137,7 +137,7 @@ model.sim.init_A=assets
 
 
 #Create variable for policy change
-age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+20#age of hh  
+age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+25#age of hh  
 calendar_year=age-age_initial[:,None]+year[:,None]
 
 policy=np.maximum(calendar_year[:,0],2007)
@@ -483,22 +483,22 @@ print("  (iv)  Δ(α·Q^(1-χ)/(1-χ)) / Δlog y_m  :  {:+.4f}      |  {:+.4f}"
       .format(β_U_ym_olf, β_U_ym_w))
 
 
-# %% Parameter sweep over (ω, ν)
+# %% Parameter sweep over (η, ν)
 
 ##########################################################################
-# Parameter sweep over (ω, ν): cross-elasticity of wife participation
-#   ω : labor disutility from working               (calibrated, xc[0])
+# Parameter sweep over (η, ν): cross-elasticity of wife participation
+#   η : labor disutility from working               (calibrated, xc[0])
 #   ν : Cobb–Douglas weight on money in home good   (external, par.ν=0.92)
 ##########################################################################
 
-def AWE_for_params(ω_val, ν_val):
-    """Build, solve, simulate the model at (ω, ν); return the pooled AWE slope."""
+def AWE_for_params(η_val, ν_val):
+    """Build, solve, simulate the model at (η, ν); return the pooled AWE slope."""
 
     par_loop = {'simN': N,
-                'ω': ω_val, 'ν': ν_val,
+                'η': η_val, 'ν': ν_val,
                 'σL': xc[1], 'α': xc[2], 'ρ': xc[3],
                 'wedge': xc[4], 'β': xc[5],
-                'sample_init': np.array(age_marriage - 20, dtype=np.int_)}
+                'sample_init': np.array(age_marriage - 25, dtype=np.int_)}
     m = brg.HouseholdModelClass(par=par_loop)
 
     # initial conditions (mirror the baseline block)
@@ -544,19 +544,19 @@ nu_grid    = np.array([0.50, 0.60,0.70, 0.92])
 
 AWE_grid = np.full((len(omega_grid), len(nu_grid)), np.nan)
 
-for i, ω_val in enumerate(omega_grid):
+for i, η_val in enumerate(omega_grid):
     for j, ν_val in enumerate(nu_grid):
-        is_baseline = (np.isclose(ω_val, ω_baseline) and np.isclose(ν_val, ν_baseline))
+        is_baseline = (np.isclose(η_val, ω_baseline) and np.isclose(ν_val, ν_baseline))
         tag = " (using already-computed baseline)" if is_baseline else ""
-        print("Working on combination ω={:.3f}, ν={:.3f}...{}".format(ω_val, ν_val, tag))
-        AWE_grid[i, j] = AWE if is_baseline else AWE_for_params(ω_val, ν_val)
+        print("Working on combination ω={:.3f}, ν={:.3f}...{}".format(η_val, ν_val, tag))
+        AWE_grid[i, j] = AWE if is_baseline else AWE_for_params(η_val, ν_val)
         print("  → AWE = {:+.4f}".format(AWE_grid[i, j]))
 
 
 # Plot — handles single-value grids gracefully
 n_om, n_nu = len(omega_grid), len(nu_grid)
 if n_om == 1 and n_nu == 1:
-    print("\n(Only one (ω, ν) combination — no plot.)")
+    print("\n(Only one (η, ν) combination — no plot.)")
 else:
     fig_sw, ax_sw = plt.subplots(figsize=(7, 5))
     if n_om == 1:

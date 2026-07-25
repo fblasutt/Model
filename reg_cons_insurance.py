@@ -18,6 +18,9 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     # Store parameters
     par=m.par
     
+    #Age
+    age=(np.cumsum(np.ones((m.par.simN,m.par.T)),axis=1)-1)+25#age of hh  
+    
     #######################################################
     #Selection issues below: only use one model m
     ######################################################
@@ -37,6 +40,32 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     smw11= (smw1) & (m.sim.couple[sample_1]==1) & (m.sim.WLP[sample_1]>0) 
 
 
+    ##########################################################
+    # BPP first stage: residualize LOG LEVELS on observables
+    ##########################################################
+    # As in BPP (2008) the first stage is run on log LEVELS: each (log) panel
+    # variable y[i,t] is regressed on observables (age polynomial) over couple
+    # observations, and all growth variables below are FIRST DIFFERENCES OF THE
+    # RESIDUALS. Non-finite entries (log of 0) are left as-is and get masked by
+    # the regression conditions downstream.
+    _aget  = np.broadcast_to((np.arange(par.T)/par.T)[None,:],(par.simN,par.T)).astype(float)
+    # NB: no employment dummy in the controls -- WLP is an endogenous choice that
+    # responds to the very shocks whose pass-through we measure; controlling for it
+    # would absorb part of the behavioral response (age polynomial only, as in
+    # simulated-BPP exercises a la Kaplan-Violante).
+    _Zp    = np.stack([np.ones_like(_aget),_aget,_aget**2,_aget**3],axis=-1)
+    _Zflat = _Zp.reshape(-1,_Zp.shape[-1])
+    _fitok = (m.sim.couple==1).ravel()                                # fit on couples
+
+    def _residualize(y):
+        """Panel y (simN,T) minus its OLS projection on observables (fit on couples, finite obs)."""
+        y=np.asarray(y,dtype=float); yf=y.ravel().copy()
+        ok=np.isfinite(yf); fit=ok&_fitok
+        if fit.sum()>_Zflat.shape[1]:
+            b=np.linalg.lstsq(_Zflat[fit],yf[fit],rcond=None)[0]
+            yf[ok]=yf[ok]-_Zflat[ok]@b
+        return yf.reshape(y.shape)
+
     #################################
     #Consumption computation
     ##################################
@@ -48,25 +77,32 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     cp = cw+cm     # Total private consumption
     C  = cp+d      # Total consumption
   
-    # Log consumption growth  for variout types of consumption
-    Δcm  = np.log(cm[sample1]/cm[sample])                            # Husband ¨Private consumption Cm
-    Δcw  = np.log(cw[sample1]/cw[sample])                            # Wife     Private consumption Cw
-    Δcp  = np.log((cw[sample1]+cm[sample1])/(cw[sample]+cm[sample])) # Husband+ wife Private consumption Cm+Cw
-    Δd   = np.log(d[sample1]/d[sample])                              # Home good expenditures d
-    ΔC   = np.log(m.sim.C_tot[sample1]/m.sim.C_tot[sample])          # Total consumption (Cw+Cm+d)
+    # BPP first stage on consumption: residualized log-level panels
+    lcm=_residualize(np.log(cm)); lcw=_residualize(np.log(cw)); lcp=_residualize(np.log(cp))
+    ldp=_residualize(np.log(d));  lC =_residualize(np.log(m.sim.C_tot)); lCc=_residualize(np.log(C))
+
+    # Log consumption growth = first differences of residualized log levels
+    Δcm  = lcm[sample1]-lcm[sample]  # Husband  private consumption Cm
+    Δcw  = lcw[sample1]-lcw[sample]  # Wife     private consumption Cw
+    Δcp  = lcp[sample1]-lcp[sample]  # Husband+wife private consumption Cm+Cw
+    Δd   = ldp[sample1]-ldp[sample]  # Home good expenditures d
+    ΔC   = lC[sample1] -lC[sample]   # Total consumption (Cw+Cm+d)
     
-    # Log consumption growth ofconsumption ratios
-    Δs  = np.log((cw[sample1]/cp[sample1])/(cw[sample]/cp[sample]))  # cw/cp
-    Δs1 = np.log((cm[sample1]/cp[sample1])/(cm[sample]/cp[sample]))  # cm/cp
-    Δsp = np.log((cp[sample1]/C[sample1])/(cp[sample]/C[sample]))    # cp/C 
-    Δws =np.log((cw[sample1]/cm[sample1])/(cw[sample]/cm[sample]))   # cw/cm
+    # Log growth of consumption ratios (residualization is linear, so ratio
+    # growth = difference of the residualized log growths)
+    Δs  = Δcw-Δcp                          # cw/cp
+    Δs1 = Δcm-Δcp                          # cm/cp
+    Δsp = Δcp-(lCc[sample1]-lCc[sample])   # cp/C
+    Δws = Δcw-Δcm                          # cw/cm
       
-    #Now the equivalent changes, but in levels not in log
-    ΔLCm  = cm[sample1]  -cm[sample]
-    ΔLCw  = cw[sample1]  -cw[sample]
-    ΔLws  = cw[sample1]/(cm[sample1])  -cw[sample]/(cm[sample])
-    ΔLC   = m.sim.C_tot[sample1]-m.sim.C_tot[sample]
-    ΔLd   = d[sample1]-d[sample]
+    #Now the equivalent changes, but in levels not in log (residualized level panels)
+    Lcm=_residualize(cm); Lcw=_residualize(cw); LCt=_residualize(m.sim.C_tot)
+    Ld =_residualize(d);  Lws=_residualize(cw/cm)
+    ΔLCm  = Lcm[sample1]-Lcm[sample]
+    ΔLCw  = Lcw[sample1]-Lcw[sample]
+    ΔLws  = Lws[sample1]-Lws[sample]
+    ΔLC   = LCt[sample1]-LCt[sample]
+    ΔLd   = Ld[sample1] -Ld[sample]
     
     ################################
     #Income Shocks below
@@ -85,6 +121,9 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
             zw[i,t]=par.grid_pw[t,ID[i,t],izw[i,t],m.sim.ih[i,t]]
             ϵw[i,t]=par.grid_ϵw[t,ID[i,t],izw[i,t],m.sim.ih[i,t]]
                 
+    # BPP first stage on the shock panels (log-level components)
+    zm=_residualize(zm); ϵm=_residualize(ϵm); zw=_residualize(zw); ϵw=_residualize(ϵw)
+
     Δzm=zm[sample1]-zm[sample] # persistent innovation husband (= contemporaneous persistent shock)
     Δzw=zw[sample1]-zw[sample] # persistent innovation wife
 
@@ -104,35 +143,64 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     Δtm=Δzm+Δϵm              # husband income-growth shock content (difference transitory)
     Δtw=Δzw+Δϵw              # wife income-growth shock content
     
+    # BPP first stage on income: residualized log-level panels
+    lym=_residualize(np.log(m.sim.incmg)); lyw=_residualize(np.log(m.sim.incwg))
+    ly =_residualize(np.log(m.sim.incmg+m.sim.incwg))
+    lyn=_residualize(np.log(m.sim.incm+m.sim.incw))
+
     # Log income growth. It is gross, unless _net, denoting net income, is attached
-    ΔYm    = np.log(m.sim.incmg[sample1]/m.sim.incmg[sample]) # husband gross income
-    ΔYw    = np.log(m.sim.incwg[sample1]/m.sim.incwg[sample]) # wife gross income
-    ΔY     = np.log((m.sim.incmg[sample1]+m.sim.incwg[sample1])/(m.sim.incmg[sample]+m.sim.incwg[sample])) # household gross income
-    ΔY_net = np.log((m.sim.incm[sample1]+m.sim.incw[sample1])/(m.sim.incm[sample]+m.sim.incw[sample]))     # household net income
+    ΔYm    = lym[sample1]-lym[sample] # husband gross income
+    ΔYw    = lyw[sample1]-lyw[sample] # wife gross income
+    ΔY     = ly[sample1] -ly[sample]  # household gross income
+    ΔY_net = lyn[sample1]-lyn[sample] # household net income
     
-    # Changes in the Level of income
-    ΔLYm  =m.sim.incmg[sample1]  -m.sim.incmg[sample]
-    ΔLYw  =m.sim.incwg[sample1]  -m.sim.incwg[sample]
-    ΔLY   =ΔLYm+ΔLYw
+    # Changes in the Level of income (residualized level panels)
+    Lym=_residualize(m.sim.incmg); Lyw=_residualize(m.sim.incwg)
+    ΔLYm  = Lym[sample1]-Lym[sample]
+    ΔLYw  = Lyw[sample1]-Lyw[sample]
+    ΔLY   = ΔLYm+ΔLYw
         
     # Changes in income one period ahed (t+1) (husband m, wife w and total)
-    ΔY1m  =np.log(m.sim.incmg[sample2]/m.sim.incmg[sample1])
-    ΔY1w  =np.log(m.sim.incwg[sample2]/m.sim.incwg[sample1])
-    ΔY1   =np.log((m.sim.incmg[sample2]+m.sim.incwg[sample2])/(m.sim.incmg[sample1]+m.sim.incwg[sample1]))
+    ΔY1m  = lym[sample2]-lym[sample1]
+    ΔY1w  = lyw[sample2]-lyw[sample1]
+    ΔY1   = ly[sample2] -ly[sample1]
 
     # Changes in income one period before (t-1) (husband m, wife w and total)
-    ΔY_1m  =np.log(m.sim.incmg[sample]/m.sim.incmg[sample_1])
-    ΔY_1w  =np.log(m.sim.incwg[sample]/m.sim.incwg[sample_1])
-    ΔY_1   =np.log((m.sim.incmg[sample]+m.sim.incwg[sample])/(m.sim.incmg[sample_1]+m.sim.incwg[sample_1]))
+    ΔY_1m  = lym[sample]-lym[sample_1]
+    ΔY_1w  = lyw[sample]-lyw[sample_1]
+    ΔY_1   = ly[sample] -ly[sample_1]
 
     # These variables below are used to construct the BPP moments
-    ΔYYm  =ΔYm+ΔY1m+ΔY_1m 
-    ΔYYw  =ΔYw+ΔY1w+ΔY_1w 
-    ΔYY   =ΔY +ΔY1 +ΔY_1   
+    ΔYYm  =ΔYm+ΔY1m+ΔY_1m
+    ΔYYw  =ΔYw+ΔY1w+ΔY_1w
+    ΔYY   =ΔY +ΔY1 +ΔY_1
+
+    ##########################################################
+    # NET (after-tax) income versions of the BPP income variables.
+    # m.sim.incm / m.sim.incw are individual net incomes (couples' joint
+    # taxation already split inside resources_couple); household net = sum.
+    ##########################################################
+    lym_n=_residualize(np.log(m.sim.incm)); lyw_n=_residualize(np.log(m.sim.incw))
+
+    # Net log income growth (household ΔY_net defined above from lyn)
+    ΔYm_net = lym_n[sample1]-lym_n[sample] # husband net income
+    ΔYw_net = lyw_n[sample1]-lyw_n[sample] # wife net income
+
+    # Net income growth one period ahead (t+1) and before (t-1)
+    ΔY1m_net  = lym_n[sample2]-lym_n[sample1]
+    ΔY1w_net  = lyw_n[sample2]-lyw_n[sample1]
+    ΔY1_net   = lyn[sample2] -lyn[sample1]
+    ΔY_1m_net = lym_n[sample]-lym_n[sample_1]
+    ΔY_1w_net = lyw_n[sample]-lyw_n[sample_1]
+    ΔY_1_net  = lyn[sample] -lyn[sample_1]
+
+    # BPP sums on net income
+    ΔYYm_net  = ΔYm_net+ΔY1m_net+ΔY_1m_net
+    ΔYYw_net  = ΔYw_net+ΔY1w_net+ΔY_1w_net
+    ΔYY_net   = ΔY_net+ΔY1_net+ΔY_1_net
     
     # Change in WLP
     ΔWLP=np.array([(m.par.grid_wlp[m.sim.WLP][sample1]>0)],dtype=np.float64)[0]-np.array([(m.par.grid_wlp[m.sim.WLP][sample]>0)],dtype=np.float64)[0]
-
     
     #Love shock changes
     lovw,lovm=np.zeros((2,m.par.simN,m.par.T))
@@ -140,51 +208,10 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     for i in range(par.T):lovw[:,i]=par.grid_lovew[i][m.sim.love[:,i]//par.num_lovem]
     for i in range(par.T):lovm[:,i]=par.grid_lovem[i][m.sim.love[:,i]%par.num_lovew]
     
+    # BPP first stage on love panels, then difference
+    lovw=_residualize(lovw); lovm=_residualize(lovm)
     Δlovw=lovw[sample1]-lovw[sample]
     Δlovm=lovm[sample1]-lovm[sample]
-
-    ##########################################################
-    # BPP first stage: purge each variable of observables
-    ##########################################################
-    # As in Blundell-Pistaferri-Preston, replace each variable by the residual of an
-    # OLS on observables (age polynomial + wife-employment dummy at the base period;
-    # add more columns to Zobs as needed, e.g. human capital m.sim.ih). Fit on the
-    # couple sample (sm) over finite obs; non-finite entries (wrap-around / log of 0)
-    # are left untouched and get masked out by the regression conditions downstream.
-    # (ΔWLP is intentionally NOT cleaned: employment is itself one of the observables.)
-    _age  = np.broadcast_to(np.arange(par.T)/par.T, (par.simN, par.T))[sample].astype(float)
-    _empl = (m.par.grid_wlp[m.sim.WLP] > 0)[sample].astype(float)   # wife employed, base period
-    Zobs  = np.column_stack([np.ones_like(_age), _age, _age**2, _age**3, _empl])
-
-    def _residualize(y, Z=Zobs, base=sm):
-        """y minus its OLS projection on observables Z (β fit on finite obs within base)."""
-        y = np.asarray(y, dtype=float); r = y.copy()
-        ok  = np.isfinite(y) & np.isfinite(Z).all(axis=1)
-        fit = ok & base
-        if fit.sum() > Z.shape[1]:
-            b = np.linalg.lstsq(Z[fit], y[fit], rcond=None)[0]
-            r[ok] = y[ok] - Z[ok] @ b
-        return r
-
-    # Single source of truth: every variable purged of observables (edit this list freely).
-    _clean = ['Δcm','Δcw','Δcp','Δd','ΔC','Δs','Δs1','Δsp','Δws',
-              'ΔYm','ΔYw','ΔY','ΔY_net','ΔY1m','ΔY1w','ΔY1','ΔY_1m','ΔY_1w','ΔY_1',
-              'ΔYYm','ΔYYw','ΔYY',
-              'ΔLCm','ΔLCw','ΔLws','ΔLC','ΔLd','ΔLYm','ΔLYw','ΔLY',
-              'Δzm','Δzw','ϵm_c','ϵw_c','Δϵm','Δϵw','Δz','Δϵ','Δtm','Δtw',
-              'Δlovm','Δlovw']
-    # NB: must be a plain for-loop, NOT a dict comprehension -- a comprehension has its
-    # own scope, so eval(nm) there can't see this function's locals (Δcm, ...).
-    _R = {}
-    for nm in _clean:
-        _R[nm] = _residualize(eval(nm))
-    (Δcm,Δcw,Δcp,Δd,ΔC,Δs,Δs1,Δsp,Δws,
-     ΔYm,ΔYw,ΔY,ΔY_net,ΔY1m,ΔY1w,ΔY1,ΔY_1m,ΔY_1w,ΔY_1,
-     ΔYYm,ΔYYw,ΔYY,
-     ΔLCm,ΔLCw,ΔLws,ΔLC,ΔLd,ΔLYm,ΔLYw,ΔLY,
-     Δzm,Δzw,ϵm_c,ϵw_c,Δϵm,Δϵw,Δz,Δϵ,Δtm,Δtw,
-     Δlovm,Δlovw) = (_R[nm] for nm in _clean)
-
 
     ##########################################################
     # Variance decomposition of individual consumption volatility
@@ -276,20 +303,20 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     #Notation: all: means all income Y; per: persistent shock, tra: transitory shock
     #all_x_y means shock of x's income on m's expenditure
-    indc={'all_m_m':ols(ΔYm,Δcm,sm),
-         'all_m_w':ols(ΔYm,Δcw,sm),
-         'all_w_m':ols(ΔYw,Δcm,smw),
-         'all_w_w':ols(ΔYw,Δcw,smw),     
-         'per_m_m':ols(Δzm,Δcm,sm),
-         'per_m_w':ols(Δzm,Δcw,sm),
-         'per_m_p':ols(Δzm,Δcp,sm),
-         'per_w_p':ols(Δzw,Δcp,sm),
-         'per_w_m':ols(Δzw,Δcm,smw),
-         'per_w_w':ols(Δzw,Δcw,smw),
-         'tra_m_m':ols(ϵm_c,Δcm,sm),
-         'tra_m_w':ols(ϵm_c,Δcw,sm),
-         'tra_w_m':ols(ϵw_c,Δcm,smw),
-         'tra_w_w':ols(ϵw_c,Δcw,smw)}
+    indc={'all_m_m':ols(ΔYm,Δcm,sm11),
+         'all_m_w':ols(ΔYm,Δcw,sm11),
+         'all_w_m':ols(ΔYw,Δcm,smw11),
+         'all_w_w':ols(ΔYw,Δcw,smw11),     
+         'per_m_m':ols(Δzm,Δcm,sm11, cov = (Δzw,ϵm_c,ϵw_c)),
+         'per_m_w':ols(Δzm,Δcw,sm11, cov = (Δzw,ϵm_c,ϵw_c)),
+         'per_m_p':ols(Δzm,Δcp,sm11),
+         'per_w_p':ols(Δzw,Δcp,smw11, cov = (Δzm,ϵm_c,ϵw_c)),
+         'per_w_m':ols(Δzw,Δcm,smw11, cov = (Δzm,ϵm_c,ϵw_c)),
+         'per_w_w':ols(Δzw,Δcw,smw11, cov = (Δzm,ϵm_c,ϵw_c)),
+         'tra_m_m':ols(ϵm_c,Δcm,sm1),
+         'tra_m_w':ols(ϵm_c,Δcw,sm1),
+         'tra_w_m':ols(ϵw_c,Δcm,smw1),
+         'tra_w_w':ols(ϵw_c,Δcw,smw1)}
     
     # Similar to above but in levels
     level={'all_m_m':ols(ΔLYm,ΔLCm,sm),
@@ -309,8 +336,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
           'level_w':ols(ΔLYw,ΔLws,sm)}
     
     #Effect of income shocks on WLP (in percentage points)
-    wlp= {'all_m':ols(Δtm,ΔWLP,sm),
-          'all_w':ols(Δtw,ΔWLP,sm),
+    wlp= {'all_m':ols(ΔYm,ΔWLP,sm),
+          'all_w':ols(ΔYm,ΔWLP,sm),
           'per_m':ols(Δzm,ΔWLP,sm),
           'per_w':ols(Δzw,ΔWLP,sm),
           'tra_m':ols(ϵm_c,ΔWLP,sm),
@@ -371,7 +398,34 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
              'yw_d':np.mean(ΔYYw[smw11]*Δd[smw11])/np.mean(ΔYw[smw11]*ΔYYw[smw11]),
              'yw_cm':np.mean(ΔYYw[smw11]*Δcm[smw11])/np.mean(ΔYw[smw11]*ΔYYw[smw11]),
              'yw_cw':np.mean(ΔYYw[smw11]*Δcw[smw11])/np.mean(ΔYw[smw11]*ΔYYw[smw11])}
-    
+
+    #Same BPP moments computed on NET (after-tax) income
+    BPP_MPC_net={'al_tot':np.mean(ΔY1_net[sm1]*ΔC[sm1])/np.mean(ΔY_net[sm1]*ΔY1_net[sm1]),
+             'al_d':np.mean(ΔY1_net[sm1]*Δd[sm1])/np.mean(ΔY_net[sm1]*ΔY1_net[sm1]),
+             'al_cm':np.mean(ΔY1_net[sm1]*Δcm[sm1])/np.mean(ΔY_net[sm1]*ΔY1_net[sm1]),
+             'al_cw':np.mean(ΔY1_net[sm1]*Δcw[sm1])/np.mean(ΔY_net[sm1]*ΔY1_net[sm1]),
+             'ym_tot':np.mean(ΔY1m_net[sm1]*ΔC[sm1])/np.mean(ΔYm_net[sm1]*ΔY1m_net[sm1]),
+             'ym_d':np.mean(ΔY1m_net[sm1]*Δd[sm1])/np.mean(ΔYm_net[sm1]*ΔY1m_net[sm1]),
+             'ym_cm':np.mean(ΔY1m_net[sm1]*Δcm[sm1])/np.mean(ΔYm_net[sm1]*ΔY1m_net[sm1]),
+             'ym_cw':np.mean(ΔY1m_net[sm1]*Δcw[sm1])/np.mean(ΔYm_net[sm1]*ΔY1m_net[sm1]),
+             'yw_tot':np.mean(ΔY1w_net[smw1]*ΔC[smw1])/np.mean(ΔYw_net[smw1]*ΔY1w_net[smw1]),
+             'yw_d':np.mean(ΔY1w_net[smw1]*Δd[smw1])/np.mean(ΔYw_net[smw1]*ΔY1w_net[smw1]),
+             'yw_cm':np.mean(ΔY1w_net[smw1]*Δcm[smw1])/np.mean(ΔYw_net[smw1]*ΔY1w_net[smw1]),
+             'yw_cw':np.mean(ΔY1w_net[smw1]*Δcw[smw1])/np.mean(ΔYw_net[smw1]*ΔY1w_net[smw1])}
+
+    BPP_PER_net={'al_tot':np.mean(ΔYY_net[sm11]*ΔC[sm11])/np.mean(ΔY_net[sm11]*ΔYY_net[sm11]),
+             'al_d':np.mean(ΔYY_net[sm11]*Δd[sm11])/np.mean(ΔY_net[sm11]*ΔYY_net[sm11]),
+             'al_cm':np.mean(ΔYY_net[sm11]*Δcm[sm11])/np.mean(ΔY_net[sm11]*ΔYY_net[sm11]),
+             'al_cw':np.mean(ΔYY_net[sm11]*Δcw[sm11])/np.mean(ΔY_net[sm11]*ΔYY_net[sm11]),
+             'ym_tot':np.mean(ΔYYm_net[sm11]*ΔC[sm11])/np.mean(ΔYm_net[sm11]*ΔYYm_net[sm11]),
+             'ym_d':np.mean(ΔYYm_net[sm11]*Δd[sm11])/np.mean(ΔYm_net[sm11]*ΔYYm_net[sm11]),
+             'ym_cm':np.mean(ΔYYm_net[sm11]*Δcm[sm11])/np.mean(ΔYm_net[sm11]*ΔYYm_net[sm11]),
+             'ym_cw':np.mean(ΔYYm_net[sm11]*Δcw[sm11])/np.mean(ΔYm_net[sm11]*ΔYYm_net[sm11]),
+             'yw_tot':np.mean(ΔYYw_net[smw11]*ΔC[smw11])/np.mean(ΔYw_net[smw11]*ΔYYw_net[smw11]),
+             'yw_d':np.mean(ΔYYw_net[smw11]*Δd[smw11])/np.mean(ΔYw_net[smw11]*ΔYYw_net[smw11]),
+             'yw_cm':np.mean(ΔYYw_net[smw11]*Δcm[smw11])/np.mean(ΔYw_net[smw11]*ΔYYw_net[smw11]),
+             'yw_cw':np.mean(ΔYYw_net[smw11]*Δcw[smw11])/np.mean(ΔYw_net[smw11]*ΔYYw_net[smw11])}
+
 
     ####################################################
     # Graph to make sure BPP captures well true shocks
@@ -579,6 +633,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
   
 
-    return {'indc':indc,'w_sh':w_sh,'totc':totc,'dins':dins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,'wlp':wlp,'level':level,'ins_dec':ins_dec,
+    return {'indc':indc,'w_sh':w_sh,'totc':totc,'dins':dins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,
+            'BPP_MPC_net':BPP_MPC_net,'BPP_PER_net':BPP_PER_net,'wlp':wlp,'level':level,'ins_dec':ins_dec,
             'vardec_w':vardec_wife,'vardec_m':vardec_husband,
             'shockdec':shockdec}

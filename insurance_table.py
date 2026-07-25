@@ -71,7 +71,7 @@ assets        = final_sample[:, 7] * np.mean(np.exp(h_income))
 # Parameterize the model
 # ---------------------------------------------------------------------------
 xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
-par = {'simN':N,'ω': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-20,dtype=np.int_)}
+par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
 model = brg.HouseholdModelClass(par=par)
 
 
@@ -93,7 +93,7 @@ izw[np.isnan(w_income)] = (model.par.num_pw * model.par.num_ϵw) // 2
 model.sim.init_z = izm * model.par.num_zm + izw
 model.sim.init_A = assets
 
-age = (np.cumsum(np.ones((model.par.simN, model.par.T)), axis=1) - 1) + 20
+age = (np.cumsum(np.ones((model.par.simN, model.par.T)), axis=1) - 1) + 25
 
 
 # ---------------------------------------------------------------------------
