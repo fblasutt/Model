@@ -62,12 +62,12 @@ indexes = np.array(np.random.choice(baseline_sample[:, 0], size=N, p=pr, replace
                    dtype=np.int32) - 1
 final_sample = baseline_sample[:, 1:][indexes]
 
-age_initial   = final_sample[:, 0]
+age_initial   = final_sample[:, 0]*0+25   # forced to 25, as in calibration.py (t=0 = age 25)
 age_final     = final_sample[:, 1]
 cw_cons_share = final_sample[:, 2]
 h_income      = final_sample[:, 3]
 w_income      = final_sample[:, 4]
-age_marriage  = final_sample[:, 5]
+age_marriage  = final_sample[:, 5]*0+25   # forced to 25, as in calibration.py
 year          = final_sample[:, 6]
 assets        = final_sample[:, 7] * np.mean(np.exp(h_income))
 
@@ -75,10 +75,10 @@ assets        = final_sample[:, 7] * np.mean(np.exp(h_income))
 # ---------------------------------------------------------------------------
 # Parameterize the model
 # ---------------------------------------------------------------------------
-# Internal parameters: [ω, σL, α, ρ, wedge, β]
-xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
+# Current estimates [η, σL, α, ρ, Ω, β] from the shared module (sync with calibration.py)
+from estimated_params import xc, par_dict
 
-par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
+par = par_dict(N, np.array(age_marriage-25,dtype=np.int_))
 model = brg.HouseholdModelClass(par=par)
 
 
@@ -167,8 +167,10 @@ def vardec_row(B, spouse, label):
     return row1 + r' \\[-0.5ex]' + '\n' + row2
 
 
-B_LC = insurance(m_LC, sample_LC, ...)
-B_FC = insurance(m_FC, sample_FC, ...)
+B_LC = insurance(m_LC, sample_LC, shock_type='permanent', shock_gender='Male',
+                 consumption_gender='Male', name_file='VardecLC', name_line='Limited commitment')
+B_FC = insurance(m_FC, sample_FC, shock_type='permanent', shock_gender='Male',
+                 consumption_gender='Male', name_file='VardecFC', name_line='Full commitment')
 
 table = '\n'.join([
     r'\textit{A. Wife} & & & & & & & \\',
@@ -200,7 +202,10 @@ with open(root + '/Output files/model/vardec.tex', 'w') as f:
 ###############################################################################
 
 INCOME_SHOCKS = ('zeta_w', 'zeta_m', 'eps_w', 'eps_m')
-LOVE_SHOCKS   = ('psi_w',  'psi_m')
+# Love shocks under the current model: ONE common persistent match-quality
+# component ψ (grid_love_/Πl_) plus iid ±Ω disagreement draws per gender
+# (trans_love; wife offset = state//2, husband offset = state%2).
+LOVE_SHOCKS   = ('psi', 'omega_w', 'omega_m')
 SHOCKS        = INCOME_SHOCKS + LOVE_SHOCKS
 
 
@@ -230,6 +235,10 @@ def _filter_transition(Pi, par, zero_set):
     """
     pw, ϵw, pm, ϵm = _component_arrays(par)
     n = len(pw)
+    # Mid-gridpoint is a TRUE zero only on an odd grid; on an even grid it is
+    # a positive shock and the ε-counterfactual is silently biased.
+    assert par.num_ϵw % 2 == 1 and par.num_ϵm % 2 == 1, \
+        "ε-zeroing needs an ODD num_ϵ grid (mid-point = 0). Set num_ϵw=num_ϵm=3 in Bargaining_numba.py."
     mid_ϵw = par.num_ϵw // 2
     mid_ϵm = par.num_ϵm // 2
 
@@ -259,22 +268,48 @@ def build_counterfactual_Pi(par, zero_set):
     return [_filter_transition(par.Π[t], par, income_zero) for t in range(par.T - 1)]
 
 
+def _disag_freeze(par, freeze_w, freeze_m):
+    """
+    Counterfactual 4-state disagreement transition: restrict the iid
+    trans_love to destinations that keep the frozen gender's ±Ω offset
+    unchanged (no new draws for that gender), then renormalize columns
+    ([post, initial] convention, matching how Πl is consumed). Freezing is
+    the right notion of 'zeroing' here: the offsets are ±Ω, there is no
+    zero state, and freezing kills all Δ-innovations while preserving the
+    initial cross-sectional heterogeneity.
+    """
+    n = par.trans_love.shape[0]                     # = 4 disagreement states
+    idx = np.arange(n)
+    T = np.zeros_like(par.trans_love)
+    for s in range(n):                              # source state (column)
+        mask = np.ones(n, dtype=bool)
+        if freeze_w: mask &= (idx // 2 == s // 2)   # wife offset unchanged
+        if freeze_m: mask &= (idx % 2  == s % 2)    # husband offset unchanged
+        col = np.where(mask, par.trans_love[:, s], 0.0)
+        T[:, s] = col / col.sum()
+    return T
+
+
 def build_counterfactual_Pil(par, zero_set):
     """
-    List of counterfactual love transitions par.Πl[t]. Since
-    par.Πl[t] = kron(par.Πlw[t], par.Πlm[t]), zeroing ψ^w replaces Πlw with I,
-    zeroing ψ^m replaces Πlm with I, zeroing both gives Πl = I.
+    List of counterfactual love transitions par.Πl[t]. In the current model
+        par.Πl[t] = kron(Πl_[t], trans_love):
+    a COMMON persistent match-quality component ψ times iid ±Ω disagreement
+    draws.
+        'psi'     zeroed ⇒ Πl_ replaced by the identity (no ψ innovations)
+        'omega_w' zeroed ⇒ wife's ±Ω offset frozen at its current value
+        'omega_m' zeroed ⇒ husband's ±Ω offset frozen
+    Initial draws (Πl0, sample-init states) are left untouched.
     """
     love_zero = zero_set & set(LOVE_SHOCKS)
     if not love_zero:
         return [Pi.copy() for Pi in par.Πl]
-    Iw = np.eye(par.num_lovew)
-    Im = np.eye(par.num_lovem)
+    I_psi = np.eye(par.num_lovew)
+    B = _disag_freeze(par, 'omega_w' in love_zero, 'omega_m' in love_zero)
     out = []
     for t in range(par.T - 1):
-        Aw = Iw if 'psi_w' in love_zero else par.Πlw[t]
-        Am = Im if 'psi_m' in love_zero else par.Πlm[t]
-        out.append(np.kron(Aw, Am))
+        A = I_psi if 'psi' in love_zero else par.Πl_[t]
+        out.append(np.kron(A, B))
     return out
 
 

@@ -27,24 +27,30 @@ N=10_000#sample size
 #Import information for the sample, then store the relevant variables
 baseline_sample=np.array(pd.read_excel(root+'/Output files/data_sample.csv'))
 
+#Without those two lines below there are nan which screw up things
+baseline_sample=baseline_sample[~np.isnan(baseline_sample).any(axis=1)]
+baseline_sample[:, 0] = np.arange(len(baseline_sample))
+
 pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
 indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
-final_sample= baseline_sample[:,1:][indexes] 
+final_sample= baseline_sample[:,1:][indexes]
 
-age_initial=final_sample[:,0]
+age_initial=final_sample[:,0]*0+25 # forced to 25, as in calibration.py; also prevents
+                                   # negative sample_init (data has age_initial=24 for ~5%)
 age_final=final_sample[:,1]
 cw_cons_share=final_sample[:,2]
 h_income=final_sample[:,3]
 w_income=final_sample[:,4]
-age_marriage=final_sample[:,5]
+age_marriage=final_sample[:,5]*0+25 # forced to 25, as in calibration.py
+assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 
-# Parametrization: [ω,σL,α,χ,wedge]
-xc=np.array([0.37341742, 0.02075481, 0.95942081, 1.94180964, 1.04444599])
+#Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py)
+from estimated_params import xc, par_dict
 
-#Parametrize the model
-par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'χ':xc[3],'wedge':xc[4]}
-model = brg.HouseholdModelClass(par=par)  
+#Parametrize the model (NB: position 4 is Ω, the match-quality disagreement shock)
+par = par_dict(N, np.array(age_initial-25,dtype=np.int_))
+model = brg.HouseholdModelClass(par=par)
 
 
 
@@ -52,19 +58,20 @@ model = brg.HouseholdModelClass(par=par)
 # Set the initial conditions for the couples based on baseline sample
 #####################################################################
 
-#We start simulating the agent at age_initial
-model.par.sample_init=age_initial-25
-
 #Given the parameters, set the initial pareto weight for couples
 param=(cw_cons_share/(1.0-cw_cons_share))**model.par.ρ
 model.sim.init_power=param/(1.0+param)
 
 #Set the initial income gridpoints for income, the closest to our value
-izm=np.array([np.argmin(np.abs(np.log(model.par.grid_zm)[int(model.par.sample_init[i]),:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+gridzw=model.par.grid_zw[:,:,np.linspace(0,model.par.num_z-1,model.par.num_zm,dtype=np.int_)]
+gridzm=model.par.grid_zm[:,:,:model.par.num_zw]
+
+izm=np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]),0,:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
-izw=np.array([np.argmin(np.abs(np.log(model.par.grid_zw)[int(model.par.sample_init[i]),:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
-izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
+izw=np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]),0,:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2
 model.sim.init_z=izm*model.par.num_zm+izw
+model.sim.init_A=assets
 
 
 
@@ -96,9 +103,9 @@ for i in range(len(gridτ)):
                                     M.par.Π=usr.labor_income(M.par) 
                                     
                                     
-    # income shocks grids: singles and couples
-    M.par.grid_zw,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
-        M.par.grid_zm,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
+    # income shocks grids: SINGLES (grid_zws/grid_zms; do not overwrite couples' grids)
+    M.par.grid_zws,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
+        M.par.grid_zms,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
                                             M.par.Πs=usr.labor_income(M.par,single=True) 
     M.solve() 
     M.simulate()  
@@ -119,9 +126,9 @@ for i in range(len(gridτ)):
                                     Mf.par.Π=usr.labor_income(Mf.par)
 
 
-    # income shocks grids: singles and couples
-    Mf.par.grid_zw,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
-        Mf.par.grid_zm,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
+    # income shocks grids: SINGLES (grid_zws/grid_zms; do not overwrite couples' grids)
+    Mf.par.grid_zws,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
+        Mf.par.grid_zms,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
                                             Mf.par.Πs=usr.labor_income(Mf.par,single=True)
 
     Mf.solve()

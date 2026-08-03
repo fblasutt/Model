@@ -36,23 +36,22 @@ pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
 indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
 final_sample= baseline_sample[:,1:][indexes] 
 
-age_initial=final_sample[:,0]
+age_initial=final_sample[:,0]*0+25 # forced to 25, as in calibration.py (t=0 = age 25)
 age_final=final_sample[:,1]
 cw_cons_share=final_sample[:,2]
 h_income=final_sample[:,3]
 w_income=final_sample[:,4]
-age_marriage=final_sample[:,5]
+age_marriage=final_sample[:,5]*0+25 # forced to 25, as in calibration.py
 year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 
 
-#target 0.065 + real pension function+love sd=0.15
-xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
+#Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py)
+from estimated_params import xc, par_dict
 
-
-#Parametrize the model 
-par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
+#Parametrize the model (NB: position 4 is Ω, the match-quality disagreement shock)
+par = par_dict(N, np.array(age_marriage-25,dtype=np.int_))
 model=brg.HouseholdModelClass(par=par)
 
 

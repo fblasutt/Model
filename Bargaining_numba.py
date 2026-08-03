@@ -121,7 +121,7 @@ class HouseholdModelClass(EconModelClass):
         par.σL = 0.1; par.σL0 = 0.00001
         
         # productivity of men and women: gridpoints
-        par.num_ϵw=2;par.num_ϵm=2#transitory
+        par.num_ϵw=2;par.num_ϵm=2#transitory (ODD: mid-gridpoint = true zero, needed by shock-decomposition counterfactuals)
         par.num_pw=3;par.num_pm=3#persistent
         par.num_zw=par.num_pw*par.num_ϵw;par.num_zm=par.num_pm*par.num_ϵw#total by gender
         par.num_z=par.num_zm*par.num_zw#total, couple
@@ -313,7 +313,14 @@ class HouseholdModelClass(EconModelClass):
         sim.init_A =  np.zeros(par.simN)                               # Assets 
         sim.init_lovew = np.ones(par.simN,dtype=np.int32)*par.num_lovew//2#w's initial love 
         sim.init_lovem = np.ones(par.simN,dtype=np.int32)*par.num_lovem//2#m's initial love 
-        sim.init_love = sim.init_lovew*par.num_lovem+sim.init_lovem          #initial love 
+        sim.init_love = sim.init_lovew*par.num_lovem+sim.init_lovem          #initial love
+
+        # Optional override of the initial-love draw at sample_init:
+        #  -1 (default) = use the random draw inside simulate_lifecycle;
+        # >=0           = force this love grid index. Used by the experiments to
+        # transplant the LC baseline's initial-love draws into FC runs so that
+        # cross-regime comparisons start from identical per-agent love states.
+        sim.force_init_love = -np.ones(par.simN,dtype=np.int32)
         sim.init_z  = np.zeros(par.simN,dtype=np.int32)                  # Initial income index
 
                        
@@ -863,11 +870,15 @@ def simulate_lifecycle(sim,sol,par):
             #BELOW YOUACTICATE HETEROGENEITY IN INITIAL MATCH QUALITY
             if t==par.sample_init[i]:
     
-                #Initial condition for assets
-                A[i,t] = sim.init_A[i]; Aw[i,t] =  par.div_A_share * A[i,t];  Am[i,t] =  (1.0-par.div_A_share) * A[i,t]
+                #Initial condition for assets. Data wealth can be NEGATIVE (~31% of the
+                #JPSC sample holds net debt) but the model has no borrowing (grid_A>=0):
+                #project indebted households onto the constraint A=0. Feeding negative
+                #assets extrapolates policies below the grid and corrupts the whole path.
+                A[i,t] = max(sim.init_A[i],0.0); Aw[i,t] =  par.div_A_share * A[i,t];  Am[i,t] =  (1.0-par.div_A_share) * A[i,t]
                 
                 #Initial love shock: common love is central value, treansitory shocks are drawn
                 initial[i]=par.num_lovem//2*par.num_love//par.num_lovem+usr.mc_simulate(0,par.trans_love,shock_love[i,t])#
+                if sim.force_init_love[i]>=0: initial[i]=sim.force_init_love[i] # optional LC->FC love transplant
 
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation) 
             # copy determines when to copy from previous period or use initial condition. This matters because
@@ -937,8 +948,14 @@ def simulate_lifecycle(sim,sol,par):
                 # Obtain household resources
                 M_resources_raw, incmt,incwt,incmgt,incwgt,taxc = usr.resources_couple(par,t,ih[i,t],iz[i,t],A[i,t])
                 incm[i,t]=incmt[wlp[i,t]];incw[i,t]=incwt[wlp[i,t]];incmg[i,t]=incmgt;incwg[i,t]=incwgt[wlp[i,t]];tax[i,t]=taxc[wlp[i,t]]
-                M_resources= M_resources_raw[wlp[i,t]] 
-                
+                M_resources= M_resources_raw[wlp[i,t]]
+
+                # Enforce feasibility (no-borrowing, as in the solution's grid_A>=0):
+                # policy interpolation near/below the asset-grid floor can overshoot
+                # resources; without this clamp A' goes negative and consumption
+                # eventually turns negative (NaN logs in the pass-through analysis).
+                C_tot[i,t] = min(max(C_tot[i,t], 1e-6), M_resources)
+
                 if t< par.simT-1:A[i,t+1] = M_resources - C_tot[i,t]#
                 if t< par.simT-1:Aw[i,t+1] =       par.div_A_share * A[i,t+1]# in case of divorce 
                 if t< par.simT-1:Am[i,t+1] = (1.0-par.div_A_share) * A[i,t+1]# in case of divorce 
@@ -965,10 +982,6 @@ def simulate_lifecycle(sim,sol,par):
                 Cm_tot[i,t] = linear_interp.interp_1d(par.grid_Am,sol_single_m,Am[i,t])   
                 C_tot[i,t]  = Cw_tot[i,t] + Cm_tot[i,t]
                               
-                home=1 if t>=par.Tr else 0
-                Cw[i,t],dw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home)
-                Cm[i,t],dm[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home)
-
                 #Labor supply
                 wlp[i,t]=par.num_wlp-1 if t<par.Tr else 0
                 
@@ -980,6 +993,16 @@ def simulate_lifecycle(sim,sol,par):
                 # update end-of-period states
                 Mw = par.R*Aw[i,t] + incw[i,t] # total resources woman
                 Mm = par.R*Am[i,t] + incm[i,t] # total resources man
+
+                # Enforce feasibility (no-borrowing), then allocate: the intraperiod
+                # split must use the CLAMPED totals, so it runs after incomes/resources.
+                Cw_tot[i,t] = min(max(Cw_tot[i,t], 1e-6), Mw)
+                Cm_tot[i,t] = min(max(Cm_tot[i,t], 1e-6), Mm)
+                C_tot[i,t]  = Cw_tot[i,t] + Cm_tot[i,t]
+
+                home=1 if t>=par.Tr else 0
+                Cw[i,t],dw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home)
+                Cm[i,t],dm[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home)
 
                 if t< par.simT-1: 
                     #if par.women[i]: Aw[i,t+1] = Mw - Cw_tot[i,t]; Am[i,t+1] = Aw[i,t+1]*par.div_A_share

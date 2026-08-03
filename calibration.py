@@ -76,8 +76,7 @@ marr_durr_pol=final_sample[:,8]
 
 
 
-xc=np.array([9.59993703, 0.03871525, 0.93100763, 1.72343712, 1.2026561 ,
-       0.973201  ])
+xc=np.array([9.59993703, 0.03871525, 0.93100763, 1.70843712, 1.2026561,  0.973201])
 
 xl=np.array([2.2,0.001,0.78 ,1.0,0.01,0.96]) 
 xu=np.array([12.2,0.15 ,0.96 ,2.5 ,7.5 ,1.005]) 
@@ -137,11 +136,18 @@ def q(pt,table=False):
     M_bef = model.copy(name='numba_new_copy')
    
     M_bef.par.η=pt[0]
-    M_bef.par.α=pt[2] 
+    M_bef.par.α=pt[2]
     M_bef.par.ρ=pt[3]
-    M_bef.par.Ω=pt[4]    
+    M_bef.par.Ω=pt[4]
     M_bef.par.β=pt[5]
-    
+
+    # Initial Pareto weights depend on ρ: recompute them with pt[3] so the
+    # in-loop economy matches a fresh run parametrized at pt. (The module-top
+    # init_power was built with the construction-time ρ and is otherwise just
+    # copied along, making the reported fit at pt differ from a restart at pt.)
+    param_pt=(cw_cons_share/(1.0-cw_cons_share))**pt[3]
+    M_bef.sim.init_power=param_pt/(1.0+param_pt)
+
     M_bef.par.grid_love_,M_bef.par.Πl_,M_bef.par.Πl0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew) # initial sd absorbs 5 unmodeled years (age-25 start)
 
 
@@ -462,7 +468,7 @@ def q(pt,table=False):
 
     
     # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
-    #if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time)
+    if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time)
   
     #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
     fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.0139)/.0139),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-2.634)/2.634)]#,(AWE+0.03)/0.03]   
@@ -560,13 +566,11 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
     PHa,PWa=simple_extract(root+'/Empirical analysis/Tables/elasticity_all_earnings.txt')
     
     # Table with pass throughs in the data and in the model
-    table=r'...any husband shocks & \textbf{'+p33(B['indc']['all_m_m'])+'}/\\textcolor{red}{'+PHa['hus']+'} & \\textbf{'+p33(B['indc']['all_m_w'])+'}/\\textcolor{red}{'+PHa['wif']+'} & \\textbf{'+p33(B['dins']['all_m'])+'}/\\textcolor{red}{'+PHa['com']+'}  & \\textbf{'+p33(B['w_sh']['all_m'])+'}/\\textcolor{red}{'+PHa['wif_rel']+'} \\\\ '+\
-          r'...any wife shocks    & \textbf{'+p33(B['indc']['all_w_m'])+'}/\\textcolor{red}{'+PWa['hus']+'} & \\textbf{'+p33(B['indc']['all_w_w'])+'}/\\textcolor{red}{'+PWa['wif']+'} & \\textbf{'+p33(B['dins']['all_w'])+'}/\\textcolor{red}{'+PWa['com']+'}  & \\textbf{'+p33(B['w_sh']['all_w'])+'}/\\textcolor{red}{'+PWa['wif_rel']+'} \\\\[1.5ex] '+\
-          r'...persistent husband shocks & \textbf{'+p33(B['BPP_PER']['ym_cm'])+'}/\\textcolor{red}{'+PHp['hus']+'} & \\textbf{'+p33(B['BPP_PER']['ym_cw'])+'}/\\textcolor{red}{'+PHp['wif']+'} &  \\\\ '+\
-          r'...persistent wife shocks    & \textbf{'+p33(B['BPP_PER']['yw_cm'])+'}/\\textcolor{red}{'+PWp['hus']+'} & \\textbf{'+p33(B['BPP_PER']['yw_cw'])+'}/\\textcolor{red}{'+PWp['wif']+'} & \\\\[1.5ex] '+\
-          r'...transitory husband shocks   & \textbf{'+p33(B['BPP_MPC']['ym_cm'])+'}/\\textcolor{red}{'+PHt['hus']+'} & \\textbf{'+p33(B['BPP_MPC']['ym_cw'])+'}/\\textcolor{red}{'+PHt['wif']+'} &  \\\\ '+\
-          r'...transitory wife shocks    & \textbf{'+p33(B['BPP_MPC']['yw_cm'])+'}/\\textcolor{red}{'+PWt['hus']+'} & \\textbf{'+p33(B['BPP_MPC']['yw_cw'])+'}/\\textcolor{red}{'+PWt['wif']+'}   &   \\\\\\bottomrule '
-    
+    # Table with pass throughs in the data and in the model
+    table=r'...persistent husband shocks & \textbf{'+p33(B['BPP_PER']['ym_cm'])+'}/\\textit{\\textcolor{orange}{0.429}} & \\textbf{'+p33(B['BPP_PER']['ym_cw'])+'}/\\textit{\\textcolor{orange}{0.175}} &  \\\\ '+\
+          r'...persistent wife shocks    & \textbf{'+p33(B['BPP_PER']['yw_cm'])+'}/\\textit{\\textcolor{orange}{0.029}} & \\textbf{'+p33(B['BPP_PER']['yw_cw'])+'}/\\textit{\\textcolor{orange}{0.281}} & \\\\[1.5ex] '+\
+          r'...transitory husband shocks & \textbf{'+p33(B['BPP_MPC']['ym_cm'])+'}/\\textit{\\textcolor{orange}{0.060}} & \\textbf{'+p33(B['BPP_MPC']['ym_cw'])+'}/\\textit{\\textcolor{orange}{0.055}} &  \\\\ '+\
+          r'...transitory wife shocks    & \textbf{'+p33(B['BPP_MPC']['yw_cm'])+'}/\\textit{\\textcolor{orange}{0.006}} & \\textbf{'+p33(B['BPP_MPC']['yw_cw'])+'}/\\textit{\\textcolor{orange}{0.038}}   &   \\\\\\bottomrule '
     
     with open(root+'/Output files/model/elasticity_BPP_model_vs_data.tex', 'w') as f: f.write(table); f.close() 
     
@@ -579,12 +583,12 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
           r'\begin{tabular}{lccc} \toprule '+\
           r'Estimated Parameters &  & Value & Target Moment  \\ '+\
           r' \midrule '+\
-          r'Match-quality shock (persistent), std.\ dev.       & $\sigma_{\psi}$   & '+p42(pt[1])+' & Annual divorce rate'+' \\\\'+\
-          r'Match-quality shock (transitory), std.\ dev.       & $\sigma_{\xi}$   & '+p42(pt[4])+r" & Effect of pension reform on wife's consumption share"+' \\\\'+\
-          r'Risk aversion, private goods                       & $\rho$         & '+p42(pt[3])+' & Total consumption to home-good expenditure elasticity'+' \\\\'+\
-          r'Weight on home goods                               & $\alpha$          & '+p42(pt[2])+' & Expenditure share of home goods'+'  \\\\'+\
-          r'Disutility of employment                           & $\eta$            & '+p42(pt[0])+' & Employment rate of married women'+' \\\\'+\
-          r'Discount factor                                    & $\beta$            & '+p42(pt[5])+r" & Wealth to husband's earnings ratio"+' \\\\'+\
+          r'Pers.\ match-quality shock, s.d.   & $\sigma_{\psi}$ & '+p42(pt[1])+' & Annual divorce rate'+' \\\\'+\
+          r'Trans.\ match-quality shock, s.d.  & $\sigma_{\xi}$  & '+p42(pt[4])+r" & Reform effect on wife's cons.\ share"+' \\\\'+\
+          r'Risk aversion, private goods       & $\rho$          & '+p42(pt[3])+r' & Home-exp.\ elasticity to total cons.'+' \\\\'+\
+          r'Weight on home goods               & $\alpha$        & '+p42(pt[2])+' & Expenditure share of home goods'+'  \\\\'+\
+          r'Disutility of employment           & $\eta$          & '+p42(pt[0])+r' & Empl.\ rate of married women'+' \\\\'+\
+          r'Discount factor                    & $\beta$         & '+p42(pt[5])+r" & Wealth/husband's earnings"+' \\\\'+\
           r' \bottomrule '+\
           r'\end{tabular}'+\
           r'\end{table}'
@@ -610,7 +614,7 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
         r'Non-targeted Moments & Data  & Model \\'+\
         r'\midrule '+\
         r'Female-to-male earnings ratio, workers  & '+p43(0.532)+' & '+p43(gender_gap_earnings)+'\\\\'+\
-        r"Wife's employment response to husband's income shocks & "+p43(-0.041)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
+        r"Wife's employment response to husband's income shocks & "+p43(-0.023)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
         r'\bottomrule '+\
         r'\end{tabular}'+\
         r'\end{table}'
@@ -653,7 +657,7 @@ if __name__ == '__main__':
         # print(f'The objective value at the min is {fx}') 
         
         # Estimate the model
-        res=dfols.solve(q, xc, rhobeg = 0.3, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
+        res=dfols.solve(q, xc, rhobeg = 0.01, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
                     npt=len(xc)+5,scaling_within_bounds=True,   
                     user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
                                   'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  

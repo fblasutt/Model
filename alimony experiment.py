@@ -35,27 +35,22 @@ pr=np.ones(baseline_sample.shape[0])/baseline_sample.shape[0]
 indexes=np.array(np.random.choice(baseline_sample[:,0], size=N, p=pr, replace=True),dtype=np.int32)-1
 final_sample= baseline_sample[:,1:][indexes] 
 
-age_initial=final_sample[:,0]
+age_initial=final_sample[:,0]*0+25 # forced to 25, as in calibration.py (t=0 = age 25)
 age_final=final_sample[:,1]
 cw_cons_share=final_sample[:,2]
 h_income=final_sample[:,3]
 w_income=final_sample[:,4]
-age_marriage=final_sample[:,5]
+age_marriage=final_sample[:,5]*0+25 # forced to 25, as in calibration.py
 year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
 
 
-#target 0.065 + real pension function+love sd=0.15
-xc=np.array([0.55, 0.1       , 0.85, 1.2, 0.929     ,1.        ])
+#Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py)
+from estimated_params import xc, par_dict
 
-
-# Lower and higher bounds of parameters
-xl=np.array([0.00001,0.000082,0.1,0.5,0.01]) 
-xu=np.array([0.8,0.4,0.999,2.5,1.0]) 
-
-#Parametrize the model 
-par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge':xc[4],'β':xc[5],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
+#Parametrize the model (NB: position 4 is Ω, the match-quality disagreement shock)
+par = par_dict(N, np.array(age_marriage-25,dtype=np.int_))
 model=brg.HouseholdModelClass(par=par)
 
 
@@ -96,21 +91,48 @@ age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 #Grid of alimony values we will consider
 gridτ=np.linspace(0.0,0.1,3)
 
-#This list will store all them models we solve and simulate
-Bmodel=list()
+#These lists will store all the models we solve and simulate
+Bmodel=list() #limited commitment
+Bfmodel=list()#full commitment
 
 
-#Solve and simulate the model
+#Solve and simulate the model - limited commitment
 for i in range(len(gridτ)):
 
     # Set up the model - limited commitment
-    M = model.copy(name='numba_new_copy')    
-    M.par.alimony=gridτ[i]    
-  
-    M.solve() 
-    M.simulate()  
+    M = model.copy(name='numba_new_copy')
+    M.par.alimony=gridτ[i]
+
+    M.solve()
+    M.simulate()
     Bmodel.append(M)
- 
+
+
+#Solve and simulate the model - full commitment
+for i in range(len(gridτ)):
+
+    # Set up the model - full commitment
+    Mf = model.copy(name='numba_new_copy')
+    Mf.par.alimony=gridτ[i]
+
+    Mf.par.full=True
+
+    Mf.solve()
+
+    # Equalize the initial-love draw with the matching LC simulation so that
+    # cross-regime comparisons are apples-to-apples. (FC's mutual-consent PC
+    # at sample-init is laxer than LC's individual PC, so without this step
+    # FC ends up with a wider initial-love distribution than LC.)
+    init_love_lc = np.array(
+        [Bmodel[i].sim.love[k, int(Bmodel[i].par.sample_init[k])]
+         for k in range(Bmodel[i].par.simN)],
+        dtype=np.int_,
+    )
+    Mf.sim.force_init_love[:] = init_love_lc
+
+    Mf.simulate()
+    Bfmodel.append(Mf)
+
 
 
 #########################################
@@ -119,9 +141,9 @@ for i in range(len(gridτ)):
 
 
 #We take individuals that stays married across spefifications
-age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh   
-alwayscouple=np.array([Bmodel[i].sim.couple_lag==1  for i in range(len(gridτ))])
-alwayscouplep=np.array([Bmodel[i].sim.couple==1  for i in range(len(gridτ))])
+age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh
+alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
+alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])
 
 sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
 sample1=np.roll(sample,1,axis=1)
@@ -132,8 +154,9 @@ sample1=np.roll(sample,1,axis=1)
 #Insurance analysis
 ########################################
 
-#List with results
-Bgrid=list()
+#Lists with results
+Bgrid=list() #limited commitment
+Bfgrid=list()#full commitment
 
 
 #Names of the file and of the table line associated with a model version (if gridτ has len()>3, names should be adapted)
@@ -142,19 +165,30 @@ Names_line=['Baseline', 'Alimony, low', 'Alimony, high']
 
 #Obtain pass-throughs and do the decomposition calling function insurance
 for i in range(len(gridτ)):
-    
-    sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1)
-   
+
+    sample   = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1)
+    sample_f = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bfmodel[i].sim.couple_lag==1)
+
     B=insurance(Bmodel[i],sample,
                 shock_type='permanent',
                 shock_gender='Male',
                 consumption_gender='Male',
                 name_file=Names[i],
                 name_line=Names_line[i])
-    
+
     B['par']=gridτ[i]
     Bgrid.append(B)
-    
+
+    Bf=insurance(Bfmodel[i],sample_f,
+                 shock_type='permanent',
+                 shock_gender='Male',
+                 consumption_gender='Male',
+                 name_file=Names[i]+'full',
+                 name_line=Names_line[i])
+
+    Bf['par']=gridτ[i]
+    Bfgrid.append(Bf)
+
 
 
     
