@@ -7,6 +7,7 @@ Created on Fri Feb 23 15:31:56 2024
  
 import numpy as np 
 import Bargaining_numba as brg  
+import init_conditions as ic
 import UserFunctions_numba as usr 
 import pandas as pd
 from reg_cons_insurance import insurance
@@ -44,6 +45,12 @@ age_marriage=final_sample[:,5]*0+25 # forced to 25, as in calibration.py
 year=final_sample[:,6]
 assets=final_sample[:,7]*np.mean(np.exp(h_income))
 
+# Pre-drawn uniforms for the posterior-draw initial income split (drawn AFTER
+# the sample so sample selection is unchanged; FIXED across evaluations so
+# SMM objectives stay deterministic)
+u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
+σME2_init=0.0  # measurement-error variance in observed entry income (0 = off)
+
 
 
 #Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py)
@@ -68,9 +75,9 @@ model.sim.init_power=param/(1.0+param)
 gridzw=model.par.grid_zw[:,:,np.linspace(0,model.par.num_z-1,model.par.num_zm,dtype=np.int_)]
 gridzm=model.par.grid_zm[:,:,:model.par.num_zw]
 
-izm=np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]),0,:,0]-h_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,model.par.grid_ϵm,u_init_m,σME2=σME2_init)
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
-izw=np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]),0,:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
+izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
 model.sim.init_z=izm*model.par.num_zm+izw
 model.sim.init_A=assets
@@ -188,6 +195,56 @@ for i in range(len(gridτ)):
 
     Bf['par']=gridτ[i]
     Bfgrid.append(Bf)
+
+
+#########################################################
+# Volatility ladder (waterfall) tables: consumption
+# volatility by insurance channel. All rungs are exact
+# sample variances on identical cells; the '=' rows are
+# risk levels remaining at each stage of the budget flow,
+# the '-' rows the variance absorbed by the channel in
+# between (telescoping is exact). Six columns:
+# (LC, FC) x alimony levels; one table per spouse.
+#########################################################
+
+def waterfall_table(gender):
+    Ls=[Bgrid[i]['vol_ladder'] for i in range(len(gridτ))] \
+      +[Bfgrid[i]['vol_ladder'] for i in range(len(gridτ))]
+    alloc = 'alloc_m' if gender=='m' else 'alloc_w'
+    Vlast = 'V_cm'    if gender=='m' else 'V_cw'
+    who   = 'Husband' if gender=='m' else 'Wife'
+    v=lambda x:'%.2f'%(100.0*x)
+    rows=[]
+    def level(label,key,bold=False):
+        cells=[v(L[key]) for L in Ls]
+        if bold: cells=[r'\textbf{'+c+'}' for c in cells]
+        rows.append(('$=$ ' if rows else '')+label+' & '+' & '.join(cells))
+    def absorbed(label,key):
+        rows.append(r'\quad $-$ '+label+' & '+' & '.join(v(L[key]) for L in Ls))
+    level('Potential household income risk','V_pot')
+    absorbed('non-participation (risk concentration)','compos')
+    level('Earnings risk, fixed participation','V_fp')
+    absorbed('participation changes','partchg')
+    level('Earnings risk','V_Y')
+    absorbed('taxes','taxes');                              level('Net income risk','V_Ynet')
+    absorbed('savings','savings');                          level('Household consumption risk','V_C')
+    absorbed('private/public expenditure shift','pubpriv'); level('Private consumption risk','V_cp')
+    absorbed('intra-household allocation',alloc);           level(who+' consumption risk',Vlast,bold=True)
+    return (' \\\\\n'.join(rows))
+
+with open(root+'/Output files/model/volladder_alimony_m.tex','w') as f: f.write(waterfall_table('m'))
+with open(root+'/Output files/model/volladder_alimony_w.tex','w') as f: f.write(waterfall_table('w'))
+
+# Console echo with the exact telescoping check
+for tag,grid in (('LC',Bgrid),('FC',Bfgrid)):
+    for i in range(len(gridτ)):
+        L=grid[i]['vol_ladder']
+        print(f"{tag} {Names_line[i]:14s}: V_pot={100*L['V_pot']:.2f} compos={100*L['compos']:.2f} "
+              f"partchg={100*L['partchg']:.2f} V_Y={100*L['V_Y']:.2f} tax={100*L['taxes']:.2f} "
+              f"sav={100*L['savings']:.2f} pub/priv={100*L['pubpriv']:.2f} "
+              f"alloc_m={100*L['alloc_m']:.2f} -> V_cm={100*L['V_cm']:.2f}  "
+              f"alloc_w={100*L['alloc_w']:.2f} -> V_cw={100*L['V_cw']:.2f}  "
+              f"[resid {L['resid_m']:.1e}/{L['resid_w']:.1e}, cells {L['n_cells']}]")
 
 
 

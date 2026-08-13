@@ -43,7 +43,8 @@ class HouseholdModelClass(EconModelClass):
         par.ρ = 1.5     # Risk avresion private goods
         par.χ = 2.0    # Risk aversion home goods
         par.α = 0.35    # Weight on home good
-        par.wedge=0.0#35   #Single-couple utility wedge
+        par.wedge_w=0.0   #Single-couple utility wedge, wife
+        par.wedge_m=0.0   #Single-couple utility wedge, husband
         par.Ω=0.0
         
         # Income processes: tren and shocks (sd of persistent (σpi), transitory (σϵi), initial (σ0i) income shocks)
@@ -51,7 +52,7 @@ class HouseholdModelClass(EconModelClass):
         # ι0+ι1·s+ι2·s²; substituting s=t+5 gives the coefficients below, so the
         # profile at model age t equals the old profile at t+5.
         par.ι0m= 0.0;       par.ι1m=.0497715; par.ι2m=-.0010579 #trend for husband
-        par.ι0w=  -.2895476;     par.ι1w=.0497715; par.ι2w=-.0010579 #trend for wife
+        par.ι0w=  -.47;     par.ι1w=.0497715; par.ι2w=-.0010579 #trend for wife
  
         # par.ι0m= -0.224+5*0.046+25*(-0.00075858); par.ι1m=0.046+10*(-0.00075858); par.ι2m=-0.00075858 #trend for husband
         # par.ι0w= -0.591+5*0.046+25*(-0.00075858); par.ι1w=0.046+10*(-0.00075858); par.ι2w=-0.00075858 #trend for wife
@@ -60,7 +61,7 @@ class HouseholdModelClass(EconModelClass):
         # σ0 absorbs 5 periods of persistent innovations (age-25 start): the
         # cross-sectional dispersion at t=0 now equals what the age-20 model
         # implied at age 25, so income grids/transitions match the old t+5 ones.
-        par.σzm=.0102609**0.5  ;par.σϵm=.0100159 **0.5;par.σ0m= 0.15**0.5; #shock size husband
+        par.σzm=.0102609**0.5  ;par.σϵm=.0100159**0.5;par.σ0m= 0.15**0.5; #shock size husband
         par.σzw=.0251831**0.5;  par.σϵw=.01069**0.5 ;par.σ0w= 0.15**0.5; #shock size wife
         
         # par.σzm=0.0082**0.5  ;par.σϵm= 0.0125**0.5;par.σ0m=  (0.0338+5*0.0082)**0.5; #shock size husband
@@ -73,7 +74,7 @@ class HouseholdModelClass(EconModelClass):
         par.κ=0.219    #proportional part of pension
         
         # Depreciation of human capital
-        par.μ = 0.85599 #1.195/5        # Human capital depreciation drift
+        par.μ = 0.514#0.85599 #1.195/5        # Human capital depreciation drift
         par.p_μ = 1/20.0#5.0/40.0   # Probability that  human capital depreciates
         
         # Home good production:  Q = (θ·home_time^ν + (1-θ)·x^ν)^(1/ν)
@@ -81,7 +82,7 @@ class HouseholdModelClass(EconModelClass):
         par.θ = 0.08 # Weight on home_time (vs. money) in home production
         par.η = 0.08   # Labor disutility from working
         par.ϕ = 0.326  # Time spend on public goods by singles
-        par.px = 1.42# Price of durables for couples (equivalence scale on d_pub)
+        par.px = 1.57# Price of durables for couples (equivalence scale on d_pub)
         
         # Taxes
         par.Λ=0.8471                              # 1- tax level
@@ -102,23 +103,22 @@ class HouseholdModelClass(EconModelClass):
         #Divorce period and grid
         par.num_perdiv = 40 # one divorce period per working year (t=0 is age 25 -> Tr=40). MUST divide Tr
         par.Dper = int(par.Tr/par.num_perdiv)
-        assert par.num_perdiv<=par.Tr and par.Tr%par.num_perdiv==0, 'num_perdiv must divide Tr (Dper=Tr/num_perdiv would be 0 or leave years unmapped)'
+        #assert par.num_perdiv<=par.Tr and par.Tr%par.num_perdiv==0, 'num_perdiv must divide Tr (Dper=Tr/num_perdiv would be 0 or leave years unmapped)'
         
         # Wealth
-        par.num_A = 15;par.max_A = 75.0
+        par.num_A = 9;par.max_A = 75.0
         
         # Bargaining power
-        par.num_power = 11
+        par.num_power = 7
         par.power_min=1e-3;par.power_max=1.0-par.power_min
         
         # Women's human capital states
-        par.num_h = 1
         par.num_h = 2
 
         # love/match quality
         par.num_lovew = 3;par.num_lovem = 3;
-        par.num_love=par.num_lovem*4
-        par.σL = 0.1; par.σL0 = 0.00001
+        par.num_love=par.num_lovew*par.num_lovem
+        par.σL = 0.1; par.σL0 = 0.1 # σL0: PERMANENT love heterogeneity across couples (t=0 grid width ±σL0*sqrt(2); median point stays 0, so unconstrained couples start at zero love)
         
         # productivity of men and women: gridpoints
         par.num_ϵw=2;par.num_ϵm=2#transitory (ODD: mid-gridpoint = true zero, needed by shock-decomposition counterfactuals)
@@ -159,45 +159,34 @@ class HouseholdModelClass(EconModelClass):
         par.grid_wlp=np.array([0.0,0.698])#np.array([0.0,0.823])
         par.num_wlp=len(par.grid_wlp)
         
-        # Match quality shock grid and transition matrices  
-        # Love grids pre-widened by the 5 unmodeled years (age-25 start): initial sd
-        # = sqrt(σL0²+5σL²) makes grids/transitions at t equal the old age-20 model's
-        # at t+5 exactly (love still starts at 0 = middle grid point at marriage).
-        par.grid_love_,par.Πl_,par.Πl0_= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovew)
-        
-  
-        disagw=np.array([-par.Ω,-par.Ω, par.Ω,par.Ω])
-        disagm=np.array([-par.Ω, par.Ω,-par.Ω,par.Ω])
-        par.trans_love=np.array([[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25],[0.25,0.25,0.25,0.25]])
-        
-        par.grid_lovew=[(par.grid_love_[t][:,None]+disagw[None,:]).ravel() for t in range(par.T)]
-        par.grid_lovem=[(par.grid_love_[t][:,None]+disagm[None,:]).ravel() for t in range(par.T)]
-        
-        par.Πl=[np.kron(par.Πl_[t],par.trans_love)  for t in range(par.T-1)]
-        par.Πl0=[np.kron(par.Πl0_[t],par.trans_love)  for t in range(par.T-1)]
+        # Match quality shock grid and transition matrices
+        # TWO individual-specific random-walk love shocks (ψw, ψm), both with
+        # innovation sd σL and initial value 0 (σL0 ≈ 0 → both spouses start at
+        # the middle grid point at marriage). Joint index iL = iψw*num_lovem + iψm,
+        # matching the kron [post,initial] column-stochastic convention.
+        par.grid_lovew_,par.Πlw_,par.Πlw0_= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovew)
+        par.grid_lovem_,par.Πlm_,par.Πlm0_= usr.rouw_nonst(par.T,par.σL,par.σL0,par.num_lovem)
+
+        par.grid_lovew=[np.repeat(par.grid_lovew_[t],par.num_lovem) for t in range(par.T)]
+        par.grid_lovem=[np.tile(par.grid_lovem_[t],par.num_lovew) for t in range(par.T)]
+
+        par.Πl=[np.kron(par.Πlw_[t],par.Πlm_[t])   for t in range(par.T-1)]
+        par.Πl0=[np.kron(par.Πlw0_[t],par.Πlm0_[t]) for t in range(par.T-1)]
  
         
         # Bargaining power grid. non-linear grid with more mass in both tails.        
         par.grid_power = usr.grid_fat_tails(par.power_min,par.power_max,par.num_power)
         
         # Women's human capital grid plus transition matrices for working full time (Πh_pt) and not working (Πh_pt)       
-        par.grid_h = np.flip(np.linspace(-par.num_h*par.μ,0.0,par.num_h)) if par.num_h>1 else np.zeros(par.num_h)#0 position is best
+        par.grid_h = np.flip(np.linspace(-par.μ,0.0,par.num_h)) if par.num_h>1 else np.zeros(par.num_h)#0 position is best
 
         Πh_pt = np.eye(par.num_h) if par.num_h>1 else np.ones(par.num_h) # Perfect transition if full-time participation...
         Πh_nt = np.array([[1-par.p_μ, par.p_μ], [0, 1]]).T  if par.num_h>1 else np.ones(par.num_h)  # ...depreciation otherwise
-        # Here a fix that works with more than 2 human capital states, TOCHECK
-        # OLF transition: from state i stay with prob 1-p_μ, drop one step (i -> i+1) with prob p_μ; bottom rung absorbing.                                                                                                           
-        # Built in [from,to] convention then transposed to the [to,from] convention used downstream.               
-        if par.num_h>1:                                                                                            
-            Πh_nt_ft = (1.0-par.p_μ)*np.eye(par.num_h)                                                             
-            for _i in range(par.num_h-1):                                                                          
-                Πh_nt_ft[_i, _i+1] = par.p_μ                                                                       
-            Πh_nt_ft[-1, -1] = 1.0                                                                                 
-            Πh_nt = Πh_nt_ft.T                                                                                     
-        else:                                                                                                      
-            Πh_nt = np.ones(par.num_h)  # ...depreciation otherwise       
 
-        par.Πh_t = np.array([w*Πh_pt + (1-w)*Πh_nt for w in par.grid_wlp])  if par.num_h>1 else np.array([np.eye(par.num_h) for w in par.grid_wlp])# Work-hour weighted transitions
+        # Any work (wlp>0) fully protects human capital: depreciation risk only
+        # in non-working periods (NOT hour-weighted — a part-time worker is as
+        # protected as a full-time one, matching the returns-to-experience target).
+        par.Πh_t = np.array([Πh_pt if w>0 else Πh_nt for w in par.grid_wlp])  if par.num_h>1 else np.array([np.eye(par.num_h) for w in par.grid_wlp])
         identity_block = np.tile(np.eye(par.num_h), (par.num_wlp, 1, 1))   #stops depreciating at retirement
         par.Πh = [par.Πh_t if t < par.Tr else identity_block for t in range(par.T)]
         
@@ -344,13 +333,91 @@ class HouseholdModelClass(EconModelClass):
                 solve_couple(sol,par,t)
     
                      
+    def rationalize_init_love(self,agents=None,verbose=True):
+        """
+        Pre-pass before simulation (LC only): couples whose ENTRY state
+        (init_z, init_A, init_power, init_ih) cannot sustain the match at the
+        MEDIAN initial love — no bargaining weight on the grid satisfies both
+        participation constraints, so the kernel would divorce them at
+        t=sample_init although they are married in the data — get the MINIMAL
+        initial love that rationalizes the observed marriage (revealed
+        preference), written into sim.force_init_love. Escalation ladder:
+        +1 love gridpoint for the spouse whose surplus at the initial weight
+        is most negative; if still infeasible +1 for the other; then +2/+1,
+        alternating, clipped at the grid edge. Agents with force_init_love
+        already set (e.g. the LC->FC transplant) are untouched; agents
+        infeasible even at (max,max) are left to divorce and counted.
+        Mirrors the entry check in simulate_lifecycle exactly
+        (Vw/Vm_remain_couple over the power grid vs singles at split assets).
+        """
+        par=self.par;sol=self.sol;sim=self.sim
+        if par.full: return          # FC entry rule (mutual consent) differs; use the transplant
+        if getattr(self,'_init_love_rationalized',False): return
+        nlw,nlm=par.num_lovew,par.num_lovem
+        med_w,med_m=nlw//2,nlm//2
+        n_checked=0;n_fixed=0;n_infeasible=0;bump_hist={}
+
+        for i in range(par.simN):
+            if agents is not None and not agents[i]: continue  # optional subset (e.g. by entry regime)
+            if sim.force_init_love[i]>=0: continue
+            if sim.init_couple[i]==0: continue
+            t=int(par.sample_init[i])
+            if t>=par.Tr: continue
+            n_checked+=1
+            ih0=int(sim.init_ih[i]);iz0=int(sim.init_z[i])
+            A0=max(sim.init_A[i],0.0)
+            Aw0=par.div_A_share*A0;Am0=(1.0-par.div_A_share)*A0
+            Vsw=np.interp(Aw0,par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih0,iz0])
+            Vsm=np.interp(Am0,par.grid_Am,sol.Vm_single[t,t//par.Dper,ih0,iz0])
+
+            def _surplus(iLw,iLm):
+                iL=iLw*nlm+iLm
+                Sw=np.array([np.interp(A0,par.grid_A,sol.Vw_remain_couple[t,ih0,iz0,iP,iL])
+                             for iP in range(par.num_power)])-Vsw
+                Sm=np.array([np.interp(A0,par.grid_A,sol.Vm_remain_couple[t,ih0,iz0,iP,iL])
+                             for iP in range(par.num_power)])-Vsm
+                return Sw,Sm
+
+            Sw,Sm=_surplus(med_w,med_m)
+            if np.any((Sw>=0.0)&(Sm>=0.0)): continue   # feasible at median: default applies
+
+            # binding spouse = more negative surplus at the INITIAL bargaining weight
+            w_binds=np.interp(sim.init_power[i],par.grid_power,Sw) \
+                   <=np.interp(sim.init_power[i],par.grid_power,Sm)
+
+            # escalation ladder: binding+1, other+1, binding+1, ... clipped at grid edge
+            bw=0;bm=0;placed=False
+            for step in range(2*max(nlw,nlm)):
+                if (step%2==0)==w_binds: bw+=1
+                else:                    bm+=1
+                iLw=min(med_w+bw,nlw-1);iLm=min(med_m+bm,nlm-1)
+                Sw,Sm=_surplus(iLw,iLm)
+                if np.any((Sw>=0.0)&(Sm>=0.0)):
+                    sim.force_init_love[i]=iLw*nlm+iLm
+                    n_fixed+=1
+                    key=(iLw-med_w,iLm-med_m)
+                    bump_hist[key]=bump_hist.get(key,0)+1
+                    placed=True;break
+                if iLw==nlw-1 and iLm==nlm-1: break
+            if not placed: n_infeasible+=1
+
+        self._init_love_rationalized=True
+        if verbose and n_checked>0:
+            print(f"rationalize_init_love: {n_checked} couples checked, "
+                  f"{n_fixed} rationalized {dict(sorted(bump_hist.items()))} (bumps wife,husband), "
+                  f"{n_infeasible} infeasible even at max love (divorce at entry)")
+
     def simulate(self):
-        
-        with jit(self) as model:    
-            
+
+        # Rationalize initial love where the median would divorce the couple
+        # at entry (LC only; no-op if already done or force_init_love is set)
+        self.rationalize_init_love()
+
+        with jit(self) as model:
+
             #Import parameter, policy functions and simulations arrays
             par = model.par; sol = model.sol; sim = model.sim
-            
+
             #Call routing performing the simulation
             simulate_lifecycle(sim,sol,par)
              
@@ -365,7 +432,7 @@ def solve_intraperiod(sol,par):
         sol.pre_d_pub, sol.pre_Cw_priv, sol.pre_Cm_priv, par.grid_marg_u, par.grid_marg_u_for_inv, par.grid_marg_u_s,\
         par.grid_cpriv_s, par.grid_marg_uw, par.grid_marg_um
         
-    pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px)
+    pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge_w,par.wedge_m,par.px)
     ϵ = 1e-8# delta increase in xs to compute numerical deratives
 
     ################ Singles part #####################
@@ -381,7 +448,7 @@ def solve_intraperiod(sol,par):
                     female=False
                     
                 
-                pars_sex=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home,female)
+                pars_sex=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,0.0,par.px,0.0,0.0,home,female)# singles: wedge slot inert (couple=0)
                 
                 # optimize to get util from total consumption(m<->C_tot)=private cons(c)+public cons(m-c)
                 grid_cpriv_s[i,iwlp,g] = usr.optimizer(lambda c,m,p:-usr.util(c,m-c,*p),ϵ,C_tot-ϵ,args=(C_tot,pars_sex))[0]
@@ -402,7 +469,7 @@ def solve_intraperiod(sol,par):
                     power=par.grid_power[iP]  
                     mult = power**(1/par.ρ)/(power**(1/par.ρ)+(1-power)**(1/par.ρ)) 
                      
-                    parss=(par.ρ,par.χ,par.α,par.ν,par.θ,par.ϕ,par.wedge,par.px)
+                    parss=(par.ρ,par.χ,par.α,par.ν,par.θ,par.ϕ,0.0,par.px)# wedge unused in couple_root FOC
                    
                     home_time=2.0 if (ret==1) else 1-wlp
 
@@ -523,7 +590,7 @@ def solve_single_egm(sol,par,t):
                         iwlp=0
                         home=1.0
                         
-                        pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home,women)
+                        pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,0.0,par.px,0.0,0.0,home,women)
                         
                         resi = par.R*grid_Ai+usr.income_single(par,t,iwlp,iD,ih,iz,grid_Ai,women)[0]
                         ci[iwlp,iD,ih,iz,:] = resi.copy() #consume all resources
@@ -546,7 +613,7 @@ def solve_single_egm(sol,par,t):
                             else:#men
                                 home = 1.0 if wlp==0 else 0.0
                             
-                            pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home,women)
+                            pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,0.0,par.px,0.0,0.0,home,women)
                         
                             # marginal utility of assets next period (continuation is
                             # labor-choice independent: full-time/identity HC transition)
@@ -655,7 +722,7 @@ def solve_remain_couple_egm(par,sol,t):
     i_Vw,i_Vm,i_Vc,i_C_tot,wls=np.zeros((5,par.num_wlp,par.num_h,par.num_z,par.num_power,par.num_love,par.num_A)) 
     Vw,Vm=np.zeros((2,par.num_h,par.num_z,par.num_power,par.num_love,par.num_A)) 
         
-    pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px)
+    pars=(par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge_w,par.wedge_m,par.px)
     for iL in prange(par.num_love): 
         for ih in range(par.num_h):
             for iz in range(par.num_z):
@@ -877,7 +944,7 @@ def simulate_lifecycle(sim,sol,par):
                 A[i,t] = max(sim.init_A[i],0.0); Aw[i,t] =  par.div_A_share * A[i,t];  Am[i,t] =  (1.0-par.div_A_share) * A[i,t]
                 
                 #Initial love shock: common love is central value, treansitory shocks are drawn
-                initial[i]=par.num_lovem//2*par.num_love//par.num_lovem+usr.mc_simulate(0,par.trans_love,shock_love[i,t])#
+                initial[i]=(par.num_lovew//2)*par.num_lovem+par.num_lovem//2# both spouses start at ψ=0 (middle grid point)
                 if sim.force_init_love[i]>=0: initial[i]=sim.force_init_love[i] # optional LC->FC love transplant
 
             # Copy variables from t-1 or initial condition. Initial (t>0) assets: preamble (later in the simulation) 
@@ -1001,8 +1068,8 @@ def simulate_lifecycle(sim,sol,par):
                 C_tot[i,t]  = Cw_tot[i,t] + Cm_tot[i,t]
 
                 home=1 if t>=par.Tr else 0
-                Cw[i,t],dw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home)
-                Cm[i,t],dm[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,par.wedge,par.px,0.0,0.0,home)
+                Cw[i,t],dw[i,t] = usr.intraperiod_allocation_single(Cw_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,0.0,par.px,0.0,0.0,home)
+                Cm[i,t],dm[i,t] = usr.intraperiod_allocation_single(Cm_tot[i,t],par.ρ,par.χ,par.α,par.ν,par.θ,par.η,par.ϕ,0.0,par.px,0.0,0.0,home)
 
                 if t< par.simT-1: 
                     #if par.women[i]: Aw[i,t+1] = Mw - Cw_tot[i,t]; Am[i,t+1] = Aw[i,t+1]*par.div_A_share

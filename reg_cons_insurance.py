@@ -53,7 +53,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     # responds to the very shocks whose pass-through we measure; controlling for it
     # would absorb part of the behavioral response (age polynomial only, as in
     # simulated-BPP exercises a la Kaplan-Violante).
-    _Zp    = np.stack([np.ones_like(_aget),_aget,_aget**2,_aget**3],axis=-1)
+    _Zp    = np.stack([np.ones_like(_aget),_aget,_aget**2],axis=-1)
     _Zflat = _Zp.reshape(-1,_Zp.shape[-1])
     _fitok = (m.sim.couple==1).ravel()                                # fit on couples
 
@@ -201,17 +201,30 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     
     # Change in WLP
     ΔWLP=np.array([(m.par.grid_wlp[m.sim.WLP][sample1]>0)],dtype=np.float64)[0]-np.array([(m.par.grid_wlp[m.sim.WLP][sample]>0)],dtype=np.float64)[0]
-    
+    DH=40*np.array([(m.par.grid_wlp[m.sim.WLP][sample1])],dtype=np.float64)[0]-40*np.array([(m.par.grid_wlp[m.sim.WLP][sample])],dtype=np.float64)[0]
     #Love shock changes
     lovw,lovm=np.zeros((2,m.par.simN,m.par.T))
     
-    for i in range(par.T):lovw[:,i]=par.grid_lovew[i][m.sim.love[:,i]//par.num_lovem]
-    for i in range(par.T):lovm[:,i]=par.grid_lovem[i][m.sim.love[:,i]%par.num_lovew]
+    # grid_lovew/grid_lovem are FLAT joint-index arrays (length num_love =
+    # num_lovew*num_lovem, built by repeat/tile in setup_grids), so they are
+    # indexed with the joint love state directly.
+    for i in range(par.T):lovw[:,i]=par.grid_lovew[i][m.sim.love[:,i]]
+    for i in range(par.T):lovm[:,i]=par.grid_lovem[i][m.sim.love[:,i]]
     
     # BPP first stage on love panels, then difference
     lovw=_residualize(lovw); lovm=_residualize(lovm)
     Δlovw=lovw[sample1]-lovw[sample]
     Δlovm=lovm[sample1]-lovm[sample]
+
+    # Human-capital depreciation shock (wife only; XHm=0 in labor_income).
+    # grid_h[ih] is the ADDITIVE log-earnings component of the h state — it is
+    # NOT part of grid_pw (labor_income returns XPw = RW component only), so
+    # without this series depreciation events would load on the shockdec
+    # residual. Its first difference is the one-time depreciation event (-mu).
+    hw=np.zeros((par.simN,par.T))
+    for t in range(par.T): hw[:,t]=par.grid_h[m.sim.ih[:,t]]
+    hw=_residualize(hw)
+    Δhw=hw[sample1]-hw[sample]
 
     ##########################################################
     # Variance decomposition of individual consumption volatility
@@ -336,7 +349,7 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
           'level_w':ols(ΔLYw,ΔLws,sm)}
     
     #Effect of income shocks on WLP (in percentage points)
-    wlp= {'all_m':ols(ΔYm,ΔWLP,sm),
+    wlp= {'all_m':ols(ΔYm,DH,(sm) & (age[sample]<40)),
           'all_w':ols(ΔYm,ΔWLP,sm),
           'per_m':ols(Δzm,ΔWLP,sm),
           'per_w':ols(Δzw,ΔWLP,sm),
@@ -475,7 +488,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     # List of (shock_name, innovation_array) pairs.
     _shock_list = [('zeta_w', Δzw), ('zeta_m', Δzm),
                    ('eps_w',  Δϵw), ('eps_m',  Δϵm),
-                   ('psi_w',  Δlovw), ('psi_m', Δlovm)]
+                   ('psi_w',  Δlovw), ('psi_m', Δlovm),
+                   ('dep_w',  Δhw)]   # wife's human-capital depreciation event
 
     def _shockdec(target, cond, shocks=_shock_list):
         """
@@ -524,6 +538,8 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
 
     # Run the decomposition for each target of interest
     shockdec = {
+        'Y'     : _shockdec(ΔY,     sm),   # gross household earnings
+        'Ynet'  : _shockdec(ΔY_net, sm),   # net (after-tax) household earnings
         'Cw'    : _shockdec(Δcw, sm),   # wife private consumption
         'Cm'    : _shockdec(Δcm, sm),   # husband private consumption
         'Cpriv' : _shockdec(Δcp, sm),   # within-couple private (cw+cm)
@@ -531,6 +547,98 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
         'sw'    : _shockdec(Δs,  sm),   # wife's private share
         'sm'    : _shockdec(Δs1, sm),   # husband's private share
     }
+
+
+    ##########################################################
+    # Potential household income (top of the volatility ladder)
+    ##########################################################
+    # grid_zw = exp(trend + z + eps + h): the wife's potential-earnings grid
+    # INCLUDES the human-capital component, so potential income risk includes
+    # DEPRECIATION risk. resources_couple sets incwg = grid_zw*grid_wlp[wlp]
+    # pre-retirement, so for a working wife potential (at working hours) and
+    # actual earnings coincide EXACTLY — the wedges below are then pure
+    # composition / participation-change effects.
+    Yw_pot=np.zeros((par.simN,par.T))
+    for t in range(par.T):
+        fac=par.grid_wlp[par.num_wlp-1] if t<par.Tr else 1.0
+        for i in range(par.simN):
+            Yw_pot[i,t]=par.grid_zw[t,ID[i,t],m.sim.iz[i,t],m.sim.ih[i,t]]*fac
+
+    lypot=_residualize(np.log(m.sim.incmg+Yw_pot))
+    ΔY_pot=lypot[sample1]-lypot[sample]     # potential household income growth
+
+    # Fixed-participation income: the wife's earnings enter with her
+    # PREVIOUS-period participation status (post-retirement pension income is
+    # always included, matching the actual income definition). At the base
+    # period of each growth cell this panel equals actual household income,
+    # so ΔY_fp = log Y^{fp}_{t+1} − log Y_t holds participation fixed at its
+    # base-period status. (Base value from the actual-income panel: the
+    # residualization-profile difference between the two panels is second
+    # order in growth.)
+    Plag=np.zeros((par.simN,par.T))
+    Plag[:,1:]=(m.sim.WLP>0)[:,:-1]
+    Plag[:,0] =(m.sim.WLP>0)[:,0]
+    Plag[:,par.Tr:]=1.0
+    lyfp=_residualize(np.log(m.sim.incmg+Plag*Yw_pot))
+    ΔY_fp=lyfp[sample1]-ly[sample]
+
+
+    ##########################################################
+    # Volatility ladder: consumption volatility by INSURANCE CHANNEL
+    ##########################################################
+    # Walk the variance of growth down the budget flow, ALL rungs exact sample
+    # variances (of genuine log-of-sum panels, no share-weighting) on
+    # IDENTICAL cells:
+    #   V_pot  = Var(ΔY_pot)  potential household income (wife at working
+    #                          hours regardless of status; incl. depreciation)
+    #   V_fp   = Var(ΔY_fp)   earnings at base-period participation
+    #   V_Y    = Var(ΔY)      actual gross household earnings growth
+    #   V_Ynet = Var(ΔY_net)  after taxes
+    #   V_C    = Var(ΔC)      after self-insurance (total consumption)
+    #   V_cp   = Var(Δcp)     after the private/public expenditure split
+    #   V_cg   = Var(Δc^g)    after intra-household allocation, per spouse
+    # Contributions telescope EXACTLY:
+    #   compos = V_pot−V_fp (non-participation: single-earner couples lose
+    #            income diversification, so this is typically NEGATIVE),
+    #   partchg = V_fp−V_Y (participation entries/exits: added-worker
+    #            responses absorb, churn adds),
+    #   taxes = V_Y−V_Ynet, savings = V_Ynet−V_C, pubpriv = V_C−V_cp,
+    #   alloc_g = V_cp−V_cg, and V_pot − Σ contributions = V_cg.
+    # Each step equals −[Var(new wedge) + 2Cov(upstream flow, new wedge)]: a
+    # smoothing channel is positive through its negative covariance with
+    # upstream risk; NEGATIVE entries are informative (channel adds
+    # volatility, e.g. renegotiation for the disfavored spouse, or love-shock
+    # risk arriving mid-ladder in the savings rung).
+
+    def _vol_ladder(cond):
+        # identical cells at every rung: require all pieces finite
+        ok = cond & np.isfinite(ΔY_pot) & np.isfinite(ΔY_fp) & np.isfinite(ΔY) \
+                  & np.isfinite(ΔY_net) & np.isfinite(ΔC) \
+                  & np.isfinite(Δcp) & np.isfinite(Δcm) & np.isfinite(Δcw)
+        V = lambda x: float(np.var(x[ok], ddof=1))
+        V_pot, V_fp = V(ΔY_pot), V(ΔY_fp)
+        V_Y, V_Ynet, V_C = V(ΔY), V(ΔY_net), V(ΔC)
+        V_cp, V_cm, V_cw = V(Δcp), V(Δcm), V(Δcw)
+        out = {
+            'V_pot': V_pot, 'V_fp': V_fp,
+            'V_Y': V_Y, 'V_Ynet': V_Ynet, 'V_C': V_C,
+            'V_cp': V_cp, 'V_cm': V_cm, 'V_cw': V_cw,
+            'compos':  V_pot  - V_fp,     # non-participation (risk concentration)
+            'partchg': V_fp   - V_Y,      # participation changes (entries/exits)
+            'taxes':   V_Y    - V_Ynet,   # progressive taxation
+            'savings': V_Ynet - V_C,      # self-insurance (net income -> consumption)
+            'pubpriv': V_C    - V_cp,     # private/public expenditure shift (C -> cw+cm)
+            'alloc_m': V_cp   - V_cm,     # intra-HH (bargaining) allocation, husband
+            'alloc_w': V_cp   - V_cw,     # intra-HH (bargaining) allocation, wife
+            'n_cells': int(ok.sum()),
+        }
+        # Exact telescoping check
+        chain = out['compos']+out['partchg']+out['taxes']+out['savings']+out['pubpriv']
+        out['resid_m'] = V_pot - (chain+out['alloc_m']) - V_cm
+        out['resid_w'] = V_pot - (chain+out['alloc_w']) - V_cw
+        return out
+
+    vol_ladder = _vol_ladder(sm)
 
 
 
@@ -636,4 +744,4 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     return {'indc':indc,'w_sh':w_sh,'totc':totc,'dins':dins,'BPP_MPC':BPP_MPC,'BPP_PER':BPP_PER,
             'BPP_MPC_net':BPP_MPC_net,'BPP_PER_net':BPP_PER_net,'wlp':wlp,'level':level,'ins_dec':ins_dec,
             'vardec_w':vardec_wife,'vardec_m':vardec_husband,
-            'shockdec':shockdec}
+            'shockdec':shockdec,'vol_ladder':vol_ladder}

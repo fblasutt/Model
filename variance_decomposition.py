@@ -29,6 +29,7 @@ import numpy as np
 import pandas as pd
 
 import Bargaining_numba as brg
+import init_conditions as ic
 from reg_cons_insurance import insurance
 
 
@@ -71,6 +72,12 @@ age_marriage  = final_sample[:, 5]*0+25   # forced to 25, as in calibration.py
 year          = final_sample[:, 6]
 assets        = final_sample[:, 7] * np.mean(np.exp(h_income))
 
+# Pre-drawn uniforms for the posterior-draw initial income split (drawn AFTER
+# the sample so sample selection is unchanged; FIXED across evaluations so
+# SMM objectives stay deterministic)
+u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
+σME2_init=0.0  # measurement-error variance in observed entry income (0 = off)
+
 
 # ---------------------------------------------------------------------------
 # Parameterize the model
@@ -91,11 +98,9 @@ model.sim.init_power = param / (1.0 + param)
 gridzw = model.par.grid_zw[:, :, np.linspace(0, model.par.num_z - 1, model.par.num_zm, dtype=np.int_)]
 gridzm = model.par.grid_zm[:, :, :model.par.num_zw]
 
-izm = np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]), 0, :, 0] - h_income[i]))
-                for i in range(model.par.simN)], dtype=np.int32)
+izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,model.par.grid_ϵm,u_init_m,σME2=σME2_init)
 izm[np.isnan(h_income)] = (model.par.num_pm * model.par.num_ϵm) // 2
-izw = np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]), 0, :, 0] - w_income[i]))
-                for i in range(model.par.simN)], dtype=np.int32)
+izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)] = (model.par.num_pw * model.par.num_ϵw) // 2
 model.sim.init_z = izm * model.par.num_zm + izw
 model.sim.init_A = assets
@@ -202,10 +207,9 @@ with open(root + '/Output files/model/vardec.tex', 'w') as f:
 ###############################################################################
 
 INCOME_SHOCKS = ('zeta_w', 'zeta_m', 'eps_w', 'eps_m')
-# Love shocks under the current model: ONE common persistent match-quality
-# component ψ (grid_love_/Πl_) plus iid ±Ω disagreement draws per gender
-# (trans_love; wife offset = state//2, husband offset = state%2).
-LOVE_SHOCKS   = ('psi', 'omega_w', 'omega_m')
+# Love shocks under the current model: TWO individual-specific random-walk
+# love shocks (ψw, ψm), initial value 0, joint index iL = iψw*num_lovem + iψm.
+LOVE_SHOCKS   = ('psi_w', 'psi_m')
 SHOCKS        = INCOME_SHOCKS + LOVE_SHOCKS
 
 
@@ -227,28 +231,24 @@ def _component_arrays(par):
 def _filter_transition(Pi, par, zero_set):
     """
     Filter income transition matrix Pi by zeroing transitions that violate
-    the constraints in zero_set, then renormalize each column.
+    the constraints in zero_set, then renormalize each column. Every shut
+    shock is FROZEN at its current value, so it keeps the t=0 entry draw
+    (from init_z) for the whole simulation:
         ζ^w zeroed  ⇒  pw' = pw
         ζ^m zeroed  ⇒  pm' = pm
-        ε^w zeroed  ⇒  ϵw' = num_ϵw // 2  (mid-grid = zero transitory)
-        ε^m zeroed  ⇒  ϵm' = num_ϵm // 2
+        ε^w zeroed  ⇒  ϵw' = ϵw
+        ε^m zeroed  ⇒  ϵm' = ϵm
     """
     pw, ϵw, pm, ϵm = _component_arrays(par)
     n = len(pw)
-    # Mid-gridpoint is a TRUE zero only on an odd grid; on an even grid it is
-    # a positive shock and the ε-counterfactual is silently biased.
-    assert par.num_ϵw % 2 == 1 and par.num_ϵm % 2 == 1, \
-        "ε-zeroing needs an ODD num_ϵ grid (mid-point = 0). Set num_ϵw=num_ϵm=3 in Bargaining_numba.py."
-    mid_ϵw = par.num_ϵw // 2
-    mid_ϵm = par.num_ϵm // 2
 
     Pi_new = Pi.copy()
     for j in range(n):  # source state
         mask = np.ones(n, dtype=bool)
         if 'zeta_w' in zero_set: mask &= (pw == pw[j])
         if 'zeta_m' in zero_set: mask &= (pm == pm[j])
-        if 'eps_w'  in zero_set: mask &= (ϵw == mid_ϵw)
-        if 'eps_m'  in zero_set: mask &= (ϵm == mid_ϵm)
+        if 'eps_w'  in zero_set: mask &= (ϵw == ϵw[j])
+        if 'eps_m'  in zero_set: mask &= (ϵm == ϵm[j])
         col_filtered = np.where(mask, Pi_new[:, j], 0.0)
         s = col_filtered.sum()
         if s > 0:
@@ -268,47 +268,24 @@ def build_counterfactual_Pi(par, zero_set):
     return [_filter_transition(par.Π[t], par, income_zero) for t in range(par.T - 1)]
 
 
-def _disag_freeze(par, freeze_w, freeze_m):
-    """
-    Counterfactual 4-state disagreement transition: restrict the iid
-    trans_love to destinations that keep the frozen gender's ±Ω offset
-    unchanged (no new draws for that gender), then renormalize columns
-    ([post, initial] convention, matching how Πl is consumed). Freezing is
-    the right notion of 'zeroing' here: the offsets are ±Ω, there is no
-    zero state, and freezing kills all Δ-innovations while preserving the
-    initial cross-sectional heterogeneity.
-    """
-    n = par.trans_love.shape[0]                     # = 4 disagreement states
-    idx = np.arange(n)
-    T = np.zeros_like(par.trans_love)
-    for s in range(n):                              # source state (column)
-        mask = np.ones(n, dtype=bool)
-        if freeze_w: mask &= (idx // 2 == s // 2)   # wife offset unchanged
-        if freeze_m: mask &= (idx % 2  == s % 2)    # husband offset unchanged
-        col = np.where(mask, par.trans_love[:, s], 0.0)
-        T[:, s] = col / col.sum()
-    return T
-
-
 def build_counterfactual_Pil(par, zero_set):
     """
-    List of counterfactual love transitions par.Πl[t]. In the current model
-        par.Πl[t] = kron(Πl_[t], trans_love):
-    a COMMON persistent match-quality component ψ times iid ±Ω disagreement
-    draws.
-        'psi'     zeroed ⇒ Πl_ replaced by the identity (no ψ innovations)
-        'omega_w' zeroed ⇒ wife's ±Ω offset frozen at its current value
-        'omega_m' zeroed ⇒ husband's ±Ω offset frozen
-    Initial draws (Πl0, sample-init states) are left untouched.
+    Counterfactual love transitions: par.Πl[t] = kron(Πlw_[t], Πlm_[t]) with
+    joint index iL = iψw*num_lovem + iψm.
+        'psi_w' zeroed ⇒ wife's RW factor replaced by the identity
+        'psi_m' zeroed ⇒ husband's RW factor replaced by the identity
+    A frozen RW keeps its current level; since both spouses enter at ψ = 0,
+    freezing kills the shock entirely. Initial draws (Πl0) are untouched.
     """
     love_zero = zero_set & set(LOVE_SHOCKS)
     if not love_zero:
         return [Pi.copy() for Pi in par.Πl]
-    I_psi = np.eye(par.num_lovew)
-    B = _disag_freeze(par, 'omega_w' in love_zero, 'omega_m' in love_zero)
+    I_w = np.eye(par.num_lovew)
+    I_m = np.eye(par.num_lovem)
     out = []
     for t in range(par.T - 1):
-        A = I_psi if 'psi' in love_zero else par.Πl_[t]
+        A = I_w if 'psi_w' in love_zero else par.Πlw_[t]
+        B = I_m if 'psi_m' in love_zero else par.Πlm_[t]
         out.append(np.kron(A, B))
     return out
 

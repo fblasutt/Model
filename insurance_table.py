@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 import Bargaining_numba as brg
+import init_conditions as ic
 from reg_cons_insurance import insurance
 
 
@@ -66,6 +67,12 @@ age_marriage  = final_sample[:, 5]*0+25   # forced to 25, as in calibration.py
 year          = final_sample[:, 6]
 assets        = final_sample[:, 7] * np.mean(np.exp(h_income))
 
+# Pre-drawn uniforms for the posterior-draw initial income split (drawn AFTER
+# the sample so sample selection is unchanged; FIXED across evaluations so
+# SMM objectives stay deterministic)
+u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
+σME2_init=0.0  # measurement-error variance in observed entry income (0 = off)
+
 
 # ---------------------------------------------------------------------------
 # Parameterize the model
@@ -86,11 +93,9 @@ model.sim.init_power = param / (1.0 + param)
 gridzw = model.par.grid_zw[:, :, np.linspace(0, model.par.num_z - 1, model.par.num_zm, dtype=np.int_)]
 gridzm = model.par.grid_zm[:, :, :model.par.num_zw]
 
-izm = np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]), 0, :, 0] - h_income[i]))
-                for i in range(model.par.simN)], dtype=np.int32)
+izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,model.par.grid_ϵm,u_init_m,σME2=σME2_init)
 izm[np.isnan(h_income)] = (model.par.num_pm * model.par.num_ϵm) // 2
-izw = np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]), 0, :, 0] - w_income[i]))
-                for i in range(model.par.simN)], dtype=np.int32)
+izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)] = (model.par.num_pw * model.par.num_ϵw) // 2
 model.sim.init_z = izm * model.par.num_zm + izw
 model.sim.init_A = assets

@@ -106,16 +106,17 @@ def income_single(par,t,iwls,iD,ih,iz,assets,women=True):
     
     
 @njit(cache=cache)
-def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,θ,ω,ϕ,wedge,px):#function to minimize
+def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px):#function to minimize
     """
         Couple's utility given private (Cpriv np.array(float,float))
         and total consumption Ctot (float). Note that love does
         not matter here, as this fun is used for intra-period
-        allocation of private and home consumption
+        allocation of private and home consumption.
+        Gender-specific single-couple wedge: wife pays wedge_w, husband wedge_m.
     """
     Cpub=Ctot-np.sum(Cpriv) #if Ctot>np.sum(Cpriv) else 1e-15
-    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=True)
-    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=True,ishom=ishom,female=False)
+    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,px,love=0.0,couple=True,ishom=ishom,female=True)
+    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge_m,px,love=0.0,couple=True,ishom=ishom,female=False)
 
     return np.array([power*Vw +(1.0-power)*Vm, Vw, Vm])
 
@@ -140,8 +141,10 @@ def couple_time_utility(Ctot,par,sol,ret,iP,wls,love,pars2):
         intraperiod_allocation(Ctot,par.grid_Ctot,sol.pre_Cw_priv[ret,wls,iP],sol.pre_Cm_priv[ret,wls,iP]) 
         
     home_time=2 if (ret==1) else 1.0-par.grid_wlp[wls]
-    vw_new = util(Cw_priv,d_pub,*pars2,love[0],True,home_time,True)                       
-    vm_new = util(Cm_priv,d_pub,*pars2,love[1],True,home_time,False)
+    # pars2 = (ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px): each spouse pays their own wedge
+    ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px = pars2
+    vw_new = util(Cw_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,px,love[0],True,home_time,True)
+    vm_new = util(Cm_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge_m,px,love[1],True,home_time,False)
      
     return vw_new, vm_new
 

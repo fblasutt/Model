@@ -2,22 +2,21 @@
 """
 Shapley shock decomposition — limited AND full commitment.
 
-Exact Shapley decomposition of Var(Δlog y) across the 7 structural shocks of
+Exact Shapley decomposition of Var(Δlog y) across the 6 structural shocks of
 the current model:
 
     ζ^w, ζ^m : persistent (random-walk) income innovations
     ε^w, ε^m : transitory income shocks
-    ψ        : common persistent match-quality component (random walk)
-    ω^w, ω^m : iid ±Ω per-gender disagreement draws (trans_love)
+    ψ^w, ψ^m : individual-specific random-walk love shocks (initial value 0)
 
-For every subset S of active shocks (2^7 = 128 configurations) each regime is
+For every subset S of active shocks (2^6 = 64 configurations) each regime is
 re-simulated with the complement zeroed out, holding the solved policy
 functions fixed (Huggett–Ventura–Yaron fixed-policy counterfactual).
 Zeroing semantics — ALL shut-down shocks are frozen at their t=0 entry value:
 
-    ζ, ψ frozen at current value (random walks: kill innovations, keep levels)
+    ζ    frozen at current value (random walk: kill innovations, keep levels)
     ε    frozen at the t=0 entry draw (transitions restricted to ϵ' = ϵ)
-    ω    frozen at the t=0 entry draw (no new ±Ω disagreement draws)
+    ψ    frozen at current value (random walk; entry value is 0 for everyone)
 
 The Shapley value of shock x is the weighted average of its marginal
 contribution V(S ∪ {x}) − V(S) over all orderings, and satisfies exact
@@ -43,6 +42,7 @@ import numpy as np
 import pandas as pd
 
 import Bargaining_numba as brg
+import init_conditions as ic
 
 
 # Initialize seed
@@ -84,6 +84,12 @@ age_marriage  = final_sample[:, 5]*0+25   # forced to 25, as in calibration.py
 year          = final_sample[:, 6]
 assets        = final_sample[:, 7] * np.mean(np.exp(h_income))
 
+# Pre-drawn uniforms for the posterior-draw initial income split (drawn AFTER
+# the sample so sample selection is unchanged; FIXED across evaluations so
+# SMM objectives stay deterministic)
+u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
+σME2_init=0.0  # measurement-error variance in observed entry income (0 = off)
+
 
 # ---------------------------------------------------------------------------
 # Parameterize the model
@@ -104,11 +110,9 @@ model.sim.init_power = param / (1.0 + param)
 gridzw = model.par.grid_zw[:, :, np.linspace(0, model.par.num_z - 1, model.par.num_zm, dtype=np.int_)]
 gridzm = model.par.grid_zm[:, :, :model.par.num_zw]
 
-izm = np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]), 0, :, 0] - h_income[i]))
-                for i in range(model.par.simN)], dtype=np.int32)
+izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,model.par.grid_ϵm,u_init_m,σME2=σME2_init)
 izm[np.isnan(h_income)] = (model.par.num_pm * model.par.num_ϵm) // 2
-izw = np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]), 0, :, 0] - w_income[i]))
-                for i in range(model.par.simN)], dtype=np.int32)
+izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)] = (model.par.num_pw * model.par.num_ϵw) // 2
 model.sim.init_z = izm * model.par.num_zm + izw
 model.sim.init_A = assets
@@ -150,7 +154,7 @@ sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_FC.s
 ###############################################################################
 
 INCOME_SHOCKS = ('zeta_w', 'zeta_m', 'eps_w', 'eps_m')
-LOVE_SHOCKS   = ('psi', 'omega_w', 'omega_m')
+LOVE_SHOCKS   = ('psi_w', 'psi_m')
 SHOCKS        = INCOME_SHOCKS + LOVE_SHOCKS
 n_shocks      = len(SHOCKS)
 
@@ -205,41 +209,24 @@ def build_counterfactual_Pi(par, zero_set):
     return [_filter_transition(par.Π[t], par, income_zero) for t in range(par.T - 1)]
 
 
-def _disag_freeze(par, freeze_w, freeze_m):
-    """
-    Counterfactual 4-state disagreement transition: restrict the iid
-    trans_love to destinations that keep the frozen gender's ±Ω offset
-    unchanged (wife offset = state//2, husband offset = state%2), then
-    renormalize columns ([post, initial] convention).
-    """
-    n = par.trans_love.shape[0]                     # = 4 disagreement states
-    idx = np.arange(n)
-    T = np.zeros_like(par.trans_love)
-    for s in range(n):                              # source state (column)
-        mask = np.ones(n, dtype=bool)
-        if freeze_w: mask &= (idx // 2 == s // 2)   # wife offset unchanged
-        if freeze_m: mask &= (idx % 2  == s % 2)    # husband offset unchanged
-        col = np.where(mask, par.trans_love[:, s], 0.0)
-        T[:, s] = col / col.sum()
-    return T
-
-
 def build_counterfactual_Pil(par, zero_set):
     """
-    Counterfactual love transitions: par.Πl[t] = kron(Πl_[t], trans_love).
-        'psi'     zeroed ⇒ Πl_ replaced by the identity (no ψ innovations)
-        'omega_w' zeroed ⇒ wife's ±Ω offset frozen at its current value
-        'omega_m' zeroed ⇒ husband's ±Ω offset frozen
-    Initial draws (Πl0, sample-init states) are left untouched.
+    Counterfactual love transitions: par.Πl[t] = kron(Πlw_[t], Πlm_[t]) with
+    joint index iL = iψw*num_lovem + iψm.
+        'psi_w' zeroed ⇒ wife's RW factor replaced by the identity
+        'psi_m' zeroed ⇒ husband's RW factor replaced by the identity
+    A frozen RW keeps its current level; since both spouses enter at ψ = 0,
+    freezing kills the shock entirely. Initial draws (Πl0) are untouched.
     """
     love_zero = zero_set & set(LOVE_SHOCKS)
     if not love_zero:
         return [Pi.copy() for Pi in par.Πl]
-    I_psi = np.eye(par.num_lovew)
-    B = _disag_freeze(par, 'omega_w' in love_zero, 'omega_m' in love_zero)
+    I_w = np.eye(par.num_lovew)
+    I_m = np.eye(par.num_lovem)
     out = []
     for t in range(par.T - 1):
-        A = I_psi if 'psi' in love_zero else par.Πl_[t]
+        A = I_w if 'psi_w' in love_zero else par.Πlw_[t]
+        B = I_m if 'psi_m' in love_zero else par.Πlm_[t]
         out.append(np.kron(A, B))
     return out
 
