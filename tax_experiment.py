@@ -55,7 +55,7 @@ u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
 
 
 #Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py)
-from estimated_params import xc, par_dict
+from estimated_params import xc, par_dict, apply_fc_params
 
 #Parametrize the model (NB: position 4 is Ω, the match-quality disagreement shock)
 par = par_dict(N, np.array(age_marriage-25,dtype=np.int_))
@@ -80,7 +80,7 @@ izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,mode
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
 izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
-model.sim.init_z=izm*model.par.num_zm+izw
+model.sim.init_z=izw*model.par.num_zm+izm   # FIXED gender swap: wife is the SLOW joint-index component
 model.sim.init_A=assets
 
 
@@ -117,22 +117,31 @@ age=(np.cumsum(np.ones((model.par.simN,model.par.T)),axis=1)-1)+25#age of hh
 #discounting to check present values
 discounting=(1/model.par.R)**(np.cumsum(age>=age_initial[:,None],axis=1)-1)
 
-#Solve the model at baseline
-M = model.copy(name='numba_new_copy')    
-M.solve() 
-M.simulate() 
+#Solve the model at baseline. Its conditional initial-love draw (inside
+#simulate) becomes THE initial love distribution, held FIXED across every
+#other version below (budget-balancing models, LC at other tax levels, FC):
+#policy comparisons are not contaminated by initial-composition differences.
+M = model.copy(name='numba_new_copy')
+M.solve()
+M.simulate()
+init_love_base = np.array(
+    [M.sim.love[k, int(M.par.sample_init[k])] for k in range(M.par.simN)],
+    dtype=np.int_,
+)
 
 
 #Obtain taxes
 taxes_baseline=((discounting*M.sim.tax)[(age>=age_initial[:,None])]).sum()
-    
+
 #create function to find deviations from baseline budget
 def budget(x,i):
-    
-    m=model.copy(name='numba_new_copy')    
+
+    m=model.copy(name='numba_new_copy')
     m.par.τ=gridτ[i]
     m.par.Λ=x
-    m.solve() 
+    m.solve()
+    m.sim.force_init_love[:] = init_love_base   # baseline-LC initial love
+    m._init_love_rationalized=True
     m.simulate()
     
     print(((discounting*m.sim.tax)[(age>=age_initial[:,None])]).sum()-taxes_baseline,x)
@@ -151,12 +160,14 @@ gridΛ=np.append(M.par.Λ,gridΛ)
 for i in range(len(gridτ)):
 
     # Set up the model - limited commitment
-    M = model.copy(name='numba_new_copy')    
-    M.par.τ=gridτ[i]    
+    M = model.copy(name='numba_new_copy')
+    M.par.τ=gridτ[i]
     M.par.Λ=gridΛ[i]
-  
-    M.solve() 
-    M.simulate() 
+
+    M.solve()
+    M.sim.force_init_love[:] = init_love_base   # baseline-LC initial love, held fixed
+    M._init_love_rationalized=True
+    M.simulate()
     Bmodel.append(M)
  
 #Loop over gender wage gap grid and solve the model - full commitment
@@ -168,19 +179,12 @@ for i in range(len(gridτ)):
     Mf.par.Λ=gridΛ[i]
 
     Mf.par.full=True
+    apply_fc_params(Mf)   # FC-specific [η, σL, β] (estimated_params.xc_full)
 
     Mf.solve()
 
-    # Equalize the initial-love draw with the matching LC simulation so that
-    # cross-regime comparisons are apples-to-apples. (FC's mutual-consent PC
-    # at sample-init is laxer than LC's individual PC, so without this step
-    # FC ends up with a wider initial-love distribution than LC.)
-    init_love_lc = np.array(
-        [Bmodel[i].sim.love[k, int(Bmodel[i].par.sample_init[k])]
-         for k in range(Bmodel[i].par.simN)],
-        dtype=np.int_,
-    )
-    Mf.sim.force_init_love[:] = init_love_lc
+    # Same BASELINE-LC initial love as every other version (see above)
+    Mf.sim.force_init_love[:] = init_love_base
 
     Mf.simulate()
     Bfmodel.append(Mf)

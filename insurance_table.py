@@ -79,7 +79,7 @@ u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
 # ---------------------------------------------------------------------------
 # Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py;
 # NB: position 4 is Ω, the match-quality disagreement shock — not the old 'wedge')
-from estimated_params import xc, par_dict
+from estimated_params import xc, par_dict, apply_fc_params
 par = par_dict(N, np.array(age_marriage-25,dtype=np.int_))
 model = brg.HouseholdModelClass(par=par)
 
@@ -97,7 +97,7 @@ izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,mode
 izm[np.isnan(h_income)] = (model.par.num_pm * model.par.num_ϵm) // 2
 izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)] = (model.par.num_pw * model.par.num_ϵw) // 2
-model.sim.init_z = izm * model.par.num_zm + izw
+model.sim.init_z = izw * model.par.num_zm + izm   # FIXED gender swap: wife is the SLOW joint-index component
 model.sim.init_A = assets
 
 age = (np.cumsum(np.ones((model.par.simN, model.par.T)), axis=1) - 1) + 25
@@ -125,6 +125,7 @@ init_love_lc = np.array(
 print("Solving FC model...")
 m_FC = model.copy(name='numba_new_copy')
 m_FC.par.full = True
+apply_fc_params(m_FC)   # FC-specific [η, σL, β] (estimated_params.xc_full)
 m_FC.solve()
 m_FC.sim.force_init_love[:] = init_love_lc      # transplant LC's draws
 m_FC.simulate()

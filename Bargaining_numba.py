@@ -36,12 +36,12 @@ class HouseholdModelClass(EconModelClass):
         par.Tr = 40 # retirement period: t=40 is age 65
          
         # Prices
-        par.R = 1.0121#1.035#1+ interest rate Source:FM.M.JP.JPY.4F.BB.R_JP10YT_RR.YLDA
+        par.R = 1.01211#+ interest rate Source:FM.M.JP.JPY.4F.BB.R_JP10YT_RR.YLDA
                
         # Preferences
         par.β = 1.0   # Discount factor
         par.ρ = 1.5     # Risk avresion private goods
-        par.χ = 2.0    # Risk aversion home goods
+        par.χ =1.5    # Risk aversion home goods
         par.α = 0.35    # Weight on home good
         par.wedge_w=0.0   #Single-couple utility wedge, wife
         par.wedge_m=0.0   #Single-couple utility wedge, husband
@@ -61,8 +61,8 @@ class HouseholdModelClass(EconModelClass):
         # σ0 absorbs 5 periods of persistent innovations (age-25 start): the
         # cross-sectional dispersion at t=0 now equals what the age-20 model
         # implied at age 25, so income grids/transitions match the old t+5 ones.
-        par.σzm=.0102609**0.5  ;par.σϵm=.0100159**0.5;par.σ0m= 0.15**0.5; #shock size husband
-        par.σzw=.0251831**0.5;  par.σϵw=.01069**0.5 ;par.σ0w= 0.15**0.5; #shock size wife
+        par.σzm=.009724**0.5  ;par.σϵm=.0088203**0.5;par.σ0m= 0.1**0.5; #shock size husband
+        par.σzw=.019759**0.5;  par.σϵw=.00882**0.5 ;par.σ0w= 0.1**0.5; #shock size wife
         
         # par.σzm=0.0082**0.5  ;par.σϵm= 0.0125**0.5;par.σ0m=  (0.0338+5*0.0082)**0.5; #shock size husband
         # par.σzw= 0.00978**0.5;par.σϵw=0.0137**0.5 ;par.σ0w= (0.1198+5*0.00978)**0.5; #shock size wife
@@ -109,7 +109,7 @@ class HouseholdModelClass(EconModelClass):
         par.num_A = 9;par.max_A = 75.0
         
         # Bargaining power
-        par.num_power = 7
+        par.num_power = 13#
         par.power_min=1e-3;par.power_max=1.0-par.power_min
         
         # Women's human capital states
@@ -118,7 +118,7 @@ class HouseholdModelClass(EconModelClass):
         # love/match quality
         par.num_lovew = 3;par.num_lovem = 3;
         par.num_love=par.num_lovew*par.num_lovem
-        par.σL = 0.1; par.σL0 = 0.1 # σL0: PERMANENT love heterogeneity across couples (t=0 grid width ±σL0*sqrt(2); median point stays 0, so unconstrained couples start at zero love)
+        par.σL = 0.1; par.σL0 = 0.0001 # σL0 FIXED HERE (single source of truth, not estimated, not passed via par dicts): t=0 love-grid width ±σL0*sqrt(2); median point stays 0
         
         # productivity of men and women: gridpoints
         par.num_ϵw=2;par.num_ϵm=2#transitory (ODD: mid-gridpoint = true zero, needed by shock-decomposition counterfactuals)
@@ -335,27 +335,35 @@ class HouseholdModelClass(EconModelClass):
                      
     def rationalize_init_love(self,agents=None,verbose=True):
         """
-        Pre-pass before simulation (LC only): couples whose ENTRY state
-        (init_z, init_A, init_power, init_ih) cannot sustain the match at the
-        MEDIAN initial love — no bargaining weight on the grid satisfies both
-        participation constraints, so the kernel would divorce them at
-        t=sample_init although they are married in the data — get the MINIMAL
-        initial love that rationalizes the observed marriage (revealed
-        preference), written into sim.force_init_love. Escalation ladder:
-        +1 love gridpoint for the spouse whose surplus at the initial weight
-        is most negative; if still infeasible +1 for the other; then +2/+1,
-        alternating, clipped at the grid edge. Agents with force_init_love
-        already set (e.g. the LC->FC transplant) are untouched; agents
-        infeasible even at (max,max) are left to divorce and counted.
-        Mirrors the entry check in simulate_lifecycle exactly
-        (Vw/Vm_remain_couple over the power grid vs singles at split assets).
+        Pre-pass before simulation (LC only): every couple DRAWS its initial
+        love from the CONDITIONAL initial love distribution — the model's
+        unconditional t=0 distribution (per-spouse Rouwenhorst binomial
+        weights over the ψ gridpoints, joint = product) RESTRICTED to the
+        love points at which the couple, given its entry state (init_z,
+        init_A, init_power, init_ih), would stay married WITHOUT
+        renegotiating at the initial bargaining weight. The draw uses
+        sim.shock_love[i, sample_init] (seeded, unused by the kernel at
+        entry), so it is deterministic across q() evaluations. Couples with
+        an EMPTY conditional set keep the median default and the kernel
+        decides at entry (renegotiation/divorce); they are counted.
+        Mirrors the entry check in simulate_lifecycle
+        (Vw/Vm_remain_couple over the power grid vs singles at split assets;
+        no-renegotiation = both surpluses weakly positive at every weight, or
+        the initial weight inside [wife's min acceptable, husband's max
+        acceptable]). Agents with force_init_love already set are untouched.
+        The previous MINIMAL-BUMP ladder variant is kept below as
+        rationalize_init_love_ladder for comparison.
         """
         par=self.par;sol=self.sol;sim=self.sim
         if par.full: return          # FC entry rule (mutual consent) differs; use the transplant
         if getattr(self,'_init_love_rationalized',False): return
-        nlw,nlm=par.num_lovew,par.num_lovem
-        med_w,med_m=nlw//2,nlm//2
-        n_checked=0;n_fixed=0;n_infeasible=0;bump_hist={}
+        from math import comb
+        nlw,nlm=par.num_lovew,par.num_lovem;nL=par.num_love
+        ww=np.array([comb(nlw-1,k) for k in range(nlw)],dtype=np.float64);ww/=ww.sum()
+        wm=np.array([comb(nlm-1,k) for k in range(nlm)],dtype=np.float64);wm/=wm.sum()
+        π0=np.kron(ww,wm)            # unconditional initial joint love distribution (iL=iψw*nlm+iψm)
+        gp=par.grid_power;gA=par.grid_A;nA=len(gA)
+        n_checked=0;n_drawn=0;n_empty=0;quiet_sizes={}
 
         for i in range(par.simN):
             if agents is not None and not agents[i]: continue  # optional subset (e.g. by entry regime)
@@ -366,46 +374,45 @@ class HouseholdModelClass(EconModelClass):
             n_checked+=1
             ih0=int(sim.init_ih[i]);iz0=int(sim.init_z[i])
             A0=max(sim.init_A[i],0.0)
-            Aw0=par.div_A_share*A0;Am0=(1.0-par.div_A_share)*A0
-            Vsw=np.interp(Aw0,par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih0,iz0])
-            Vsm=np.interp(Am0,par.grid_Am,sol.Vm_single[t,t//par.Dper,ih0,iz0])
+            Vsw=np.interp(par.div_A_share*A0,par.grid_Aw,sol.Vw_single[t,t//par.Dper,ih0,iz0])
+            Vsm=np.interp((1.0-par.div_A_share)*A0,par.grid_Am,sol.Vm_single[t,t//par.Dper,ih0,iz0])
 
-            def _surplus(iLw,iLm):
-                iL=iLw*nlm+iLm
-                Sw=np.array([np.interp(A0,par.grid_A,sol.Vw_remain_couple[t,ih0,iz0,iP,iL])
-                             for iP in range(par.num_power)])-Vsw
-                Sm=np.array([np.interp(A0,par.grid_A,sol.Vm_remain_couple[t,ih0,iz0,iP,iL])
-                             for iP in range(par.num_power)])-Vsm
-                return Sw,Sm
+            # couple surpluses at A0 for ALL (power, love) at once (clamped linear interp over A)
+            j=int(np.clip(np.searchsorted(gA,A0)-1,0,nA-2))
+            wA=float(np.clip((A0-gA[j])/(gA[j+1]-gA[j]),0.0,1.0))
+            Vw=sol.Vw_remain_couple[t,ih0,iz0];Vm=sol.Vm_remain_couple[t,ih0,iz0]   # (nP,nL,nA)
+            Sw=Vw[:,:,j]*(1.0-wA)+Vw[:,:,j+1]*wA-Vsw                                # (nP,nL)
+            Sm=Vm[:,:,j]*(1.0-wA)+Vm[:,:,j+1]*wA-Vsm
 
-            Sw,Sm=_surplus(med_w,med_m)
-            if np.any((Sw>=0.0)&(Sm>=0.0)): continue   # feasible at median: default applies
+            # quiet set: love points with marriage AND no renegotiation at init_power
+            p0=sim.init_power[i]
+            quiet=np.zeros(nL,dtype=bool)
+            for iL in range(nL):
+                sw=Sw[:,iL];sm=Sm[:,iL]
+                if (sw.min()>=0.0) and (sm.min()>=0.0): quiet[iL]=True;continue
+                if (sw.max()<0.0) or (sm.max()<0.0): continue
+                p0w=np.interp(0.0,sw,gp)             # Sw increasing in power
+                p0m=np.interp(0.0,sm[::-1],gp[::-1]) # Sm decreasing in power
+                quiet[iL]=(p0>=p0w) and (p0<=p0m)
 
-            # binding spouse = more negative surplus at the INITIAL bargaining weight
-            w_binds=np.interp(sim.init_power[i],par.grid_power,Sw) \
-                   <=np.interp(sim.init_power[i],par.grid_power,Sm)
-
-            # escalation ladder: binding+1, other+1, binding+1, ... clipped at grid edge
-            bw=0;bm=0;placed=False
-            for step in range(2*max(nlw,nlm)):
-                if (step%2==0)==w_binds: bw+=1
-                else:                    bm+=1
-                iLw=min(med_w+bw,nlw-1);iLm=min(med_m+bm,nlm-1)
-                Sw,Sm=_surplus(iLw,iLm)
-                if np.any((Sw>=0.0)&(Sm>=0.0)):
-                    sim.force_init_love[i]=iLw*nlm+iLm
-                    n_fixed+=1
-                    key=(iLw-med_w,iLm-med_m)
-                    bump_hist[key]=bump_hist.get(key,0)+1
-                    placed=True;break
-                if iLw==nlw-1 and iLm==nlm-1: break
-            if not placed: n_infeasible+=1
+            wq=π0*quiet
+            tot=wq.sum()
+            if tot<=0.0:
+                n_empty+=1
+                continue             # empty conditional set: median default, kernel decides
+            cdf=np.cumsum(wq/tot)
+            iL=int(min(np.searchsorted(cdf,sim.shock_love[i,t]),nL-1))
+            sim.force_init_love[i]=iL
+            n_drawn+=1
+            k=int(quiet.sum());quiet_sizes[k]=quiet_sizes.get(k,0)+1
 
         self._init_love_rationalized=True
         if verbose and n_checked>0:
-            print(f"rationalize_init_love: {n_checked} couples checked, "
-                  f"{n_fixed} rationalized {dict(sorted(bump_hist.items()))} (bumps wife,husband), "
-                  f"{n_infeasible} infeasible even at max love (divorce at entry)")
+            print(f"draw_init_love (conditional): {n_checked} couples, {n_drawn} drew from the "
+                  f"quiet-conditional initial distribution (quiet-set sizes {dict(sorted(quiet_sizes.items()))}), "
+                  f"{n_empty} with NO quiet love point (kernel decides at entry)")
+
+
 
     def simulate(self):
 

@@ -443,25 +443,46 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
     ####################################################
     # Graph to make sure BPP captures well true shocks
     #################################################
-    plt.scatter(BPP_PER['ym_cm'], indc['per_m_m'], c='blue', marker='o', s=100,zorder=2)
-    plt.scatter(BPP_PER['ym_cm'], indc['per_m_m'], c='red', marker='o', s=30,zorder=2)    
-    plt.scatter(BPP_PER['ym_cw'], indc['per_m_w'], c='blue', marker='o', s=100,zorder=2)
-    plt.scatter(BPP_PER['ym_cw'], indc['per_m_w'], c='blue', marker='o', s=30,zorder=2)    
-    plt.scatter(BPP_PER['yw_cm'], indc['per_w_m'], c='red', marker='o', s=100,zorder=2)
-    plt.scatter(BPP_PER['yw_cm'], indc['per_w_m'], c='red', marker='o', s=30,zorder=2)
-    plt.scatter(BPP_PER['yw_cw'], indc['per_w_w'], c='red', marker='o', s=100,zorder=2)
-    plt.scatter(BPP_PER['yw_cw'], indc['per_w_w'], c='blue', marker='o', s=30,zorder=2)
-    plt.scatter(BPP_MPC['ym_cm'], indc['tra_m_m'], c='blue', marker='^', s=100,zorder=2)
-    plt.scatter(BPP_MPC['ym_cm'], indc['tra_m_m'], c='red', marker='^', s=30,zorder=2)
-    plt.scatter(BPP_MPC['ym_cw'], indc['tra_m_w'], c='blue', marker='^', s=100,zorder=2)
-    plt.scatter(BPP_MPC['yw_cm'], indc['tra_w_m'], c='red', marker='^', s=100,zorder=2)
-    plt.scatter(BPP_MPC['yw_cm'], indc['tra_w_m'], c='red', marker='^', s=30,zorder=2) 
-    plt.scatter(BPP_MPC['yw_cw'], indc['tra_w_w'], c='red', marker='^', s=100,zorder=2)
-    plt.scatter(BPP_MPC['yw_cw'], indc['tra_w_w'], c='blue', marker='^', s=30,zorder=2)
-    plt.plot([-0.2, 1], [-0.2, 1], color = 'black', linestyle='--', linewidth = 2,zorder=1)
-    plt.xlabel("BPP") 
-    plt.ylabel("True") 
-    plt.savefig(root+'/Output files/model/BPP_true.eps', format='eps', bbox_inches="tight")  
+    # 8 pass-throughs, encoded as: SHAPE = shock type (circle persistent,
+    # triangle transitory), FILL = shocked earner (blue husband, red wife),
+    # LABEL = whose consumption responds. Points on the 45-degree line mean
+    # the BPP estimator recovers the true model pass-through.
+    _blue, _red = '#1f77b4', '#d62728'
+    # last tuple element: label offset in display points (NE for the husband's
+    # persistent shocks; SE for the wife's persistent and ALL transitory ones)
+    _pts = [
+        (BPP_PER['ym_cm'], indc['per_m_m'], 'o', _blue, r'$y^m\!\rightarrow\!c^m$', ( 8,   4)),
+        (BPP_PER['ym_cw'], indc['per_m_w'], 'o', _blue, r'$y^m\!\rightarrow\!c^w$', ( 8,   4)),
+        (BPP_PER['yw_cm'], indc['per_w_m'], 'o', _red,  r'$y^w\!\rightarrow\!c^m$', ( 8, -11)),
+        (BPP_PER['yw_cw'], indc['per_w_w'], 'o', _red,  r'$y^w\!\rightarrow\!c^w$', ( 8, -11)),
+        (BPP_MPC['ym_cm'], indc['tra_m_m'], '^', _blue, r'$y^m\!\rightarrow\!c^m$', ( 8, -11)),
+        (BPP_MPC['ym_cw'], indc['tra_m_w'], '^', _blue, r'$y^m\!\rightarrow\!c^w$', ( 8, -11)),
+        (BPP_MPC['yw_cm'], indc['tra_w_m'], '^', _red,  r'$y^w\!\rightarrow\!c^m$', ( 8, -11)),
+        (BPP_MPC['yw_cw'], indc['tra_w_w'], '^', _red,  r'$y^w\!\rightarrow\!c^w$', ( 8, -11)),
+    ]
+    fig, ax = plt.subplots(figsize=(5.2, 5.2))
+    _lo = min(min(x for x, *_ in _pts), min(y for _, y, *_ in _pts)) - 0.05
+    _hi = 0.8   # axes extended up to 0.8
+    ax.plot([_lo, _hi], [_lo, _hi], color='0.35', ls='--', lw=1.2, zorder=1)
+    for _x, _y, _mk, _cl, _lab, _off in _pts:
+        ax.scatter(_x, _y, marker=_mk, s=95, facecolor=_cl,
+                   edgecolor='black', linewidth=0.7, zorder=3)
+        ax.annotate(_lab, (_x, _y), textcoords='offset points',
+                    xytext=_off, fontsize=9, zorder=4)
+    from matplotlib.lines import Line2D
+    _handles = [
+        Line2D([], [], marker='o', ls='', mfc='0.75', mec='black', ms=9, label='Persistent shock'),
+        Line2D([], [], marker='^', ls='', mfc='0.75', mec='black', ms=9, label='Transitory shock'),
+        Line2D([], [], marker='s', ls='', mfc=_blue,  mec='black', ms=9, label="Husband's earnings shock"),
+        Line2D([], [], marker='s', ls='', mfc=_red,   mec='black', ms=9, label="Wife's earnings shock"),
+    ]
+    ax.legend(handles=_handles, loc='upper left', frameon=False, fontsize=9)
+    ax.set_xlim(_lo, _hi); ax.set_ylim(_lo, _hi); ax.set_aspect('equal')
+    ax.set_xlabel('BPP-estimated pass-through')
+    ax.set_ylabel('True pass-through (model)')
+    ax.grid(True, linewidth=0.4, alpha=0.35); ax.set_axisbelow(True)
+    fig.tight_layout()
+    fig.savefig(root+'/Output files/model/BPP_true.eps', format='eps', bbox_inches='tight')
     plt.show()
     
     # Innovation in consumption
@@ -691,19 +712,27 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
            
         
     else:
-        
-        K1=κywp
-        K3=1-sYm
-        temp = (sYm*κymp)/((1-sYm)*κywp)
-        K2=κyp/(K1*K3)#κyp/(K1*K3)-temp
-        
-        K4=1#1+temp/K2
+
+        # Wu-Krueger appendix A, FEMALE-shock chain: K1 = her intensive
+        # margin, K2 = her extensive margin (+ interactions, residual),
+        # K3 = her earnings share (composition), K4 = male intensive
+        # response. The share dilution is applied BEFORE the spouse step, so
+        # the active increment is measured on the diluted chain (the old
+        # ordering measured it pre-dilution, mechanically giving negative
+        # active and >100% passive insurance).
+        K1=κywp                                   # her intensive margin
+        K3=1-sYm                                  # composition: her earnings share
+        # residual BEFORE the spouse step: her extensive margin + interactions
+        # (κyp - sYm*κymp = the part of the household response due to HER earnings)
+        K2=(κyp-sYm*κymp)/(K1*K3)
+        K4=κyp/(K1*K2*K3)                         # male intensive response (spousal insurance)
         K5=κynug
         K6=ols(SHOCK,ΔC,sm,cov=CONTROLS,take=1)/(κyp*K5)
-        
-        # Finally the decomposition of household insurance   
-        Active_insurance =  1-K1*K2
-        Passive_insurance = 1-K1*K2*K3*K4-(1-K1*K2)
+
+        # Same grouping as the male branch: Passive = own responses +
+        # dilution, Active = the SPOUSE's labor-supply increment
+        Passive_insurance = 1-K1*K2*K3
+        Active_insurance  = 1-K1*K2*K3*K4-(1-K1*K2*K3)
         Taxes             = 1-K1*K2*K3*K4*K5-(1-K1*K2*K3*K4)
         Self_insurance    = 1-K1*K2*K3*K4*K5*K6-(1-K1*K2*K3*K4*K5)
         

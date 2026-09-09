@@ -19,19 +19,48 @@ import io
 import re
 import numpy as np
 
-# Current SMM estimates [η, σL, α, ρ, wedge_w, wedge_m, β, ι0w] — sync with calibration.py
-# PLACEHOLDER pending re-estimation with ι0w internally estimated (targets the
-# mean wife-to-husband earnings ratio among working wives, 0.46): last 7-param
-# estimate with the previous fixed ι0w = -0.47 appended.
-xc=np.array([4.52531362,  0.01574232,  0.92576666,  1.67436856,  2.65417813, -0.11096475,0.98380537, -0.56896309])
-xc=np.array([4.85457701,  0.0207449,   0.93030974,  1.700733,    2.84106809, -0.08532483,0.98470179, -0.62552763])
-xc=np.array([6.21926302,  0.02625619,  0.96,        2.05119648,  3.45904837, -0.11929322,0.98213518, -0.66810006])
+# Current SMM estimates [η, σL, α, ρ, wedge_w, wedge_m, β, ι0w] — sync with
+# calibration.py. σL0 (initial match-quality dispersion) is FIXED in
+# Bargaining_numba.setup() (no longer estimated; young-divorce target dropped).
+xc=np.array([ 2.17742503,  0.03991867,  0.95089659,  1.80807117,  0.63913244,
+       -0.23640997,  0.99523097, -0.90290523])
+
+
 
 def par_dict(N, sample_init):
     """Common par dict for HouseholdModelClass under the current estimates."""
     return {'simN': N, 'η': xc[0], 'σL': xc[1], 'α': xc[2], 'ρ': xc[3],
             'wedge_w': xc[4], 'wedge_m': xc[5], 'β': xc[6], 'ι0w': xc[7],
             'sample_init': sample_init}
+
+
+# ---------------------------------------------------------------------------
+# FULL-COMMITMENT re-calibrated parameters [η, σL, β] — estimated in
+# run_full.py (ESTIMATE=True), targeting the employment rate of married women,
+# the annual divorce rate and wealth/husband's earnings, holding everything
+# else at the LC estimates above. PLACEHOLDER = LC values until estimated.
+# ---------------------------------------------------------------------------
+xc_full = np.array([1.8394,0.23844,0.99635 ])
+
+
+def apply_fc_params(M):
+    """
+    Apply the FC re-calibrated [η, σL, β] to a model (call AFTER copying it
+    and setting par.full=True, BEFORE solve). σL differs from the LC value,
+    so the love grids are rebuilt (σL0 unchanged). Initial-love TRANSPLANTS
+    from an LC model remain valid: they are grid INDICES (relative positions),
+    whose values are read off the FC grids.
+    """
+    import UserFunctions_numba as usr
+    p = M.par
+    p.η = xc_full[0]; p.σL = xc_full[1]; p.β = xc_full[2]
+    p.grid_lovew_, p.Πlw_, p.Πlw0_ = usr.rouw_nonst(p.T, p.σL, p.σL0, p.num_lovew)
+    p.grid_lovem_, p.Πlm_, p.Πlm0_ = usr.rouw_nonst(p.T, p.σL, p.σL0, p.num_lovem)
+    p.grid_lovew = [np.repeat(p.grid_lovew_[t], p.num_lovem) for t in range(p.T)]
+    p.grid_lovem = [np.tile(p.grid_lovem_[t], p.num_lovew) for t in range(p.T)]
+    p.Πl  = [np.kron(p.Πlw_[t],  p.Πlm_[t])  for t in range(p.T-1)]
+    p.Πl0 = [np.kron(p.Πlw0_[t], p.Πlm0_[t]) for t in range(p.T-1)]
+    return M
 
 
 def _warn_if_out_of_sync():

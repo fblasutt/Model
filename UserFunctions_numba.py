@@ -31,17 +31,19 @@ def home_good(x,ν,θ,ϕ,wedge,couple,ishom):
     return home_time**θ * x**(1-θ)
 
 @njit(cache=cache)
-def util(c_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
+def util(c_priv,d_pub,ρ,χ,α,ν,θ,η,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
     """
     Intra-temporal utility function. ν: CES substitution in home production;
-    θ: weight on home_time vs. home inputs in home production; ω: labor
+    θ: weight on home_time vs. home inputs in home production; η: labor
     disutility; px: durables price (couples).
     """
 
     dd=d_pub/px if couple==1 else d_pub
     Q=home_good(dd,ν,θ,ϕ,wedge,couple=couple,ishom=ishom)
 
-    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge-ω*(1-ishom)*female#*couple
+    return (1-α)*c_priv**(1-ρ)/(1-ρ) + α*Q**(1-χ)/(1-χ)+love-couple*wedge\
+                                                      -female*η*(ishom<0.4)#\
+                                                      #-η*(1-female)*( couple*(ishom<1.5) + (1-couple)*(ishom<0.5) )
 
  
 @njit(cache=cache)  
@@ -106,7 +108,7 @@ def income_single(par,t,iwls,iD,ih,iz,assets,women=True):
     
     
 @njit(cache=cache)
-def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px):#function to minimize
+def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,θ,η,ϕ,wedge_w,wedge_m,px):#function to minimize
     """
         Couple's utility given private (Cpriv np.array(float,float))
         and total consumption Ctot (float). Note that love does
@@ -115,20 +117,20 @@ def couple_util(Cpriv,Ctot,power,ishom,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px):
         Gender-specific single-couple wedge: wife pays wedge_w, husband wedge_m.
     """
     Cpub=Ctot-np.sum(Cpriv) #if Ctot>np.sum(Cpriv) else 1e-15
-    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,px,love=0.0,couple=True,ishom=ishom,female=True)
-    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,θ,ω,ϕ,wedge_m,px,love=0.0,couple=True,ishom=ishom,female=False)
+    Vw=util(Cpriv[0],Cpub,ρ,χ,α,ν,θ,η,ϕ,wedge_w,px,love=0.0,couple=True,ishom=ishom,female=True)
+    Vm=util(Cpriv[1],Cpub,ρ,χ,α,ν,θ,η,ϕ,wedge_m,px,love=0.0,couple=True,ishom=ishom,female=False)
 
     return np.array([power*Vw +(1.0-power)*Vm, Vw, Vm])
 
 @njit(cache=cache)
-def single_time_util(Ctot,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
+def single_time_util(Ctot,ρ,χ,α,ν,θ,η,ϕ,wedge,px,love=0.0,couple=0.0,ishom=0.0,female=False):
     """
     Single utility given resources Ctot allocated to consumption
     """
 
-    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom)
+    c_priv,d_pub = intraperiod_allocation_single(Ctot,ρ,χ,α,ν,θ,η,ϕ,wedge,px,love,couple,ishom)
 
-    return util(c_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom,female)
+    return util(c_priv,d_pub,ρ,χ,α,ν,θ,η,ϕ,wedge,px,love,couple,ishom,female)
      
 
 
@@ -141,10 +143,10 @@ def couple_time_utility(Ctot,par,sol,ret,iP,wls,love,pars2):
         intraperiod_allocation(Ctot,par.grid_Ctot,sol.pre_Cw_priv[ret,wls,iP],sol.pre_Cm_priv[ret,wls,iP]) 
         
     home_time=2 if (ret==1) else 1.0-par.grid_wlp[wls]
-    # pars2 = (ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px): each spouse pays their own wedge
-    ρ,χ,α,ν,θ,ω,ϕ,wedge_w,wedge_m,px = pars2
-    vw_new = util(Cw_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge_w,px,love[0],True,home_time,True)
-    vm_new = util(Cm_priv,d_pub,ρ,χ,α,ν,θ,ω,ϕ,wedge_m,px,love[1],True,home_time,False)
+    # pars2 = (ρ,χ,α,ν,θ,η,ϕ,wedge_w,wedge_m,px): each spouse pays their own wedge
+    ρ,χ,α,ν,θ,η,ϕ,wedge_w,wedge_m,px = pars2
+    vw_new = util(Cw_priv,d_pub,ρ,χ,α,ν,θ,η,ϕ,wedge_w,px,love[0],True,home_time,True)
+    vm_new = util(Cm_priv,d_pub,ρ,χ,α,ν,θ,η,ϕ,wedge_m,px,love[1],True,home_time,False)
      
     return vw_new, vm_new
 
@@ -166,12 +168,12 @@ def intraperiod_allocation(C_tot,grid_Ctot,pre_Cw_priv,pre_Cm_priv):
         
 
 @njit(cache=cache)
-def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom):
+def intraperiod_allocation_single(C_tot,ρ,χ,α,ν,θ,η,ϕ,wedge,px,love,couple,ishom):
 
     """
     Finds private and public expenditure to max util for singles
     """
-    args=(ρ,χ,α,ν,θ,ω,ϕ,wedge,px,love,couple,ishom)
+    args=(ρ,χ,α,ν,θ,η,ϕ,wedge,px,love,couple,ishom)
     C_priv = optimizer(lambda x,y,args:-util(x,y-x,*args),1.0e-6, C_tot - 1.0e-6,args=(C_tot,args))[0]
 
     return C_priv,C_tot - C_priv#=d_pub
@@ -191,7 +193,7 @@ def couple_root(x,c,powe,ρ,χ,α,ν,θ,ϕ,wedge,px,ishom):
     The ν argument is unused under Cobb-Douglas; retained for signature
     compatibility with the CES variant.
 
-    ω is absent: linear in ishom, drops out of the FOC wrt d_pub.
+    η is absent: linear in ishom, drops out of the FOC wrt d_pub.
     """
 
     m = powe**(1/ρ)/(powe**(1/ρ)+(1-powe)**(1/ρ))

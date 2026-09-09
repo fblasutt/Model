@@ -1,25 +1,65 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Feb 23 15:31:56 2024
+Variance decomposition — limited AND full commitment (single consolidated
+script; supersedes the former shapley_decomposition.py).
 
-@author: 32489
+Kaplan–Violante-style BLOCK decomposition of Var(Δlog y): starting from the
+baseline, whole blocks of structural shocks are shut down one at a time,
+holding the solved policy functions fixed (fixed-policy counterfactual à la
+Huggett–Ventura–Yaron). The blocks are
 
-This script:
-  1. Solves and simulates the limited-commitment (LC) and full-commitment (FC)
-     models on the JPSC sample.
-  2. Builds the channel variance decomposition (Var(Δlog c^g) into aggregate +
-     rebargaining + covariance), via the existing insurance() routine, and
-     writes its LaTeX table to vardec.tex.
-  3. Runs a fixed-policy shock decomposition (à la Huggett, Ventura & Yaron 2011):
-     for each structural shock x ∈ {ζ^w, ζ^m, ε^w, ε^m, ψ^w, ψ^m}, re-simulates
-     the model with x's innovations zeroed out (policy functions unchanged),
-     measures the drop in Var(Δlog y) for two targets, and writes one LaTeX
-     table per target:
-        * shockdec_Cpriv.tex — total within-couple private consumption (cw+cm),
-        * shockdec_sw.tex    — wife's private consumption share cw/(cw+cm).
-     Each table has two rows: limited and full commitment.
+    persistent : ζ^w + ζ^m   (random-walk income innovations, both spouses)
+    transitory : ε^w + ε^m   (transitory income shocks, both spouses)
+    love       : ψ^w + ψ^m   (individual-specific random-walk love shocks)
 
-The channel decomposition (Step 2) is reported separately for wife and husband.
+The wife's human-capital DEPRECIATION shock (δ^w) is NOT part of any block
+and stays ACTIVE in every counterfactual (floor included); its own one-at-a-
+time contribution is reported in a separate table.
+
+Freezing semantics (a frozen block keeps its t=0 entry values):
+    ζ    frozen at current VALUE. The persistent grids are nonstationary
+         (width ~ sqrt(t)), so freezing the INDEX would let off-median
+         agents' income drift as the grid widens. The frozen component maps
+         to the two t+1 gridpoints BRACKETING its current value with
+         interpolation weights: E[value'] = value — the conditional mean of
+         the true RW kernel, minus its innovation variance.
+    ε    frozen at the t=0 entry draw (transitions restricted to ϵ' = ϵ).
+         The ε grids are time-constant so index = value; NOTE num_ϵ = 2
+         (even) means there is no zero midpoint — do not switch to
+         mid-forcing unless num_ϵ is made odd.
+    ψ    frozen at current VALUE (same bracketing kernel on the widening
+         love grids; matters because entry love is off-median for many
+         couples under the conditional draw with σL0 > 0).
+    δ    (dep table only) frozen at current h: Πh replaced by the identity.
+
+Var(Δlog y) is computed AFTER residualizing Δlog y on age dummies, so the
+deterministic life-cycle profile of growth drops out of every counterfactual
+— the pooled variance would put it in the floor, unattributable to shocks.
+
+The contribution of block B is V(all) − V(all∖B): one-at-a-time shutdowns,
+no exact adding-up (interactions are not allocated). The FLOOR world has all
+three blocks frozen simultaneously (δ^w still active): whatever variance
+remains there comes from depreciation risk plus deterministic couple-specific
+dynamics (trend-driven renegotiations, participation-switch timing).
+
+Simulations per regime: baseline + 3 block shutdowns + floor + δ^w = 6.
+
+Outputs (root + '/Output files/model/'):
+    vardec.tex           — channel identity Var(Δlog c^g) = Var(Δlog C)
+                           + Var(Δlog s^g) + 2Cov, wife & husband panels,
+                           LC & FC rows (via reg_cons_insurance.insurance())
+    shockdec_Cpriv.tex   — block decomposition, target C_priv = cw + cm;
+                           columns: V_total | persistent | transitory | love;
+                           rows LC, FC (the floor is console-only)
+    shockdec_sw.tex      — same, target sw = cw/(cw+cm)
+    shockdec_sm.tex      — same, target sm = cm/(cw+cm)
+    shockdec_dep.tex     — the DEPRECIATION table: δ^w's one-at-a-time
+                           contribution for C_priv and sw, LC & FC rows
+    events_sw_<tag>.tex  — decomposition of E[(Δlog s_w)^2] by renegotiation
+                           direction (toward wife / toward husband / none)
+
+After a run, M_NOSHOCK['LC'] / M_NOSHOCK['FC'] hold the simulated FLOOR
+models for interactive inspection.
 """
 
 import copy
@@ -82,8 +122,8 @@ u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
 # ---------------------------------------------------------------------------
 # Parameterize the model
 # ---------------------------------------------------------------------------
-# Current estimates [η, σL, α, ρ, Ω, β] from the shared module (sync with calibration.py)
-from estimated_params import xc, par_dict
+# Current estimates from the shared module (sync with calibration.py)
+from estimated_params import xc, par_dict, apply_fc_params
 
 par = par_dict(N, np.array(age_marriage-25,dtype=np.int_))
 model = brg.HouseholdModelClass(par=par)
@@ -102,29 +142,24 @@ izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,mode
 izm[np.isnan(h_income)] = (model.par.num_pm * model.par.num_ϵm) // 2
 izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)] = (model.par.num_pw * model.par.num_ϵw) // 2
-model.sim.init_z = izm * model.par.num_zm + izw
+model.sim.init_z = izw * model.par.num_zm + izm   # FIXED gender swap: wife is the SLOW joint-index component
 model.sim.init_A = assets
 
 age = (np.cumsum(np.ones((model.par.simN, model.par.T)), axis=1) - 1) + 25
-calendar_year = age - age_initial[:, None] + year[:, None]
-policy = np.maximum(calendar_year[:, 0], 2007)
-age_policy = np.array(np.where(policy[:, None] == calendar_year)[1], dtype=np.int32)
 
 
 # ---------------------------------------------------------------------------
-# Solve & simulate baseline models
+# Solve & simulate the two baselines (LC and FC)
 # ---------------------------------------------------------------------------
 print("Solving LC model...")
 m_LC = model.copy(name='numba_new_copy')
 m_LC.solve()
 m_LC.simulate()
-sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_LC.sim.couple_lag == 1)
 
-# Extract LC's per-agent initial-love grid index. We feed these into the FC
-# baseline simulation so both regimes start from the same per-agent love
-# state. (LC's PC check is stricter than FC's at sample-init, so without this
-# step FC ends up with a wider initial-love distribution, which contaminates
-# any cross-regime variance comparison.)
+# Extract LC's per-agent initial-love grid index and feed it into the FC
+# baseline so both regimes start from the same per-agent love state (LC's PC
+# check is stricter than FC's at sample-init; without this step FC ends up
+# with a wider initial-love distribution).
 init_love_lc = np.array(
     [m_LC.sim.love[i, int(m_LC.par.sample_init[i])] for i in range(m_LC.par.simN)],
     dtype=np.int_,
@@ -133,90 +168,34 @@ init_love_lc = np.array(
 print("Solving FC model...")
 m_FC = model.copy(name='numba_new_copy')
 m_FC.par.full = True
+apply_fc_params(m_FC)   # FC-specific [η, σL, β] (estimated_params.xc_full)
 m_FC.solve()
 m_FC.sim.force_init_love[:] = init_love_lc      # transplant LC's draws
 m_FC.simulate()
-sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_FC.sim.couple_lag == 1)
 
-sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_LC.sim.couple_lag == 1) 
-sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_FC.sim.couple_lag == 1) & (m_LC.sim.couple_lag == 1)
-
-
-###############################################################################
-#                                                                             #
-# Channel variance decomposition: Var(Δlog c^g) = Var(Δlog C) + Var(Δlog s^g) #
-#                                                + 2 Cov(...)                 #
-#                                                                             #
-###############################################################################
-
-def vardec_row(B, spouse, label):
-    """
-    Two LaTeX rows for one (regime × spouse) case from a results dict B
-    returned by insurance(): variance values (×100) on row 1, share of total
-    in scriptsize on row 2 with negative \\\\[-0.5ex] separator.
-    Empty cells (" & & ") sit in narrow operator columns of the header.
-    """
-    d = B['vardec_w'] if spouse == 'w' else B['vardec_m']
-    def v(x):  return '%.2f' % (100.0*x) if abs(x) > 1e-6 else '0.00'
-    def p(x):  return '%.0f' % (100.0*x) if abs(x) > 1e-3 else '0'
-    pct = lambda x: r'{\scriptsize (' + p(x) + r'\%)}'
-    row1 = (label + ' & ' +
-            v(d['V_total']) + ' & & ' +
-            v(d['V_agg'])   + ' & & ' +
-            v(d['V_reb'])   + ' & & ' +
-            v(d['2Cov']))
-    row2 = (' & ' + pct(1.0)         + ' & & ' +
-                    pct(d['sh_agg']) + ' & & ' +
-                    pct(d['sh_reb']) + ' & & ' +
-                    pct(d['sh_cov']))
-    return row1 + r' \\[-0.5ex]' + '\n' + row2
-
-
-B_LC = insurance(m_LC, sample_LC, shock_type='permanent', shock_gender='Male',
-                 consumption_gender='Male', name_file='VardecLC', name_line='Limited commitment')
-B_FC = insurance(m_FC, sample_FC, shock_type='permanent', shock_gender='Male',
-                 consumption_gender='Male', name_file='VardecFC', name_line='Full commitment')
-
-table = '\n'.join([
-    r'\textit{A. Wife} & & & & & & & \\',
-    r'\addlinespace',
-    vardec_row(B_LC, 'w', 'Limited commitment') + r' \\',
-    vardec_row(B_FC, 'w', 'Full commitment')    + r' \\',
-    r'\addlinespace',
-    r'\textit{B. Husband} & & & & & & & \\',
-    r'\addlinespace',
-    vardec_row(B_LC, 'm', 'Limited commitment') + r' \\',
-    vardec_row(B_FC, 'm', 'Full commitment'),     # no trailing \\
-])
-with open(root + '/Output files/model/vardec.tex', 'w') as f:
-    f.write(table)
+sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None])# & (m_LC.sim.couple_lag == 1)  & (m_LC.sim.couple == 1)
+sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None])# & (m_FC.sim.couple_lag == 1)  & (m_FC.sim.couple == 1)
 
 
 ###############################################################################
-#                                                                             #
-# Shock decomposition: marginal contribution of each structural shock to      #
-# Var(Δlog c^g), via fixed-policy re-simulation (Huggett, Ventura & Yaron     #
-# 2011 "Sources of Lifetime Inequality").                                     #
-#                                                                             #
-# For each shock x, we re-simulate the estimated model with x's innovations   #
-# zeroed out, holding the solved policy functions m.sol.* fixed (no re-       #
-# solve). The drop in Var(Δlog c^g) is the marginal contribution of x.        #
-# In a nonlinear model contributions don't sum to the baseline variance;      #
-# the residual is reported as 'interaction'.                                  #
-#                                                                             #
+# Counterfactual machinery                                                    #
 ###############################################################################
 
 INCOME_SHOCKS = ('zeta_w', 'zeta_m', 'eps_w', 'eps_m')
-# Love shocks under the current model: TWO individual-specific random-walk
-# love shocks (ψw, ψm), initial value 0, joint index iL = iψw*num_lovem + iψm.
 LOVE_SHOCKS   = ('psi_w', 'psi_m')
-SHOCKS        = INCOME_SHOCKS + LOVE_SHOCKS
+DEP_SHOCKS    = ('dep_w',)              # wife's human-capital depreciation
+
+# BLOCKS shut down together (depreciation deliberately NOT a block: it stays
+# active in every block counterfactual and in the floor; its own contribution
+# is reported separately in shockdec_dep.tex)
+BLOCKS = {
+    'persistent': ('zeta_w', 'zeta_m'),
+    'transitory': ('eps_w',  'eps_m'),
+    'love':       ('psi_w',  'psi_m'),
+}
+BLOCK_KEYS = tuple(BLOCKS)
 
 
-# ---------------------------------------------------------------------------
-# iz decomposition: iz = pw*(num_ϵw·num_pm·num_ϵm) + ϵw*(num_pm·num_ϵm)
-#                       + pm*num_ϵm + ϵm
-# ---------------------------------------------------------------------------
 def _component_arrays(par):
     """Vectorized (pw, ϵw, pm, ϵm) arrays indexed by iz."""
     n_total = par.num_pw * par.num_ϵw * par.num_pm * par.num_ϵm
@@ -231,13 +210,15 @@ def _component_arrays(par):
 def _filter_transition(Pi, par, zero_set):
     """
     Filter income transition matrix Pi by zeroing transitions that violate
-    the constraints in zero_set, then renormalize each column. Every shut
-    shock is FROZEN at its current value, so it keeps the t=0 entry draw
-    (from init_z) for the whole simulation:
+    the constraints in zero_set, then renormalize each column — this pins
+    every frozen component at its current INDEX:
         ζ^w zeroed  ⇒  pw' = pw
         ζ^m zeroed  ⇒  pm' = pm
-        ε^w zeroed  ⇒  ϵw' = ϵw
+        ε^w zeroed  ⇒  ϵw' = ϵw   (grid time-constant: index = value)
         ε^m zeroed  ⇒  ϵm' = ϵm
+    For ζ the index-freeze is then corrected to a VALUE-freeze by
+    _value_freeze_redistribute (the persistent grids widen over time, so a
+    frozen index would drift in value).
     """
     pw, ϵw, pm, ϵm = _component_arrays(par)
     n = len(pw)
@@ -254,10 +235,59 @@ def _filter_transition(Pi, par, zero_set):
         if s > 0:
             Pi_new[:, j] = col_filtered / s
         else:
-            # No allowed destination (numerical edge): self-transition.
             Pi_new[:, j] = 0.0
             Pi_new[j, j] = 1.0
     return Pi_new
+
+
+def _freeze_kernel(g_now, g_next):
+    """
+    Value-preserving no-innovation kernel for a nonstationary (widening)
+    grid, column-stochastic F[post, initial]: the current value v = g_now[i]
+    maps to the two g_next points bracketing v with linear interpolation
+    weights, so E[value'] = v exactly (v is always interior since the grid
+    widens around the same center). Median 0 maps to 0 with weight 1.
+    """
+    n = len(g_now)
+    F = np.zeros((n, n))
+    for i, v in enumerate(g_now):
+        j = int(np.clip(np.searchsorted(g_next, v) - 1, 0, n - 2))
+        w = float(np.clip((g_next[j+1] - v)/(g_next[j+1] - g_next[j]), 0.0, 1.0))
+        F[j, i] += w
+        F[j+1, i] += 1.0 - w
+    return F
+
+
+def _value_freeze_redistribute(Pi, par, t, which):
+    """
+    Correct the ζ INDEX-freeze produced by _filter_transition into a
+    VALUE-freeze: the probability block sitting at persistent index i0
+    (whose t-value is g_now[i0]) is moved to the two t+1 gridpoints
+    bracketing that value, with interpolation weights. Leaves the other
+    components of each destination state untouched (block shift by the
+    component's stride), so columns stay stochastic.
+    """
+    if which == 'w':
+        nP, stride = par.num_pw, par.num_ϵw*par.num_pm*par.num_ϵm
+        g_now  = par.grid_pw[t,   0, ::par.num_ϵw, 0]
+        g_next = par.grid_pw[t+1, 0, ::par.num_ϵw, 0]
+        comp = _component_arrays(par)[0]
+    else:
+        nP, stride = par.num_pm, par.num_ϵm
+        g_now  = par.grid_pm[t,   0, ::par.num_ϵm, 0]
+        g_next = par.grid_pm[t+1, 0, ::par.num_ϵm, 0]
+        comp = _component_arrays(par)[2]
+    assert len(g_now) == nP and np.all(np.diff(g_now) > 0), "unexpected persistent-grid layout"
+
+    out = np.zeros_like(Pi)
+    for i0 in range(nP):
+        v = g_now[i0]
+        j = int(np.clip(np.searchsorted(g_next, v) - 1, 0, nP - 2))
+        w = float(np.clip((g_next[j+1] - v)/(g_next[j+1] - g_next[j]), 0.0, 1.0))
+        rows = np.where(comp == i0)[0]
+        out[rows + (j   - i0)*stride, :] += w        * Pi[rows, :]
+        out[rows + (j+1 - i0)*stride, :] += (1.0-w)  * Pi[rows, :]
+    return out
 
 
 def build_counterfactual_Pi(par, zero_set):
@@ -265,36 +295,44 @@ def build_counterfactual_Pi(par, zero_set):
     income_zero = zero_set & set(INCOME_SHOCKS)
     if not income_zero:
         return [Pi.copy() for Pi in par.Π]
-    return [_filter_transition(par.Π[t], par, income_zero) for t in range(par.T - 1)]
+    out = []
+    for t in range(par.T - 1):
+        Pi = _filter_transition(par.Π[t], par, income_zero)
+        if 'zeta_w' in income_zero: Pi = _value_freeze_redistribute(Pi, par, t, 'w')
+        if 'zeta_m' in income_zero: Pi = _value_freeze_redistribute(Pi, par, t, 'm')
+        out.append(Pi)
+    return out
 
 
 def build_counterfactual_Pil(par, zero_set):
     """
     Counterfactual love transitions: par.Πl[t] = kron(Πlw_[t], Πlm_[t]) with
     joint index iL = iψw*num_lovem + iψm.
-        'psi_w' zeroed ⇒ wife's RW factor replaced by the identity
-        'psi_m' zeroed ⇒ husband's RW factor replaced by the identity
-    A frozen RW keeps its current level; since both spouses enter at ψ = 0,
-    freezing kills the shock entirely. Initial draws (Πl0) are untouched.
+        'psi_w' zeroed ⇒ wife's RW factor replaced by the value-freeze kernel
+        'psi_m' zeroed ⇒ husband's RW factor replaced likewise
+    Initial draws (Πl0) are untouched.
     """
     love_zero = zero_set & set(LOVE_SHOCKS)
     if not love_zero:
         return [Pi.copy() for Pi in par.Πl]
-    I_w = np.eye(par.num_lovew)
-    I_m = np.eye(par.num_lovem)
     out = []
     for t in range(par.T - 1):
-        A = I_w if 'psi_w' in love_zero else par.Πlw_[t]
-        B = I_m if 'psi_m' in love_zero else par.Πlm_[t]
+        # VALUE-preserving freeze (not the identity): the love grids widen
+        # over time, so an index-freeze would let off-median entry love
+        # (conditional draw with σL0 > 0) drift deterministically.
+        A = (_freeze_kernel(par.grid_lovew_[t], par.grid_lovew_[t+1])
+             if 'psi_w' in love_zero else par.Πlw_[t])
+        B = (_freeze_kernel(par.grid_lovem_[t], par.grid_lovem_[t+1])
+             if 'psi_m' in love_zero else par.Πlm_[t])
         out.append(np.kron(A, B))
     return out
 
 
 def simulate_counterfactual(m_baseline, zero_set):
     """
-    Deep-copy m_baseline, replace par.Π / par.Πl with their counterfactual
-    versions, and run simulate(). Solved policy functions m.sol.* are
-    preserved. Returns the modified model.
+    Deep-copy m_baseline, replace par.Π / par.Πl / par.Πh with their
+    counterfactual versions, and run simulate(). Solved policies m.sol.*
+    are preserved.
     """
     zero_set = set(zero_set)
     m_cf = copy.deepcopy(m_baseline)
@@ -309,10 +347,13 @@ def simulate_counterfactual(m_baseline, zero_set):
         for t in range(m_cf.par.T - 1):
             m_cf.par.Πl[t] = Πl_cf[t]
 
-    # NOT TOUCHED:
-    #  par.Πs  — single-spell income transitions (post-divorce paths).
-    #  par.Πh  — human-capital transitions (depreciation is shut down here).
-    #  par.Πl0 — initial-period love distribution (innovations only).
+    if 'dep_w' in zero_set:
+        # Freeze the wife's human capital at its current level: Πh replaced
+        # by the identity for every wlp at every t (post-retirement periods
+        # already use exactly this identity_block in setup).
+        identity_block = np.tile(np.eye(m_cf.par.num_h), (m_cf.par.num_wlp, 1, 1))
+        for t in range(m_cf.par.T):
+            m_cf.par.Πh[t] = identity_block
 
     m_cf.simulate()
     return m_cf
@@ -321,13 +362,11 @@ def simulate_counterfactual(m_baseline, zero_set):
 # ---------------------------------------------------------------------------
 # Targets and Var(Δlog target) extractor
 # ---------------------------------------------------------------------------
-TARGETS = ('C_tot', 'C_priv', 'Cw', 'Cm', 'sw', 'sm')
+TARGETS = ('C_priv', 'Cw', 'Cm', 'sw', 'sm')
 
 
 def _series(m, target):
-    """Time series (simN × T) for the requested target."""
-    if   target == 'C_tot':  return m.sim.C_tot
-    elif target == 'C_priv': return m.sim.Cw + m.sim.Cm
+    if   target == 'C_priv': return m.sim.Cw + m.sim.Cm
     elif target == 'Cw':     return m.sim.Cw
     elif target == 'Cm':     return m.sim.Cm
     elif target == 'sw':     return m.sim.Cw / (m.sim.Cw + m.sim.Cm)
@@ -336,107 +375,281 @@ def _series(m, target):
 
 
 def var_growth(m, sample, target):
-    """Sample variance of Δlog(target)_t for couples present in t and t+1."""
+    """
+    Sample variance of Δlog(target)_t for couples present in t and t+1,
+    residualized on AGE (period) dummies. The raw pooled variance would also
+    count the deterministic life-cycle profile of growth (between-age
+    variation of mean growth), which is common to every counterfactual and
+    would otherwise sit in the floor unattributable to any shock.
+    """
     sample1 = np.roll(sample, 1, axis=1)
     sm = (m.sim.couple[sample1] == 1) & (m.sim.couple[sample] == 1)
     x = _series(m, target)
     dx = np.log(x[sample1] / x[sample])[sm]
+    tt = np.tile(np.arange(m.par.T), (m.par.simN, 1))
+    t_cell = tt[sample1][sm]                 # period of the growth cell
+    for tv in np.unique(t_cell):
+        g = t_cell == tv
+        dx[g] -= dx[g].mean()                # age-dummy residualization
     return dx.var(ddof=1)
 
 
+###############################################################################
+# The counterfactual RUNS (KV block shutdowns), per regime                    #
+###############################################################################
+# 'baseline'  : all shocks on (the baseline model itself, no re-simulation)
+# one per BLOCK: that block frozen, everything else (incl. δ^w) on
+# 'floor'     : ALL three blocks frozen simultaneously (δ^w still ACTIVE)
+# 'no_dep'    : only δ^w frozen (for the separate depreciation table)
+
+RUNS = {'baseline': set()}
+RUNS.update({b: set(BLOCKS[b]) for b in BLOCK_KEYS})
+RUNS['floor']  = set().union(*(set(v) for v in BLOCKS.values()))
+RUNS['no_dep'] = set(DEP_SHOCKS)
+
+
+def floor_diagnostics(m, sample, tag):
+    """
+    What still moves in the FLOOR world? Frozen shocks are not frozen
+    FUNDAMENTALS: income still follows its deterministic life-cycle trend and
+    assets evolve along couple-specific paths, so outside options drift and
+    participation constraints can be crossed deterministically — each couple
+    at its own date (which is why age dummies cannot absorb it). On top of
+    that, δ^w is still ACTIVE here by design. Split the floor variance by
+    event: renegotiation cells, participation-switch cells (no reneg), and
+    quiet cells. sw moves ONLY with power, so its floor should load
+    ~entirely on the renegotiation cells (and be ~0 under FC).
+    """
+    sample1 = np.roll(sample, 1, axis=1)
+    sm = (m.sim.couple[sample1] == 1) & (m.sim.couple[sample] == 1)
+    reneg = m.sim.power[sample1][sm] != m.sim.power_lag[sample1][sm]
+    wlpch = m.sim.WLP[sample1][sm] != m.sim.WLP[sample][sm]
+    groups = (('renegotiation', reneg),
+              ('wlp switch (no reneg)', wlpch & ~reneg),
+              ('neither', ~(reneg | wlpch)))
+    print(f"  [floor diagnostics {tag}] blocks frozen (dep active): "
+          f"reneg freq {reneg.mean():.2%}, wlp-switch freq {wlpch.mean():.2%}")
+    for tgt in ('sw', 'C_priv'):
+        x = _series(m, tgt)
+        dx = np.log(x[sample1] / x[sample])[sm]
+        dx = dx - dx.mean()
+        vtot = np.mean(dx**2)
+        line = f"    E[(dlog {tgt})^2] = {100*vtot:.3f} (x100):"
+        for name, g in groups:
+            c = np.mean(dx**2 * g)
+            share = c/vtot if vtot > 0 else 0.0
+            line += f"   {name} {100*c:.3f} ({share:.0%})"
+        print(line)
+
+
+# The simulated FLOOR model of each regime is KEPT here for inspection after
+# the run: e.g. M_NOSHOCK['LC'].sim.power, .sim.WLP, .sim.Cw, ...
+# (fixed baseline policies; persistent+transitory+love frozen, dep active).
+M_NOSHOCK = {}
+
+
+def run_counterfactuals(m_base, sample, tag):
+    """One V[run][target] = Var(Δlog target) per run in RUNS."""
+    print(f"Running {len(RUNS)-1} fixed-policy counterfactual simulations ({tag})...")
+    V = {}
+    for name, zero_set in RUNS.items():
+        if not zero_set:
+            m_cf = m_base                    # baseline: everything on
+        else:
+            print(f"  freezing {sorted(zero_set)} ...")
+            m_cf = simulate_counterfactual(m_base, zero_set)
+        V[name] = {tgt: var_growth(m_cf, sample, tgt) for tgt in TARGETS}
+        if name == 'floor':
+            floor_diagnostics(m_cf, sample, tag)
+            M_NOSHOCK[tag] = m_cf            # keep for interactive inspection
+        elif zero_set:
+            del m_cf
+    return V
+
+
+REGIMES = (('LC', m_LC, sample_LC), ('FC', m_FC, sample_FC))
+Vcache = {tag: run_counterfactuals(m, sample, tag) for tag, m, sample in REGIMES}
+
+
 # ---------------------------------------------------------------------------
-# Marginal shock decomposition
+# KV block contributions: c_B = V(all) − V(all∖B); + floor and dep numbers
 # ---------------------------------------------------------------------------
-def run_counterfactuals(m_baseline, verbose=False):
-    """
-    Run the 6 fixed-policy counterfactual simulations once and cache them.
-    Returns dict keyed by shock name; the baseline model itself is the
-    'baseline' key. Reuse to compute Var(Δlog target) for any target without
-    re-simulating.
-    """
-    cfs = {'baseline': m_baseline}
-    for x in SHOCKS:
-        if verbose:
-            print(f"  zero {x} ...")
-        cfs[x] = simulate_counterfactual(m_baseline, zero_set={x})
-    return cfs
+results = {}
+for tag, _, _ in REGIMES:
+    V = Vcache[tag]
+    results[tag] = {}
+    for tgt in TARGETS:
+        V_all = V['baseline'][tgt]
+        con   = {b: V_all - V[b][tgt] for b in BLOCK_KEYS}
+        c_dep = V_all - V['no_dep'][tgt]
+        V_flr = V['floor'][tgt]
+        results[tag][tgt] = {'V_all': V_all, 'contrib': con,
+                             'c_dep': c_dep, 'V_floor': V_flr}
 
-
-def shock_decomposition(cfs, sample, target):
-    """
-    Marginal contribution of each shock to Var(Δlog target), from the cached
-    counterfactual simulations in `cfs` (output of run_counterfactuals).
-
-    Returns a dict with one entry per shock (= V_baseline - V_without_shock),
-    plus 'V_total' and 'interaction' (= V_total - sum of contributions).
-    """
-    V_base = var_growth(cfs['baseline'], sample, target)
-    out = {'target': target, 'V_total': V_base}
-    for x in SHOCKS:
-        out[x] = V_base - var_growth(cfs[x], sample, target)
-    out['interaction'] = V_base - sum(out[x] for x in SHOCKS)
-    return out
+        print(f"\n=== KV block decomposition of Var(Δlog {tgt}) — {tag} ===")
+        print(f"  V(all shocks) = {100*V_all:.3f}   V(floor: blocks frozen, dep on) = {100*V_flr:.3f}   (x100)")
+        print(f"  {'block':12s} {'V(all)-V(all-B)':>16s} {'(share)':>8s}")
+        for b in BLOCK_KEYS:
+            share = con[b]/V_all if abs(V_all) > 1e-12 else 0.0
+            print(f"  {b:12s} {100*con[b]:16.3f} {share:8.1%}")
+        share = c_dep/V_all if abs(V_all) > 1e-12 else 0.0
+        print(f"  {'dep_w (sep.)':12s} {100*c_dep:16.3f} {share:8.1%}")
+        print(f"  SUM(blocks) = {100*sum(con.values()):.3f}  vs  "
+              f"V(all)-V(floor) = {100*(V_all - V_flr):.3f}   [KV: no exact adding-up]")
 
 
 # ---------------------------------------------------------------------------
-# LaTeX row builder for the shock-decomposition table
+# LaTeX tables: one row of contributions (x100), one scriptsize row of shares.
+# shockdec_<target>.tex columns: V_total | persistent | transitory | love.
+# Rows: LC, FC. (The floor is computed and printed to console but not
+# tabulated.)
 # ---------------------------------------------------------------------------
-def shockdec_row(dec, label):
-    """
-    Two LaTeX rows for one (regime × target) case, mirroring vardec_row.
-        Row 1: V_total, then ΔV_x for each shock, then interaction (×100).
-        Row 2: share of V_total in scriptsize, in parentheses.
-    If V_total ≈ 0 (e.g., consumption share under full commitment, where
-    Δlog s^g ≡ 0 for intact couples), the percentage row is suppressed
-    because the shares are all 0/0; only the value row is returned.
-    No operator columns — the table header lists shock names directly.
-    """
-    def v(x):  return '%.2f' % (100.0*x) if abs(x) > 1e-6 else '0.00'
-    def p(x):  return '%.0f' % (100.0*x) if abs(x) > 1e-3 else '0'
-    pct = lambda x: r'{\scriptsize (' + p(x) + r'\%)}'
+def _v(x):  return '%.2f' % (100.0*x) if abs(x) > 1e-6 else '0.00'
+def _p(x):  return '%.0f' % (100.0*x) if abs(x) > 1e-3 else '0'
+_pct = lambda x: r'{\scriptsize (' + _p(x) + r'\%)}'
 
-    V = dec['V_total']
-    keys = list(SHOCKS) + ['interaction']
-    cells_v = [v(V)] + [v(dec[k]) for k in keys]
+
+def block_rows(tag, target, label):
+    r = results[tag][target]
+    Vt = r['V_all']
+    cells_v = [_v(Vt)] + [_v(r['contrib'][b]) for b in BLOCK_KEYS]
     row1 = label + ' & ' + ' & '.join(cells_v)
-
-    if abs(V) < 1e-8:
-        return row1                         # V_total ≈ 0 → drop the % row
-
-    cells_p = [pct(1.0)] + [pct(dec[k] / V) for k in keys]
+    if abs(Vt) < 1e-8:
+        return row1                          # V_total ≈ 0 → drop the % row
+    cells_p = [_pct(1.0)] + [_pct(r['contrib'][b]/Vt) for b in BLOCK_KEYS]
     row2 = ' & ' + ' & '.join(cells_p)
     return row1 + r' \\[-0.5ex]' + '\n' + row2
 
 
-# ---------------------------------------------------------------------------
-# Run shock decomposition for both regimes and emit one table per target.
-#
-# Two output tables, each with two rows (LC, FC):
-#   * shockdec_Cpriv.tex — target = C_priv (within-couple private cw + cm),
-#     measuring the role of each shock for total private consumption volatility.
-#   * shockdec_sw.tex    — target = sw (wife's private share cw/(cw+cm)),
-#     measuring the role of each shock for the consumption share.
-# ---------------------------------------------------------------------------
-print("Running fixed-policy counterfactual simulations (LC)...")
-cfs_LC = run_counterfactuals(m_LC, verbose=True)
-
-print("Running fixed-policy counterfactual simulations (FC)...")
-cfs_FC = run_counterfactuals(m_FC, verbose=True)
-
-
-def write_shockdec_table(target, filename):
-    """Build a 2-row LaTeX table (LC + FC) for the given target and save it."""
-    dec_LC = shock_decomposition(cfs_LC, sample_LC, target=target)
-    dec_FC = shock_decomposition(cfs_FC, sample_FC, target=target)
+for tgt, fname in (('C_priv', 'shockdec_Cpriv.tex'), ('sw', 'shockdec_sw.tex'),
+                   ('sm', 'shockdec_sm.tex')):
     body = '\n'.join([
-        shockdec_row(dec_LC, 'Limited commitment') + r' \\',
-        shockdec_row(dec_FC, 'Full commitment'),     # no trailing \\
+        block_rows('LC', tgt, '\hspace{8pt}Limited commitment') + r' \\',
+        block_rows('FC', tgt, '\hspace{8pt}Full commitment'),     # no trailing \\
     ])
-    with open(root + '/Output files/model/' + filename, 'w') as f:
+    with open(root + '/Output files/model/' + fname, 'w') as f:
         f.write(body)
 
 
-write_shockdec_table(target='C_priv', filename='shockdec_Cpriv.tex')
-write_shockdec_table(target='sw',     filename='shockdec_sw.tex')
+# --- the DEPRECIATION table: δ^w's one-at-a-time contribution --------------
+# Columns: C_priv: V_total, ΔV_dep | sw: V_total, ΔV_dep. Rows: LC, FC.
+def dep_row(tag, label):
+    rc, rs = results[tag]['C_priv'], results[tag]['sw']
+    row1 = (label + ' & ' + _v(rc['V_all']) + ' & ' + _v(rc['c_dep']) +
+            ' & ' + _v(rs['V_all']) + ' & ' + _v(rs['c_dep']))
+    shc = rc['c_dep']/rc['V_all'] if abs(rc['V_all']) > 1e-8 else 0.0
+    shs = rs['c_dep']/rs['V_all'] if abs(rs['V_all']) > 1e-8 else 0.0
+    row2 = (' & ' + _pct(1.0) + ' & ' + _pct(shc) +
+            ' & ' + (_pct(1.0) if abs(rs['V_all']) > 1e-8 else '') +
+            ' & ' + (_pct(shs) if abs(rs['V_all']) > 1e-8 else ''))
+    return row1 + r' \\[-0.5ex]' + '\n' + row2
 
-print("Done. Wrote vardec.tex, shockdec_Cpriv.tex, shockdec_sw.tex.")
+
+with open(root + '/Output files/model/shockdec_dep.tex', 'w') as f:
+    f.write('\n'.join([
+        dep_row('LC', 'Limited commitment') + r' \\',
+        dep_row('FC', 'Full commitment'),
+    ]))
+
+
+###############################################################################
+# Channel table vardec.tex (BASELINE identity only, no shock split):          #
+#   Var(Δlog c^g) = Var(Δlog C) + Var(Δlog s^g) + 2 Cov(Δlog C, Δlog s^g)     #
+# via the insurance() routine (which also writes its pass-through side files) #
+###############################################################################
+
+def vardec_row(B, spouse, label):
+    """
+    Two LaTeX rows for one (regime × spouse) case from a results dict B
+    returned by insurance(): variance values (×100) on row 1, share of total
+    in scriptsize on row 2. Empty cells (" & & ") sit in narrow operator
+    columns of the header.
+    """
+    d = B['vardec_w'] if spouse == 'w' else B['vardec_m']
+    row1 = (label + ' & ' +
+            _v(d['V_total']) + ' & & ' +
+            _v(d['V_agg'])   + ' & & ' +
+            _v(d['V_reb'])   + ' & & ' +
+            _v(d['2Cov']))
+    row2 = (' & ' + _pct(1.0)         + ' & & ' +
+                    _pct(d['sh_agg']) + ' & & ' +
+                    _pct(d['sh_reb']) + ' & & ' +
+                    _pct(d['sh_cov']))
+    return row1 + r' \\[-0.5ex]' + '\n' + row2
+
+
+B_LC = insurance(m_LC, sample_LC, shock_type='permanent', shock_gender='Male',
+                 consumption_gender='Male', name_file='VardecLC', name_line='Limited commitment')
+B_FC = insurance(m_FC, sample_FC, shock_type='permanent', shock_gender='Male',
+                 consumption_gender='Male', name_file='VardecFC', name_line='Full commitment')
+
+table = '\n'.join([
+    r'\textit{A. Wife} & & & & & & & \\',
+    r'\addlinespace',
+    vardec_row(B_LC, 'w', '\hspace{8pt}Limited comm.') + r' \\',
+    vardec_row(B_FC, 'w', '\hspace{8pt}Full comm.')    + r' \\',
+    r'\addlinespace',
+    r'\textit{B. Husband} & & & & & & & \\',
+    r'\addlinespace',
+    vardec_row(B_LC, 'm', '\hspace{8pt}Limited comm.') + r' \\',
+    vardec_row(B_FC, 'm', '\hspace{8pt}Full comm.'),          # no trailing \\
+])
+with open(root + '/Output files/model/vardec.tex', 'w') as f:
+    f.write(table)
+
+
+###############################################################################
+# Event-direction decomposition of E[(Δlog s_w)^2] — per-regime baseline      #
+###############################################################################
+# Every Δlog s_w observation is classified by what the bargaining weight did
+# in the SECOND period of the growth cell: renegotiation toward the wife
+# (power up), toward the husband (power down), or no renegotiation. The three
+# groups' contributions to E[(Δlog s_w)^2] add up exactly. (Under FC the
+# weight never moves, so everything lands in 'No renegotiation'.)
+
+def event_decomposition(m, sample, tag):
+    sample1 = np.roll(sample, 1, axis=1)
+    sm = (m.sim.couple[sample1] == 1) & (m.sim.couple[sample] == 1)
+
+    sw_ser = _series(m, 'sw')
+    dsw = np.log(sw_ser[sample1] / sw_ser[sample])[sm]
+    pw_now = m.sim.power[sample1][sm]
+    pw_lag = m.sim.power_lag[sample1][sm]
+
+    tol = 1e-12
+    up   = pw_now > pw_lag + tol      # renegotiation toward wife
+    down = pw_now < pw_lag - tol      # renegotiation toward husband
+    none = ~(up | down)
+
+    E_tot = np.mean(dsw**2)
+    groups = [('Toward wife', up), ('Toward husband', down), ('No renegotiation', none)]
+
+    print(f"\n=== Event decomposition of E[(dlog s_w)^2] — {tag} baseline ===")
+    print(f"  E[(dlog s_w)^2] = {100*E_tot:.3f}  (x100)")
+    rows = []
+    for name, g in groups:
+        contrib = np.sum(dsw[g]**2) / len(dsw)          # additive contribution
+        freq = g.mean()
+        share = contrib/E_tot if E_tot > 0 else 0.0
+        print(f"  {name:18s} freq {freq:6.1%}   contribution {100*contrib:8.3f}  ({share:6.1%})")
+        rows.append((name, freq, contrib))
+
+    def v(x):  return '%.2f' % (100.0*x)
+    def p(x):  return '%.0f' % (100.0*x)
+    lines = []
+    for name, freq, contrib in rows:
+        share = contrib / E_tot if E_tot > 0 else 0.0
+        lines.append(f'{name} & {p(freq)}\\% & {v(contrib)} & {p(share)}\\%')
+    table = (' \\\\\n'.join(lines) + ' \\\\\n\\midrule\n' +
+             f'Total & 100\\% & {v(E_tot)} & 100\\%')
+    with open(root + f'/Output files/model/events_sw_{tag}.tex', 'w') as f:
+        f.write(table)
+
+
+for tag, m, sample in REGIMES:
+    event_decomposition(m, sample, tag)
+
+
+
+print("\nDone. Wrote vardec.tex, shockdec_Cpriv.tex, shockdec_sw.tex, "
+      "shockdec_sm.tex, shockdec_dep.tex, events_sw_{LC,FC}.tex.")

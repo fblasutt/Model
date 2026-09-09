@@ -81,7 +81,7 @@ izm=np.array([np.argmin(np.abs(np.log(gridzm)[int(model.par.sample_init[i]),0,:,
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
 izw=np.array([np.argmin(np.abs(np.log(gridzw)[int(model.par.sample_init[i]),0,:,0]-w_income[i])) for i in range(model.par.simN)],dtype=np.int32)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
-model.sim.init_z=izm*model.par.num_zm+izw
+model.sim.init_z=izw*model.par.num_zm+izm   # FIXED gender swap: wife is the SLOW joint-index component
 model.sim.init_A=assets
 
 

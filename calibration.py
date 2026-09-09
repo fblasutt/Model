@@ -46,12 +46,11 @@ else:
 #estimating the model (True) or compute tables given paramters in xc below (BPP, paramters, fitt) (False)
 ESTIMATE=False
 
-
 #Create sample with replacement 
 N=10_000#sample size 
 
 
-#Import information for the sample, then store the relevant variables
+#Import information for the sample, then store t-*9he relevant variables
 baseline_sample=np.array(pd.read_excel(root+'/Output files/data_sample.csv'))
 
 #Without those two lines below there are nan which screw up things
@@ -80,19 +79,17 @@ marr_durr_pol=final_sample[:,8]
 
 
 # Guess of internal parameters: [η,σL,α,ρ,wedge_w,wedge_m,β,ι0w]
+# σL0 (initial match-quality dispersion) is FIXED in Bargaining_numba.setup(),
+# no longer estimated; the young-divorce target was dropped with it.
 
 
-#Target 0.97 (large diff of pass thorughs + ridiculous real effect of reform)
-xc=np.array([4.46931249,  0.04134383,  0.92836788,  1.68926261,  2.40723492, -0.09099960,.98391886, -0.64534907])
+#normal rate, power grid 13
+xc=np.array([2.17742503,  0.03991867,  0.95089659,  1.80807117,  0.63913244, -0.23640997,
+  0.99523097, -0.90290523])
 
-#Target 1.03.. (resonable pass throughs, , ridiculous effect of the reorm)
-xc=np.array([5.61375811,  0.03893,     0.95715273,  1.97497468,  3.05150031, -0.10250626, 0.98321172, -0.64221611])
 
-# 8-parameter layout: [η, σL, α, ρ, wedge_w, wedge_m, β, ι0w] — ι0w (female
-# income-trend level) now internally estimated, targeting the mean wife-to-
-# husband earnings ratio among working wives (0.46 in the data).
-xl=np.array([0.2,0.001,0.78 ,1.0,-0.2,-0.2,0.94,-1.5])
-xu=np.array([12.2,0.25 ,0.98 ,2.5 ,3.5 ,3.5 ,1.005,-0.05])
+xl=np.array([0.2,0.001,0.78 ,1.0,-3.2,-3.2,0.94,-1.5])
+xu=np.array([13.2,0.35 ,0.999 ,4.5 ,7.5 ,7.5 ,1.005,-0.05])
 
 #Parametrize the model 
 par = {'simN':N,'η': xc[0],'σL':xc[1],'α':xc[2],'ρ':xc[3],'wedge_w':xc[4],'wedge_m':xc[5],'β':xc[6],'ι0w':xc[7],'sample_init':np.array(age_marriage-25,dtype=np.int_)}
@@ -117,7 +114,8 @@ izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,mode
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
 izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2     
-model.sim.init_z=izm*model.par.num_zm+izw
+model.sim.init_z=izw*model.par.num_zm+izm   # FIXED gender swap: wife is the SLOW joint-index component
+#model.sim.init_z=izm*model.par.num_zm+izw
 model.sim.init_A=assets
 
 
@@ -170,8 +168,9 @@ def q(pt,table=False):
         gridzw_pt=M_bef.par.grid_zw[:,:,np.linspace(0,M_bef.par.num_z-1,M_bef.par.num_zm,dtype=np.int_)]
         izw_pt=ic.draw_init_iz(w_income,M_bef.par.sample_init,gridzw_pt,M_bef.par.grid_pw,M_bef.par.grid_ϵw,u_init_w,σME2=σME2_init)
         izw_pt[np.isnan(w_income)]=(M_bef.par.num_pw*M_bef.par.num_ϵw)//2
-        M_bef.sim.init_z=izm*M_bef.par.num_zm+izw_pt
-
+        M_bef.sim.init_z=izw_pt*M_bef.par.num_zm+izm   # FIXED gender swap: wife is the SLOW joint-index component
+   
+        
         # Initial Pareto weights depend on ρ: recompute them with pt[3] so the
         # in-loop economy matches a fresh run parametrized at pt. (The module-top
         # init_power was built with the construction-time ρ and is otherwise just
@@ -180,8 +179,7 @@ def q(pt,table=False):
         M_bef.sim.init_power=param_pt/(1.0+param_pt)
     
         # Two individual-specific random-walk love shocks with innovation sd pt[1],
-        # initial sd σL0 = 0.1 fixed (set in setup_grids: t=0 grid width for the
-        # init-love rationalization; median point stays exactly 0). Joint index iL = iψw*num_lovem + iψm.
+        # Joint index iL = iψw*num_lovem + iψm.
         M_bef.par.grid_lovew_,M_bef.par.Πlw_,M_bef.par.Πlw0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovew)
         M_bef.par.grid_lovem_,M_bef.par.Πlm_,M_bef.par.Πlm0_= usr.rouw_nonst(M_bef.par.T,pt[1],M_bef.par.σL0,M_bef.par.num_lovem)
         M_bef.par.grid_lovew=[np.repeat(M_bef.par.grid_lovew_[t],M_bef.par.num_lovem) for t in range(M_bef.par.T)]
@@ -371,18 +369,7 @@ def q(pt,table=False):
         ######################################
         #Other moments here
         ###################################### 
-        # from consav import linear_interp,upperenvelope
-        # Vcw=np.zeros(M.par.simN)
-        # for i in range(M.par.simN):
-            
-            
-            
-        #     idx = (44,M.sim.ih[i,44],M.sim.iz[i,44],slice(None),M.sim.love[i,44])
-            
-        #     Vcw[i]=linear_interp.interp_2d(M.par.grid_power,M.par.grid_A,M.sol.Vw_remain_couple[idx],M_bef.sim.power[i,44],M_bef.sim.A[i,44])
-            
-            
-        
+
          
         #Wife share of consumption
         event_time=np.arange(-5,20)
@@ -510,8 +497,8 @@ def q(pt,table=False):
         
     
         ΔC =np.log(M.sim.C_tot[sample_pass])#  -np.log(M.sim.C_tot[sample_pass_m1])
-        Δd=np.log(M.sim.dw[sample_pass]) # -np.log(M.sim.dw[sample_pass_m1])     
-        βdC=np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
+        Δd=np.log((M.sim.dw)[sample_pass]) # -np.log(M.sim.dw[sample_pass_m1])     
+        βCp=np.cov(ΔC,Δd)[0,1]/np.var(ΔC)
         
         # Average household income
         couple_assets = M.sim.A[sample_empl].mean()/M.sim.incmg[sample_empl].mean()
@@ -530,19 +517,19 @@ def q(pt,table=False):
         share_full_time=(M.sim.WLP[sample_empl][(M.sim.WLP[sample_empl]>0) & (M.sim.couple[sample_empl]==1)]==(M.par.num_wlp-1)).mean()
         
     
-        fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.0139)/.0139)**2+((divorce_rate-0.0103)/0.0103)**2+((expenditure_x_share-0.812)/0.812)**2+((βdC-.97899)/.97899)**2+((couple_assets-2.634)/2.634)**2+((wife_cons_share-0.322)/0.322)**2+((gender_gap_earnings-.3767)/.3767)**2#+((AWE+0.03)/0.03)**2
+        fit =((wife_empl-0.5879)/0.5879)**2+((policy_effect_wife_ratio-.0139)/.0139)**2+((divorce_rate-.0107513)/.0107513)**2+((expenditure_x_share-0.812)/0.812)**2+((βCp-1.044)/1.044)**2+((couple_assets-2.44)/2.44)**2+((wife_cons_share-0.322)/0.322)**2+((gender_gap_earnings-.3767)/.3767)**2#+((AWE+0.03)/0.03)**2
         print('Point is {}, fit is {}'.format(pt,fit))  
-        print('Simulated moments are {}'.format([wife_empl,policy_effect_wife_ratio,divorce_rate,expenditure_x_share,βdC,couple_assets,wife_cons_share,gender_gap_earnings]))
+        print('Simulated moments are {}'.format([wife_empl,policy_effect_wife_ratio,divorce_rate,expenditure_x_share,βCp,couple_assets,wife_cons_share,gender_gap_earnings,divorce_rate_young]))
         
       
         print('Simulated moments are {}'.format([gender_gap_earnings,share_full_time,policy_effect_wife_ratio]))
     
         
         # Function tables computes a lot of tables with results and fit. Should be activated only for the final solution
-        if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time,wife_cons_share,gender_gap_earnings)
+        if table:tables(M,sample_reg,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βCp,couple_assets,gender_gap_earnings,share_full_time,wife_cons_share,gender_gap_earnings,divorce_rate_young)
       
-        #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βdC-.9)/.9)]   
-        fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.0139)/.0139),((divorce_rate-0.0103)/0.0103),((expenditure_x_share-.812)/.812),((βdC-.97899)/.97899),((couple_assets-2.634)/2.634),((wife_cons_share-0.322)/0.322),((gender_gap_earnings-.3767)/.3767)]#,(AWE+0.03)/0.03]
+        #fitt=[((wife_empl-.567)/.567),((divorce_rate_young-.0109)/.0109),((divorce_rate-.0101)/.0101),((expenditure_x_share-.782)/.782),((βCp-.9)/.9)]   
+        fitt=[((wife_empl-0.5879)/0.5879),((policy_effect_wife_ratio-.0139)/.0139),((divorce_rate-.0107513)/.0107513),((expenditure_x_share-.812)/.812),((βCp-1.044)/1.044),((couple_assets-2.44)/2.44),((wife_cons_share-0.322)/0.322),((gender_gap_earnings-.3767)/.3767)]#,(AWE+0.03)/0.03]
 
         if np.isnan(fitt).max():fitt=[10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]#
         return fitt#fit#
@@ -552,7 +539,7 @@ def q(pt,table=False):
         print("Global error! Point is {}".format(pt))
         return [10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0,10000.0]
      
-def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βdC,couple_assets,gender_gap_earnings,share_full_time,wife_cons_share,wife_ratio):
+def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_share,wife_empl,βCp,couple_assets,gender_gap_earnings,share_full_time,wife_cons_share,wife_ratio,divorce_rate_young):
     
     # Extract empirical pass throughs from Sara's files
     def simple_extract(filename):
@@ -585,7 +572,8 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
     #Tables with pass-throughs results below
     def p33(x): y=x;return str('%3.3f' % y)    
     def p42(x): return str('%4.2f' % x)  
-    def p43(x): return str('%4.3f' % x)     
+    def p43(x): return str('%4.3f' % x)  
+    def p53(x): return str('%5.3f' % x)     
     def p40(x): return str('%4.0f' % x) 
      
     #% changes in consumption out of a 1 % change in all income
@@ -638,10 +626,10 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
     
     # Table with pass throughs in the data and in the model
     # Table with pass throughs in the data and in the model
-    table=r'...persistent husband shocks & \textbf{'+p33(B['BPP_PER']['ym_cm'])+'}/\\textit{\\textcolor{orange}{0.429}} & \\textbf{'+p33(B['BPP_PER']['ym_cw'])+'}/\\textit{\\textcolor{orange}{0.175}} &  \\\\ '+\
-          r'...persistent wife shocks    & \textbf{'+p33(B['BPP_PER']['yw_cm'])+'}/\\textit{\\textcolor{orange}{0.029}} & \\textbf{'+p33(B['BPP_PER']['yw_cw'])+'}/\\textit{\\textcolor{orange}{0.281}} & \\\\[1.5ex] '+\
-          r'...transitory husband shocks & \textbf{'+p33(B['BPP_MPC']['ym_cm'])+'}/\\textit{\\textcolor{orange}{0.060}} & \\textbf{'+p33(B['BPP_MPC']['ym_cw'])+'}/\\textit{\\textcolor{orange}{0.055}} &  \\\\ '+\
-          r'...transitory wife shocks    & \textbf{'+p33(B['BPP_MPC']['yw_cm'])+'}/\\textit{\\textcolor{orange}{0.006}} & \\textbf{'+p33(B['BPP_MPC']['yw_cw'])+'}/\\textit{\\textcolor{orange}{0.038}}   &   \\\\\\bottomrule '
+    table=r'...persistent husband shocks & \textbf{'+p33(B['BPP_PER_net']['ym_cm'])+'}/\\textit{\\textcolor{orange}{0.429}} & \\textbf{'+p33(B['BPP_PER_net']['ym_cw'])+'}/\\textit{\\textcolor{orange}{0.175}} &  \\\\ '+\
+          r'...persistent wife shocks    & \textbf{'+p33(B['BPP_PER_net']['yw_cm'])+'}/\\textit{\\textcolor{orange}{0.029}} & \\textbf{'+p33(B['BPP_PER_net']['yw_cw'])+'}/\\textit{\\textcolor{orange}{0.281}} & \\\\[1.5ex] '+\
+          r'...transitory husband shocks & \textbf{'+p33(B['BPP_MPC_net']['ym_cm'])+'}/\\textit{\\textcolor{orange}{0.060}} & \\textbf{'+p33(B['BPP_MPC_net']['ym_cw'])+'}/\\textit{\\textcolor{orange}{0.055}} &  \\\\ '+\
+          r'...transitory wife shocks    & \textbf{'+p33(B['BPP_MPC_net']['yw_cm'])+'}/\\textit{\\textcolor{orange}{0.006}} & \\textbf{'+p33(B['BPP_MPC_net']['yw_cw'])+'}/\\textit{\\textcolor{orange}{0.038}}   &   \\\\\\bottomrule '
     
     with open(root+'/Output files/model/elasticity_BPP_model_vs_data.tex', 'w') as f: f.write(table); f.close() 
     
@@ -654,14 +642,14 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
           r'\begin{tabular}{lccc} \toprule '+\
           r'Estimated Parameters &  & Value & Target Moment  \\ '+\
           r' \midrule '+\
-          r'Match-quality shock (each spouse), s.d. & $\sigma_{\psi}$ & '+p42(pt[1])+' & Annual divorce rate'+' \\\\'+\
-          r'Single--couple utility wedge, wife & $Wedge_w$       & '+p42(pt[4])+r" & Reform effect on wife's cons.\ share"+' \\\\'+\
-          r'Single--couple utility wedge, husband & $Wedge_m$    & '+p42(pt[5])+r" & Wife's share of private consumption"+' \\\\'+\
-          r'Female income trend, level         & $\iota_{0w}$    & '+p42(pt[7])+r" & Wife/husband earnings ratio, workers"+' \\\\'+\
-          r'Risk aversion, private goods       & $\rho$          & '+p42(pt[3])+r' & Home-exp.\ elasticity to total cons.'+' \\\\'+\
-          r'Weight on home goods               & $\alpha$        & '+p42(pt[2])+' & Expenditure share of home goods'+'  \\\\'+\
-          r'Disutility of employment           & $\eta$          & '+p42(pt[0])+r' & Empl.\ rate of married women'+' \\\\'+\
-          r'Discount factor                    & $\beta$         & '+p42(pt[6])+r" & Wealth/husband's earnings"+' \\\\'+\
+          r'Love shock, s.d.                   & $\sigma_{\psi}$   & '+p53(pt[1])+' & Annual divorce rate'+' \\\\'+\
+          r'Initial match quality, wife        & $\bar{\psi}^f$    & '+p53(-pt[4])+r" & Reform effect on wife's cons.\ share"+' \\\\'+\
+          r'Initial match quality, husband     & $\bar{\psi}^m$    & '+p53(-pt[5])+r" & Wife's share of private consumption"+' \\\\'+\
+          r'Female income profile, intercept   & $\iota^f_0$       & '+p53(pt[7])+r" & Wife-to-husband earnings ratio"+' \\\\'+\
+          r'Risk aversion, private goods       & $\sigma$          & '+p53(pt[3])+r' & Private-exp.\ elasticity to total cons.'+' \\\\'+\
+          r'Weight on home goods               & $\alpha$          & '+p53(pt[2])+' & Expenditure share of home goods'+'  \\\\'+\
+          r'Disutility of employment           & $\eta$            & '+p53(pt[0])+r' & Empl.\ rate of married women'+' \\\\'+\
+          r'Discount factor                    & $\beta$           & '+p53(pt[6])+r" & Wealth/husband's earnings"+' \\\\'+\
           r' \bottomrule '+\
           r'\end{tabular}'+\
           r'\end{table}'
@@ -678,18 +666,17 @@ def tables(M,sample,pt,root,divorce_rate,policy_effect_wife_ratio,expenditure_x_
          r'\begin{tabular}{lcc}\toprule '+\
         r'Targeted Moments & Data  & Model  \\ \midrule '+\
         r'Annual divorce rate              & '+p43(0.010)+' & '+p43(divorce_rate)+'  \\\\'+\
-        r"Effect of pension reform on wife's consumption share & "+p43(0.014)+' & '+p43(policy_effect_wife_ratio)+' \\\\'+\
-        r'Pass-through of total consumption to home-good expenditure & '+p43(.979)+' & '+p43(βdC)+' \\\\'+\
+        r"Reform effect on wife's cons.\ share & "+p43(0.014)+' & '+p43(policy_effect_wife_ratio)+' \\\\'+\
+        r'Private-exp.\ elasticity to total cons. & '+p43(1.044)+' & '+p43(βCp)+' \\\\'+\
         r'Employment rate of married women        & '+p43(0.588)+' & '+p43(wife_empl)+'  \\\\'+\
         r'Expenditure share of home goods         & '+p43(0.812)+' & '+p43(expenditure_x_share)+'  \\\\'+\
-        r"Wealth to husband's earnings ratio      & "+p43(2.634)+' & '+p43(couple_assets)+'  \\\\'+\
+        r"Wealth/husband's earnings      & "+p43(2.44)+' & '+p43(couple_assets)+'  \\\\'+\
         r"Wife's share of private consumption     & "+p43(0.322)+' & '+p43(wife_cons_share)+'  \\\\'+\
-        r"Wife-to-husband earnings ratio, working wives & "+p43(0.46)+' & '+p43(wife_ratio)+'  \\\\'+\
+        r"Wife-to-husband earnings ratio & "+p43(0.3767)+' & '+p43(gender_gap_earnings)+'  \\\\'+\
         r'\midrule '+\
         r'Non-targeted Moments & Data  & Model \\'+\
         r'\midrule '+\
-        r'Female-to-male earnings ratio, workers  & '+p43(0.532)+' & '+p43(gender_gap_earnings)+'\\\\'+\
-        r"Wife's employment response to husband's income shocks & "+p43(-0.023)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
+        r"Wife's hours response to husband's income shocks & "+p43(-1.653)+' &  '+p43(B['wlp']['all_m'])+'\\\\'+\
         r'\bottomrule '+\
         r'\end{tabular}'+\
         r'\end{table}'
@@ -732,7 +719,7 @@ if __name__ == '__main__':
         # print(f'The objective value at the min is {fx}') 
         
         # Estimate the model
-        res=dfols.solve(q, xc, rhobeg = 0.1, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
+        res=dfols.solve(q, xc, rhobeg = 0.03, rhoend=1e-5, maxfun=100, bounds=(xl,xu),  
                     npt=len(xc)+5,scaling_within_bounds=True,   
                     user_params={'tr_radius.gamma_dec':0.98,'tr_radius.gamma_inc':1.0,  
                                   'tr_radius.alpha1':0.9,'tr_radius.alpha2':0.95},  

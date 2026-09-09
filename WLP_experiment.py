@@ -53,7 +53,7 @@ u_init_w=np.random.rand(N);u_init_m=np.random.rand(N)
 
 
 #Current estimates [η,σL,α,ρ,Ω,β] from the shared module (sync with calibration.py)
-from estimated_params import xc, par_dict
+from estimated_params import xc, par_dict, apply_fc_params
 
 #Parametrize the model (NB: position 4 is Ω, the match-quality disagreement shock)
 par = par_dict(N, np.array(age_initial-25,dtype=np.int_))
@@ -77,7 +77,7 @@ izm=ic.draw_init_iz(h_income,model.par.sample_init,gridzm,model.par.grid_pm,mode
 izm[np.isnan(h_income)]=(model.par.num_pm*model.par.num_ϵm)//2
 izw=ic.draw_init_iz(w_income,model.par.sample_init,gridzw,model.par.grid_pw,model.par.grid_ϵw,u_init_w,σME2=σME2_init)
 izw[np.isnan(w_income)]=(model.par.num_pw*model.par.num_ϵw)//2
-model.sim.init_z=izm*model.par.num_zm+izw
+model.sim.init_z=izw*model.par.num_zm+izm   # FIXED gender swap: wife is the SLOW joint-index component
 model.sim.init_A=assets
 
 
@@ -114,8 +114,23 @@ for i in range(len(gridτ)):
     M.par.grid_zws,M.par.grid_ϵw,M.par.grid_pw,M.par.Π_zw0, \
         M.par.grid_zms,M.par.grid_ϵm,M.par.grid_pm,M.par.Π_zm0, \
                                             M.par.Πs=usr.labor_income(M.par,single=True) 
-    M.solve() 
-    M.simulate()  
+    M.solve()
+
+    # The initial love distribution is drawn ONCE, in the BASELINE LC model
+    # (i=0, gridτ[0]=baseline ι0w), then held FIXED across every other version
+    # (other gap levels and all FC models): comparisons are not contaminated
+    # by initial-composition differences.
+    if i==0:
+        M.simulate()
+        init_love_base = np.array(
+            [M.sim.love[k, int(M.par.sample_init[k])] for k in range(M.par.simN)],
+            dtype=np.int_,
+        )
+    else:
+        M.sim.force_init_love[:] = init_love_base
+        M._init_love_rationalized=True
+        M.simulate()
+
     Bmodel.append(M)
  
 #Loop over gender wage gap grid and solve the model - full commitment
@@ -125,6 +140,7 @@ for i in range(len(gridτ)):
     Mf = model.copy(name='numba_new_copy')
     Mf.par.ι0w=gridτ[i]
     Mf.par.full=True
+    apply_fc_params(Mf)   # FC-specific [η, σL, β] (estimated_params.xc_full)
 
 
     # income shocks grids: singles and couples
@@ -140,16 +156,8 @@ for i in range(len(gridτ)):
 
     Mf.solve()
 
-    # Equalize the initial-love draw with the matching LC simulation so that
-    # cross-regime comparisons are apples-to-apples. (FC's mutual-consent PC
-    # at sample-init is laxer than LC's individual PC, so without this step
-    # FC ends up with a wider initial-love distribution than LC.)
-    init_love_lc = np.array(
-        [Bmodel[i].sim.love[k, int(Bmodel[i].par.sample_init[k])]
-         for k in range(Bmodel[i].par.simN)],
-        dtype=np.int_,
-    )
-    Mf.sim.force_init_love[:] = init_love_lc
+    # Same BASELINE-LC initial love as every other version (see above)
+    Mf.sim.force_init_love[:] = init_love_base
 
     Mf.simulate()
     Bfmodel.append(Mf)

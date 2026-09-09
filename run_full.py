@@ -50,10 +50,18 @@ else:
 
 ###############################################################################
 # USER PARAMETRIZATION — edit freely. Layout:
-#            [η,          σL,         α,          ρ,          wedge_w,    wedge_m,    β,          ι0w]
+#            [η,          σL,         α,          ρ,          wedge_w,    wedge_m,    β,          ι0w]   (σL0 fixed in Bargaining_numba.setup())
 ###############################################################################
-xf=np.array([4.52531362,  0.01574232,  0.92576666,  1.67436856,  2.65417813, -0.11096475,0.98380537, -0.56896309])
+xf=np.array([ 2.17742503,  0.03991867,  0.95089659,  1.80807117,  0.63913244,
+       -0.23640997,  0.99523097, -0.90290523])
 
+# xf=np.array([ 1.8,  0.13991867,  0.95089659,  1.80807117,  0.63913244,
+#        -0.23640997,  0.998, -0.90290523])
+
+
+# Commitment regime of the run: True = full commitment (LC twin solved first
+# for the initial love distribution), False = limited commitment.
+FULL = True
 
 N = 10_000  # sample size
 
@@ -91,7 +99,7 @@ age = (np.cumsum(np.ones((N, 65)), axis=1)-1)+25   # rebuilt per-run inside q() 
 ###############################################################################
 # One full run at a chosen parametrization
 ###############################################################################
-def q(xf, extra_par=None, name_file='ManualFull'):
+def q(xf, extra_par=None, name_file='ManualFull', full=False, light=False, init_love=None):
     """
     Build, solve and simulate the FULL-COMMITMENT model at parametrization
     xf = [η, σL, α, ρ, wedge_w, wedge_m, β, ι0w]; print the fit against the
@@ -106,7 +114,7 @@ def q(xf, extra_par=None, name_file='ManualFull'):
     # --- Build the FC model ------------------------------------------------
     par = {'simN': N, 'η': xf[0], 'σL': xf[1], 'α': xf[2], 'ρ': xf[3],
            'wedge_w': xf[4], 'wedge_m': xf[5], 'β': xf[6], 'ι0w': xf[7],
-           'full': False,
+           'full': full,
            'sample_init': np.array(age_marriage-25, dtype=np.int_)}
     if extra_par: par.update(extra_par)
     M = brg.HouseholdModelClass(par=par)
@@ -123,14 +131,28 @@ def q(xf, extra_par=None, name_file='ManualFull'):
     izm[np.isnan(h_income)] = (M.par.num_pm*M.par.num_ϵm)//2
     izw=ic.draw_init_iz(w_income,M.par.sample_init,gridzw,M.par.grid_pw,M.par.grid_ϵw,u_init_w,σME2=σME2_init)
     izw[np.isnan(w_income)] = (M.par.num_pw*M.par.num_ϵw)//2
-    M.sim.init_z = izm*M.par.num_zm+izw
+    M.sim.init_z = izw*M.par.num_zm+izm   # FIXED gender swap: wife is the SLOW joint-index component
     M.sim.init_A = assets   # as in calibration.py (use np.maximum(assets,0.0) to clamp debt)
 
     age = (np.cumsum(np.ones((M.par.simN, M.par.T)), axis=1)-1)+25
 
-    print("Solving the full-commitment model at:")
+    print("Solving the model at:")
     print("  [η, σL, α, ρ, wedge_w, wedge_m, β, ι0w] =", np.round(np.asarray(xf), 5))
     if extra_par: print("  extra overrides:", extra_par)
+
+    if init_love is not None:
+        # externally supplied initial love (e.g. the LC baseline during the
+        # FC estimation loop): transplant and skip the conditional draw
+        M.sim.force_init_love[:] = init_love
+        M._init_love_rationalized = True
+    elif M.par.full:
+        # FULL COMMITMENT: the initial love distribution comes from the LC
+        # BASELINE at the ORIGINAL LC estimates (estimated_params.xc) — same
+        # convention as the experiment scripts. It is computed ONCE and cached,
+        # so trying new FC parametrizations does not re-run the LC model.
+        M.sim.force_init_love[:] = lc_baseline_init_love()
+        M._init_love_rationalized = True
+
     M.solve()
     M.simulate()
 
@@ -143,6 +165,7 @@ def q(xf, extra_par=None, name_file='ManualFull'):
 
     wife_empl       = np.mean(M.sim.WLP[sample_empl] > 0)
     divorce_rate    = np.mean((M.sim.couple == 0)[sample_div])
+    divorce_rate_young = np.mean((M.sim.couple == 0)[(sample_div) & (age <= 40)])
     expenditure_x_share = np.mean((M.sim.dw/M.sim.C_tot)[sample_empl])
     wife_cons_share = np.mean((M.sim.Cw/(M.sim.Cw+M.sim.Cm))[sample_empl])
     wife_ratio      = np.mean((M.sim.incwg/(M.sim.incmg+M.sim.incwg))[sample_empl][M.sim.WLP[sample_empl] > 0])
@@ -151,19 +174,20 @@ def q(xf, extra_par=None, name_file='ManualFull'):
 
     ΔC = np.log(M.sim.C_tot[sample_pass])
     Δd = np.log(M.sim.dw[sample_pass])
-    βdC = np.cov(ΔC, Δd)[0, 1]/np.var(ΔC)
+    βCp = np.cov(ΔC, Δd)[0, 1]/np.var(ΔC)   # same moment as calibration's βCp
 
     moments = [
-        # (label,                                    data,    model)
-        ('Employment rate married women',            0.5879,  wife_empl),
-        ('Annual divorce rate',                      0.0103,  divorce_rate),
-        ('Expenditure share home goods',             0.812,   expenditure_x_share),
-        ('Pass-through C to home-good exp (βdC)',    0.97899, βdC),
-        ('Wealth / husband earnings',                2.634,   couple_assets),
-        ("Wife's share of private consumption",      0.322,   wife_cons_share),
-        ('Gender gap earnings (workers/husbands)',   0.3767,  gender_gap_earnings),
-        ('[diag] wife share of HH earnings, workers', np.nan, wife_ratio),
-        ('[skipped] reform effect on wife share',    0.0139,  np.nan),
+        # (label,                              data,      model)   targets synced with calibration.py
+        ('Employment rate married women',            0.5879,    wife_empl),
+        ('Annual divorce rate',                      0.0107513, divorce_rate),
+        ('[diag] annual divorce rate, young (<=40)', 0.0118,    divorce_rate_young),
+        ('Expenditure share home goods',             0.812,     expenditure_x_share),
+        ('Private-exp. elasticity to total cons.',   1.044,     βCp),
+        ('Wealth / husband earnings',                2.44,      couple_assets),
+        ("Wife's share of private consumption",      0.322,     wife_cons_share),
+        ('Gender gap earnings (workers/husbands)',   0.3767,    gender_gap_earnings),
+        ('[diag] wife share of HH earnings, workers', np.nan,   wife_ratio),
+        ('[skipped] reform effect on wife share',    0.0139,    np.nan),
     ]
 
     print("\n=== FIT (full commitment, single solve) ===")
@@ -175,6 +199,16 @@ def q(xf, extra_par=None, name_file='ManualFull'):
         print(f"{name:45s} {dat:9.4f} {mod:9.4f} {rel:9.3f}" if np.isfinite(mod)
               else f"{name:45s} {dat:9.4f} {'---':>9s} {'---':>9s}")
     print(f"\nfit (sum of squared rel. deviations, reform moment excluded) = {fit:.4f}")
+
+    # store the moments on the model for programmatic use (estimation loop)
+    M._moments = {'wife_empl': wife_empl, 'divorce_rate': divorce_rate,
+                  'divorce_rate_young': divorce_rate_young,
+                  'expenditure_x_share': expenditure_x_share, 'βCp': βCp,
+                  'couple_assets': couple_assets, 'wife_cons_share': wife_cons_share,
+                  'gender_gap_earnings': gender_gap_earnings}
+
+    if light:
+        return M, None, fit   # estimation mode: skip the insurance machinery
 
     # --- Insurance / decomposition outputs ---------------------------------
     B = insurance(M, sample_reg,
@@ -192,7 +226,67 @@ def q(xf, extra_par=None, name_file='ManualFull'):
     return M, B, fit
 
 
-# Run once at the xf above; re-run from the console with e.g.
-#   xf2 = xf.copy(); xf2[0] = 4.5
-#   M, B, fit = q(xf2)
-M, B, fit = q(xf)
+###############################################################################
+# Initial love distribution for FULL-COMMITMENT runs: from the LC BASELINE at
+# the ORIGINAL LC estimates (estimated_params.xc), computed ONCE and cached —
+# new FC parametrizations never re-run the LC model.
+###############################################################################
+_init_love_cache = {'v': None}
+
+def lc_baseline_init_love():
+    if _init_love_cache['v'] is None:
+        from estimated_params import xc as xc_lc
+        print("(solving the LC baseline at the LC estimates ONCE, for the initial love distribution)")
+        M0, _, _ = q(np.asarray(xc_lc), full=False, light=True)
+        _init_love_cache['v'] = np.array(
+            [M0.sim.love[k, int(M0.par.sample_init[k])] for k in range(M0.par.simN)],
+            dtype=np.int_)
+    return _init_love_cache['v']
+
+
+###############################################################################
+# ESTIMATE = True: re-calibrate the FULL-COMMITMENT model — [η, σL, β] chosen
+# to match the employment rate of married women (0.5879), the annual divorce
+# rate (0.0107513) and wealth/husband's earnings (2.44) — holding all other
+# parameters at the LC estimates (xf). The FC models use the LC BASELINE's
+# initial love distribution (at the ORIGINAL estimates, cached).
+# Paste the result into estimated_params.xc_full so the experiments use it.
+###############################################################################
+ESTIMATE = True
+
+if ESTIMATE:
+    import dfols
+
+    # LC baseline at the LC estimates -> the initial love distribution (cached)
+    init_love_base = lc_baseline_init_love()
+
+    def q3(pt3):
+        """[η, σL, β] -> residuals on (employment, divorce, wealth) for the FC model."""
+        xf_ = xf.copy(); xf_[0] = pt3[0]; xf_[1] = pt3[1]; xf_[6] = pt3[2]
+        Mx, _, _ = q(xf_, full=True, light=True, init_love=init_love_base)
+        mo = Mx._moments
+        return [(mo['wife_empl']-0.5879)/0.5879,
+                (mo['divorce_rate']-0.0107513)/0.0107513,
+                (mo['couple_assets']-2.44)/2.44]
+
+    x0  = np.array([xf[0], xf[1], xf[6]])
+    lb  = np.array([0.2,  0.1, 0.99])
+    ub  = np.array([3.2, 0.6,  1.005])
+    res = dfols.solve(q3, x0, rhobeg=0.1, rhoend=1e-5, maxfun=100, bounds=(lb, ub),
+                      npt=len(x0)+5, scaling_within_bounds=True,
+                      user_params={'tr_radius.gamma_dec': 0.98, 'tr_radius.gamma_inc': 1.0,
+                                   'tr_radius.alpha1': 0.9, 'tr_radius.alpha2': 0.95},
+                      objfun_has_noise=False, print_progress=True)
+    print('FC estimates [η, σL, β] =', res.x)
+    print('LC values were          =', x0)
+    print('-> paste into estimated_params.xc_full')
+    # full diagnostics at the FC optimum
+    xf_opt = xf.copy(); xf_opt[0], xf_opt[1], xf_opt[6] = res.x
+    M, B, fit = q(xf_opt, full=True, init_love=init_love_base, name_file='ManualFullFC')
+
+else:
+    # Run once at the xf above (regime set by FULL at the top); re-run from
+    # the console with e.g.
+    #   xf2 = xf.copy(); xf2[0] = 4.5
+    #   M, B, fit = q(xf2, full=FULL)
+    M, B, fit = q(xf, full=FULL)
