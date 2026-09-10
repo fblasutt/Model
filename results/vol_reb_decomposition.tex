@@ -1,0 +1,129 @@
+% vol_reb_decomposition.tex
+% Derivation and interpretation of the size-vs-level decomposition of the
+% variance of consumption-share growth. The decomposition is computed by
+% share_var_decomposition() in reg_cons_insurance.py, called at the end of
+% the experiment scripts (alimony experiment.py, WLP_experiment.py,
+% tax_experiment.py).
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1.1in]{geometry}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\ren}{\mathcal{R}}
+
+\title{Decomposing the variance of consumption-share growth:\\ size versus level of renegotiations}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Object and notation}
+
+Let $s^g_{it}$ denote spouse $g$'s share of private consumption within
+couple $i$ at age $t$ (for the wife, $s^w = c^w/(c^w+c^m)$; for the husband,
+$s^m = 1-s^w$), and let
+\[
+y^g_{it} \;\equiv\; \Delta \log s^g_{it} \;=\; \log s^g_{i,t+1}-\log s^g_{it}
+\]
+be its log growth over married cells. The object of interest is the
+(uncentered) volatility $\E\!\left[(y^g)^2\right]$, the ``share component''
+of individual private-consumption volatility in the policy-experiment
+figures. In the model, $s^g$ is a monotone function of the Pareto weight
+alone, so $y^g$ is (up to numerical interpolation error) nonzero only in
+periods in which the weight is renegotiated. Let $\ren$ denote the set of
+renegotiation cells (the bargaining weight differs from its lag) and
+$f \equiv \Pr(\ren)$ the renegotiation frequency.
+
+\section{Derivation}
+
+Write the log change as the product of the share change in \emph{levels}
+and an effective inverse share:
+\[
+y^g_{it} \;=\; \Delta S^g_{it}\cdot M^g_{it},
+\qquad
+\Delta S^g_{it} \equiv s^g_{i,t+1}-s^g_{it},
+\qquad
+M^g_{it} \equiv \frac{\Delta \log s^g_{it}}{\Delta S^g_{it}} .
+\]
+This is an identity, not an approximation. By the mean value theorem applied
+to $\log(\cdot)$, $M^g_{it} = 1/\tilde{s}^g_{it}$ for some
+$\tilde{s}^g_{it}$ between $s^g_{it}$ and $s^g_{i,t+1}$: $M$ is the exact
+``$1/\text{share}$'' \emph{at which the change is evaluated}. Splitting
+$\E[(y^g)^2]$ into renegotiation and non-renegotiation cells and factoring
+the renegotiation part,
+\begin{equation}
+\E\!\left[(y^g)^2\right]
+\;=\;
+\underbrace{f \cdot
+\E\!\left[\Delta S^2 \,\middle|\, \ren\right]\cdot
+\E\!\left[(M^g)^2 \,\middle|\, \ren\right]\cdot
+R^g}_{\text{renegotiation part}}
+\;+\;
+\underbrace{(1-f)\,\E\!\left[(y^g)^2 \,\middle|\, \neg\ren\right]}_{\text{numerical noise (reported, small)}},
+\label{eq:dec}
+\end{equation}
+where
+\[
+R^g \;\equiv\;
+\frac{\E\!\left[\Delta S^2 (M^g)^2 \mid \ren\right]}
+     {\E\!\left[\Delta S^2 \mid \ren\right]\,\E\!\left[(M^g)^2 \mid \ren\right]}
+\]
+is the correction that turns the product of averages into the average of the
+product. Equation~\eqref{eq:dec} is exact; the four factors of the
+renegotiation part are log-additive, so changes across policy variants can
+be attributed factor by factor.
+
+A structural implication built into the decomposition: since
+$\Delta S^m = -\Delta S^w$, the frequency $f$ and the size factor
+$\E[\Delta S^2\mid\ren]$ are \emph{identical for the two spouses}. Any
+difference between the wife's and the husband's share volatility---in level
+or in its response to policy---must run through the level factor
+$\E[(M^g)^2\mid\ren]$ and the interaction $R^g$.
+
+\section{Interpretation of the factors}
+
+\begin{itemize}
+\item[{$f$:}] \textbf{how often} the bargaining weight moves. A policy that
+  tightens or relaxes participation constraints shows up here.
+\item[{$\E[\Delta S^2\mid\ren]$:}] \textbf{how large} renegotiations are in
+  \emph{levels} of the share---bargaining risk with the proportional
+  (log) scaling stripped out. Common to both spouses.
+\item[{$\E[(M^g)^2\mid\ren]$:}] \textbf{where in the share distribution} the
+  events land. A given level change is proportionally large for the spouse
+  whose share is small: for a share near $0.3$ this factor is roughly
+  $(1/0.3)^2 \approx 11$, against $(1/0.7)^2 \approx 2$ for the other
+  spouse. Because it is computed event by event, it captures composition:
+  if a policy relocates renegotiations toward couples with more equal
+  shares, this factor falls for the low-share spouse even if the mean share
+  moves little.
+\item[{$R^g$:}] the \textbf{pairing of size and location}. $R>1$ means the
+  large share changes happen precisely where the spouse's share is small
+  (damage compounds); $R<1$ means they happen where the share is large
+  (damage cushioned); $R=1$ means size and location are unrelated and the
+  size and level factors can be discussed independently. $R$ is a
+  bookkeeping term, not a separate economic channel: if it is close to one,
+  it should not be interpreted.
+\end{itemize}
+
+The non-renegotiation term in~\eqref{eq:dec} collects the microscopic share
+movements that occur off renegotiation cells (interpolation of the
+intra-period allocation over the weight/resources grids). It is reported as
+a share of $\E[(y^g)^2]$ and should be negligible; a non-negligible value
+would indicate that measured share volatility partly reflects numerical
+noise rather than bargaining.
+
+\section{Implementation}
+
+The decomposition is computed by \texttt{share\_var\_decomposition()} in
+\texttt{reg\_cons\_insurance.py} and printed at the end of each policy
+experiment (\texttt{alimony experiment.py}, \texttt{WLP\_experiment.py},
+\texttt{tax\_experiment.py}), one row per policy variant and spouse, on the
+same married cells as the corresponding volatility figures. Column mapping:
+\texttt{E[y2]x100} $=\E[(y^g)^2]\times 100$; \texttt{freq} $=f$;
+\texttt{E[dS2|r]x100} $=\E[\Delta S^2\mid\ren]\times 100$;
+\texttt{E[M2|r]} $=\E[(M^g)^2\mid\ren]$; \texttt{R} $=R^g$;
+\texttt{nonren\%} $=$ the non-renegotiation share of $\E[(y^g)^2]$ in
+percent. The exactness of~\eqref{eq:dec} is verified numerically at every
+call (an \texttt{identity gap} warning is printed if it fails).
+
+\end{document}

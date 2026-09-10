@@ -9,7 +9,7 @@ import numpy as np
 import Bargaining_numba as brg  
 import init_conditions as ic
 import pandas as pd
-from reg_cons_insurance import insurance
+from reg_cons_insurance import insurance, vol_stack_figure, share_var_decomposition
 import matplotlib.pyplot as plt
 from scipy import optimize
 import UserFunctions_numba as usr 
@@ -92,9 +92,8 @@ model.sim.init_A=assets
 gridτ=np.linspace(model.par.ι0w,model.par.ι0m,3)#gender wage gap grid
 
 
-#These lists will store all them models we solve and simulate
+#This list will store all the models we solve and simulate (LC only)
 Bmodel=list()#limited commitment
-Bfmodel=list()#full commitment
 
 
 #Loop over gender wage gap grid and solve the model - limited commitment
@@ -133,48 +132,13 @@ for i in range(len(gridτ)):
 
     Bmodel.append(M)
  
-#Loop over gender wage gap grid and solve the model - full commitment
-for i in range(len(gridτ)):
-
-    # Set up the model - full
-    Mf = model.copy(name='numba_new_copy')
-    Mf.par.ι0w=gridτ[i]
-    Mf.par.full=True
-    apply_fc_params(Mf)   # FC-specific [η, σL, β] (estimated_params.xc_full)
-
-
-    # income shocks grids: singles and couples
-    Mf.par.grid_zw,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
-        Mf.par.grid_zm,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
-                                    Mf.par.Π=usr.labor_income(Mf.par)
-
-
-    # income shocks grids: SINGLES (grid_zws/grid_zms; do not overwrite couples' grids)
-    Mf.par.grid_zws,Mf.par.grid_ϵw,Mf.par.grid_pw,Mf.par.Π_zw0, \
-        Mf.par.grid_zms,Mf.par.grid_ϵm,Mf.par.grid_pm,Mf.par.Π_zm0, \
-                                            Mf.par.Πs=usr.labor_income(Mf.par,single=True)
-
-    Mf.solve()
-
-    # Same BASELINE-LC initial love as every other version (see above)
-    Mf.sim.force_init_love[:] = init_love_base
-
-    Mf.simulate()
-    Bfmodel.append(Mf)
-
-
 #########################################
 #Sample selection for Insurance analysis
 ########################################
 
-#We take individuals that stays married across spefifications
-age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh   
-
-alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
-alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])
-
-sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
-sample1=np.roll(sample,1,axis=1)
+#Common age window; the married-couple requirement is MODEL-SPECIFIC (each
+#policy variant's statistics use its own surviving couples, built in-loop)
+age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh
     
 
 
@@ -182,17 +146,20 @@ sample1=np.roll(sample,1,axis=1)
 #Insurance analysis
 ########################################
 
-#Lists with results
-Bgrid=list()#limited commitment
-Bfgrid=list()#full commitment
+#Lists with results (LC only; male-shock and female-shock decompositions)
+Bgrid=list()   # permanent MALE shock   -> HIS consumption
+Bwgrid=list()  # permanent FEMALE shock -> HER consumption
+samples=list() # per-variant samples (for the volatility figure)
 
 #Names of the file and of the table line associated with a model version (if gridτ has len()>3, names should be adapted)
 Names=['Baseline', 'LowGG1', 'LowGG2']
-Names_line=['Baseline', 'Low GWG', 'No GWG']
+Names_line=['Baseline', 'Lower gender gap', 'No gender gap']
 
 #Obtain pass-throughs and do the decomposition calling function insurance
 for i in range(len(gridτ)):
 
+    sample = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1) &  (Bmodel[i].sim.couple==1) 
+    samples.append(sample)
 
     B=insurance(Bmodel[i],sample,
                 shock_type='permanent',
@@ -200,23 +167,28 @@ for i in range(len(gridτ)):
                 consumption_gender='Male',
                 name_file=Names[i],
                 name_line=Names_line[i])
-                
-    
+
     B['par']=gridτ[i]
     Bgrid.append(B)
-    
-    Bf=insurance(Bfmodel[i],sample,                
-                 shock_gender='Male',
+
+    Bw=insurance(Bmodel[i],sample,
                  shock_type='permanent',
-                 consumption_gender='Male',
-                 name_file=Names[i]+'full',
+                 shock_gender='Female',
+                 consumption_gender='Female',
+                 name_file=Names[i]+'w',
                  name_line=Names_line[i])
-                 
-    
-    Bf['par']=gridτ[i]
-    Bfgrid.append(Bf)
+
+    Bw['par']=gridτ[i]
+    Bwgrid.append(Bw)
        
     
+#########################################
+# Private-consumption volatility figure: one stacked bar per variant x
+# spouse (household part + share component + 2Cov; raw variances)
+########################################
+vol_stack_figure(Bmodel, samples, Names_line, 'volbars_gwg')
+
+
 # sh_perm=np.array([Bgrid[i]['w_sh']['per_m'] for i in range(len(gridτ))])
 
 # perm_m_m=np.array([Bgrid[i]['indc']['per_m_m'] for i in range(len(gridτ))])
@@ -251,3 +223,32 @@ for i in range(len(gridτ)):
 # #plt.savefig(root+'/Output files/model/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
 # plt.show()
 
+
+
+
+#########################################
+# Diagnostic: level effect vs transition lumpiness behind the share
+# 'scissors'. Per variant: the share LEVEL (denominator of the mechanical
+# effect), the dispersion of share changes in LEVELS (bargaining risk with
+# the level effect stripped out), the DRIFT of log share growth (fingerprint
+# of the catch-up transition), and renegotiation frequency/direction.
+########################################
+print()
+print('=== Share-volatility diagnostic (variants) ===')
+print(f"{'variant':18s} {'mean s^w':>9s} {'Var(dS)x100':>12s} {'mean dlog s^w':>14s} "
+      f"{'reneg freq':>11s} {'tow. wife':>10s} {'tow. husb':>10s}")
+for i,m in enumerate(Bmodel):
+    s  = samples[i]; s1 = np.roll(s,1,axis=1)
+    sm = np.roll(s,-1,axis=1)[s]              # sample at t and t+1
+    swl = m.sim.Cw/(m.sim.Cw+m.sim.Cm)
+    dS   = (swl[s1]-swl[s])[sm]               # share growth in LEVELS
+    dls  = np.log(swl[s1]/swl[s])[sm]         # share growth in LOGS
+    pw_now,pw_lag = m.sim.power[s1][sm], m.sim.power_lag[s1][sm]
+    ren = pw_now!=pw_lag
+    up  = pw_now>pw_lag
+    print(f"{Names_line[i]:18s} {swl[s].mean():9.3f} {100*dS.var(ddof=1):12.3f} "
+          f"{dls.mean():14.4f} {ren.mean():11.4f} {(ren&up).mean():10.4f} {(ren&~up).mean():10.4f}")
+
+
+# Size-vs-level decomposition of share-growth variance (both spouses)
+share_var_decomposition(Bmodel, samples, Names_line)

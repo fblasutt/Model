@@ -103,8 +103,13 @@ def income_single(par,t,iwls,iD,ih,iz,assets,women=True):
   
     
     
-    if women: return labor_income-tax_income+par.alimony,labor_income+par.alimony,tax_income
-    else:    return  labor_income-tax_income-par.alimony,labor_income-par.alimony,tax_income
+    # PROPORTIONAL alimony: par.alimony is a RATE applied to the FORMER
+    # husband's current gross labor income (the joint iz state is retained
+    # after divorce, so his income is on the singles' grid). Transferred
+    # post-tax from him to her, like the old lump sum.
+    alim = par.alimony*par.grid_zms[t,iD,iz,ih]
+    if women: return labor_income-tax_income+alim,labor_income+alim,tax_income
+    else:    return  labor_income-tax_income-alim,labor_income-alim,tax_income
     
     
 @njit(cache=cache)

@@ -10,7 +10,7 @@ import Bargaining_numba as brg
 import init_conditions as ic
 import UserFunctions_numba as usr 
 import pandas as pd
-from reg_cons_insurance import insurance
+from reg_cons_insurance import insurance, vol_stack_figure, share_var_decomposition
 import matplotlib.pyplot as plt
  
 #Initialize seed 
@@ -95,12 +95,11 @@ age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 # Solve the model for different alimony levels
 ############################################################################
 
-#Grid of alimony values we will consider
-gridτ=np.linspace(0.0,0.1,3)
+#Grid of alimony RATES (share of ex-husband's gross income): 0%, 10%, 20%
+gridτ=np.linspace(0.0,0.2,3)
 
-#These lists will store all the models we solve and simulate
+#This list will store all the models we solve and simulate (LC only)
 Bmodel=list() #limited commitment
-Bfmodel=list()#full commitment
 
 
 #Solve and simulate the model - limited commitment.
@@ -133,38 +132,14 @@ for i in range(len(gridτ)):
     Bmodel.append(M)
 
 
-#Solve and simulate the model - full commitment
-for i in range(len(gridτ)):
-
-    # Set up the model - full commitment
-    Mf = model.copy(name='numba_new_copy')
-    Mf.par.alimony=gridτ[i]
-
-    Mf.par.full=True
-    apply_fc_params(Mf)   # FC-specific [η, σL, β] (estimated_params.xc_full)
-
-    Mf.solve()
-
-    # Same BASELINE-LC initial love as every other version (see above)
-    Mf.sim.force_init_love[:] = init_love_base
-
-    Mf.simulate()
-    Bfmodel.append(Mf)
-
-
-
 #########################################
 #Sample selection for Insurance analysis
 ########################################
 
 
-#We take individuals that stays married across spefifications
+#Common age window; the married-couple requirement is MODEL-SPECIFIC (each
+#policy variant's statistics use its own surviving couples, built in-loop)
 age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh
-alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
-alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])
-
-sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
-sample1=np.roll(sample,1,axis=1)
     
 
 
@@ -172,20 +147,21 @@ sample1=np.roll(sample,1,axis=1)
 #Insurance analysis
 ########################################
 
-#Lists with results
-Bgrid=list() #limited commitment
-Bfgrid=list()#full commitment
+#Lists with results (LC only; male-shock and female-shock decompositions)
+Bgrid=list()   # permanent MALE shock   -> HIS consumption
+Bwgrid=list()  # permanent FEMALE shock -> HER consumption
+samples=list() # per-variant samples (for the volatility figure)
 
 
 #Names of the file and of the table line associated with a model version (if gridτ has len()>3, names should be adapted)
 Names=['Baselinealimony', 'Alimony1', 'Alimony2']
-Names_line=['Baseline', 'Alimony, low', 'Alimony, high']
+Names_line=['Baseline', 'Alimony', 'Alimony +']
 
 #Obtain pass-throughs and do the decomposition calling function insurance
 for i in range(len(gridτ)):
 
-    sample   = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1)
-    sample_f = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bfmodel[i].sim.couple_lag==1)
+    sample = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1) &  (Bmodel[i].sim.couple==1)
+    samples.append(sample)
 
     B=insurance(Bmodel[i],sample,
                 shock_type='permanent',
@@ -197,15 +173,15 @@ for i in range(len(gridτ)):
     B['par']=gridτ[i]
     Bgrid.append(B)
 
-    Bf=insurance(Bfmodel[i],sample_f,
+    Bw=insurance(Bmodel[i],sample,
                  shock_type='permanent',
-                 shock_gender='Male',
-                 consumption_gender='Male',
-                 name_file=Names[i]+'full',
+                 shock_gender='Female',
+                 consumption_gender='Female',
+                 name_file=Names[i]+'w',
                  name_line=Names_line[i])
 
-    Bf['par']=gridτ[i]
-    Bfgrid.append(Bf)
+    Bw['par']=gridτ[i]
+    Bwgrid.append(Bw)
 
 
 #########################################################
@@ -219,8 +195,7 @@ for i in range(len(gridτ)):
 #########################################################
 
 def waterfall_table(gender):
-    Ls=[Bgrid[i]['vol_ladder'] for i in range(len(gridτ))] \
-      +[Bfgrid[i]['vol_ladder'] for i in range(len(gridτ))]
+    Ls=[Bgrid[i]['vol_ladder'] for i in range(len(gridτ))]
     alloc = 'alloc_m' if gender=='m' else 'alloc_w'
     Vlast = 'V_cm'    if gender=='m' else 'V_cw'
     who   = 'Husband' if gender=='m' else 'Wife'
@@ -247,7 +222,7 @@ with open(root+'/Output files/model/volladder_alimony_m.tex','w') as f: f.write(
 with open(root+'/Output files/model/volladder_alimony_w.tex','w') as f: f.write(waterfall_table('w'))
 
 # Console echo with the exact telescoping check
-for tag,grid in (('LC',Bgrid),('FC',Bfgrid)):
+for tag,grid in (('LC',Bgrid),):
     for i in range(len(gridτ)):
         L=grid[i]['vol_ladder']
         print(f"{tag} {Names_line[i]:14s}: V_pot={100*L['V_pot']:.2f} compos={100*L['compos']:.2f} "
@@ -260,6 +235,13 @@ for tag,grid in (('LC',Bgrid),('FC',Bfgrid)):
 
 
     
+#########################################
+# Private-consumption volatility figure: one stacked bar per variant x
+# spouse (household part + share component + 2Cov; raw variances)
+########################################
+vol_stack_figure(Bmodel, samples, Names_line, 'volbars_alimony')
+
+
 # sh_perm=np.array([Bgrid[i]['w_sh']['per_m'] for i in range(len(gridτ))])
 
 # perm_m_m=np.array([Bgrid[i]['indc']['per_m_m'] for i in range(len(gridτ))])
@@ -289,3 +271,7 @@ for tag,grid in (('LC',Bgrid),('FC',Bfgrid)):
 # #plt.savefig(root+'/Output files/model/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
 # plt.show()
 
+
+
+# Size-vs-level decomposition of share-growth variance (both spouses)
+share_var_decomposition(Bmodel, samples, Names_line)

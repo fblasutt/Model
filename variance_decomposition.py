@@ -32,9 +32,10 @@ Freezing semantics (a frozen block keeps its t=0 entry values):
          couples under the conditional draw with σL0 > 0).
     δ    (dep table only) frozen at current h: Πh replaced by the identity.
 
-Var(Δlog y) is computed AFTER residualizing Δlog y on age dummies, so the
-deterministic life-cycle profile of growth drops out of every counterfactual
-— the pooled variance would put it in the floor, unattributable to shocks.
+Var(Δlog y) is the RAW pooled variance (no age residualization, consistent
+with the experiment figures). NB: the deterministic life-cycle profile of
+growth (between-age variation of mean growth) is therefore included; it is
+common to every counterfactual and sits in the floor.
 
 The contribution of block B is V(all) − V(all∖B): one-at-a-time shutdowns,
 no exact adding-up (interactions are not allocated). The FLOOR world has all
@@ -173,8 +174,10 @@ m_FC.solve()
 m_FC.sim.force_init_love[:] = init_love_lc      # transplant LC's draws
 m_FC.simulate()
 
-sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None])# & (m_LC.sim.couple_lag == 1)  & (m_LC.sim.couple == 1)
-sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None])# & (m_FC.sim.couple_lag == 1)  & (m_FC.sim.couple == 1)
+# Same convention as the experiments (WLP_experiment.py): common age window
+# plus the MODEL-SPECIFIC married requirement (couple in t-1 AND t)
+sample_LC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_LC.sim.couple_lag == 1) & (m_LC.sim.couple == 1)
+sample_FC = (age > age_initial[:, None]) & (age <= age_final[:, None]) & (m_FC.sim.couple_lag == 1) & (m_FC.sim.couple == 1)
 
 
 ###############################################################################
@@ -376,21 +379,19 @@ def _series(m, target):
 
 def var_growth(m, sample, target):
     """
-    Sample variance of Δlog(target)_t for couples present in t and t+1,
-    residualized on AGE (period) dummies. The raw pooled variance would also
-    count the deterministic life-cycle profile of growth (between-age
-    variation of mean growth), which is common to every counterfactual and
-    would otherwise sit in the floor unattributable to any shock.
+    RAW sample variance of Δlog(target)_t (no age residualization, for
+    consistency with the experiment figures). Growth cells require the
+    passed-in sample at BOTH t and t+1 — i.e. married in the BASELINE
+    version whose sample this is; the counterfactual's own couple status is
+    deliberately NOT consulted, so all counterfactuals of a regime run on
+    identical cells. NB: the pooled variance includes the deterministic
+    life-cycle profile of growth; it is common to every counterfactual and
+    sits in the floor.
     """
     sample1 = np.roll(sample, 1, axis=1)
-    sm = (m.sim.couple[sample1] == 1) & (m.sim.couple[sample] == 1)
+    sm = np.roll(sample, -1, axis=1)[sample]   # next period also in the sample
     x = _series(m, target)
     dx = np.log(x[sample1] / x[sample])[sm]
-    tt = np.tile(np.arange(m.par.T), (m.par.simN, 1))
-    t_cell = tt[sample1][sm]                 # period of the growth cell
-    for tv in np.unique(t_cell):
-        g = t_cell == tv
-        dx[g] -= dx[g].mean()                # age-dummy residualization
     return dx.var(ddof=1)
 
 
@@ -421,7 +422,7 @@ def floor_diagnostics(m, sample, tag):
     ~entirely on the renegotiation cells (and be ~0 under FC).
     """
     sample1 = np.roll(sample, 1, axis=1)
-    sm = (m.sim.couple[sample1] == 1) & (m.sim.couple[sample] == 1)
+    sm = np.roll(sample, -1, axis=1)[sample]   # baseline-sample cells, as in var_growth
     reneg = m.sim.power[sample1][sm] != m.sim.power_lag[sample1][sm]
     wlpch = m.sim.WLP[sample1][sm] != m.sim.WLP[sample][sm]
     groups = (('renegotiation', reneg),

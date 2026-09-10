@@ -9,7 +9,7 @@ import numpy as np
 import Bargaining_numba as brg  
 import init_conditions as ic
 import pandas as pd
-from reg_cons_insurance import insurance
+from reg_cons_insurance import insurance, vol_stack_figure, share_var_decomposition
 import matplotlib.pyplot as plt
 from scipy import optimize
 
@@ -100,9 +100,8 @@ age_policy=np.array(np.where(policy[:,None]==calendar_year)[1],dtype=np.int32)
 #Tax progressivity parameters to consider
 gridτ=np.linspace(model.par.τ,0.3,3)
 
-#Lists that contains model information
+#List that contains model information (LC only)
 Bmodel=list()
-Bfmodel=list()
 
 ############################################################################
 # BALANCE THE GOVERNMENT BUDGET
@@ -170,55 +169,33 @@ for i in range(len(gridτ)):
     M.simulate()
     Bmodel.append(M)
  
-#Loop over gender wage gap grid and solve the model - full commitment
-for i in range(len(gridτ)):
-
-    # Set up the model - full commitment
-    Mf = model.copy(name='numba_new_copy')
-    Mf.par.τ=gridτ[i]
-    Mf.par.Λ=gridΛ[i]
-
-    Mf.par.full=True
-    apply_fc_params(Mf)   # FC-specific [η, σL, β] (estimated_params.xc_full)
-
-    Mf.solve()
-
-    # Same BASELINE-LC initial love as every other version (see above)
-    Mf.sim.force_init_love[:] = init_love_base
-
-    Mf.simulate()
-    Bfmodel.append(Mf)
-
-
 #########################################
 #Sample selection for Insurance analysis
 ########################################
 
-#We take individuals that stays married across spefifications
-age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh   
-
-alwayscouple=np.array([(Bmodel[i].sim.couple_lag==1) & (Bfmodel[i].sim.couple_lag==1)  for i in range(len(gridτ))])
-alwayscouplep=np.array([(Bmodel[i].sim.couple==1) & (Bfmodel[i].sim.couple==1)  for i in range(len(gridτ))])
-
-sample =  (age>age_initial[:,None]) & (age<=age_final[:,None]) & (alwayscouple.min(axis=0)) & (alwayscouplep.min(axis=0))
-sample1=np.roll(sample,1,axis=1)
+#Common age window; the married-couple requirement is MODEL-SPECIFIC (each
+#policy variant's statistics use its own surviving couples, built in-loop)
+age=(np.cumsum(np.ones((M.par.simN,M.par.T)),axis=1)-1)+25#age of hh
     
 
 #########################################
 #Insurance analysis
 ########################################
 
-#Lists with results
-Bgrid=list()#limited commitment
-Bfgrid=list()#full commitment
+#Lists with results (LC only; male-shock and female-shock decompositions)
+Bgrid=list()   # permanent MALE shock   -> HIS consumption
+Bwgrid=list()  # permanent FEMALE shock -> HER consumption
+samples=list() # per-variant samples (for the volatility figure)
 
 #Names of the file and of the table line associated with a model version (if gridτ has len()>3, names should be adapted)
 Names=['Baselineprog', 'Progr1', 'Progr2']
-Names_line=['Baseline', 'Higher tax progr', 'Even higher tax progr']
+Names_line=['Baseline', 'Progressivity +', 'Progressivity ++']
 
 #Obtain pass-throughs and do the decomposition calling function insurance
 for i in range(len(gridτ)):
 
+    sample = (age>age_initial[:,None]) & (age<=age_final[:,None]) & (Bmodel[i].sim.couple_lag==1) &  (Bmodel[i].sim.couple==1)
+    samples.append(sample)
 
     B=insurance(Bmodel[i],sample,
                 shock_type='permanent',
@@ -226,24 +203,30 @@ for i in range(len(gridτ)):
                 consumption_gender='Male',
                 name_file=Names[i],
                 name_line=Names_line[i])
-    
+
     B['par']=gridτ[i]
     Bgrid.append(B)
-    
-    Bf=insurance(Bfmodel[i],sample,                 
+
+    Bw=insurance(Bmodel[i],sample,
                  shock_type='permanent',
-                 shock_gender='Male',
-                 consumption_gender='Male',
-                 name_file=Names[i]+'full',
+                 shock_gender='Female',
+                 consumption_gender='Female',
+                 name_file=Names[i]+'w',
                  name_line=Names_line[i])
-                 
-    
-    Bf['par']=gridτ[i]
-    Bfgrid.append(Bf)
+
+    Bw['par']=gridτ[i]
+    Bwgrid.append(Bw)
     
 
 
     
+#########################################
+# Private-consumption volatility figure: one stacked bar per variant x
+# spouse (household part + share component + 2Cov; raw variances)
+########################################
+vol_stack_figure(Bmodel, samples, Names_line, 'volbars_tax')
+
+
 # sh_perm=np.array([Bgrid[i]['w_sh']['per_m'] for i in range(len(gridτ))])
 
 # perm_m_m=np.array([Bgrid[i]['indc']['per_m_m'] for i in range(len(gridτ))])
@@ -277,4 +260,10 @@ for i in range(len(gridτ)):
 # plt.legend()                              
 # #plt.savefig(root+'/Output files/model/lifecycle_singlew.eps', format='eps', bbox_inches="tight")  
 # plt.show()
+
+
+
+# Size-vs-level decomposition of share-growth variance (both spouses)
+share_var_decomposition(Bmodel, samples, Names_line)
+
 

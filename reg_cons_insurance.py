@@ -774,3 +774,169 @@ def insurance(m,sample,shock_type='permanent',shock_gender='Male',consumption_ge
             'BPP_MPC_net':BPP_MPC_net,'BPP_PER_net':BPP_PER_net,'wlp':wlp,'level':level,'ins_dec':ins_dec,
             'vardec_w':vardec_wife,'vardec_m':vardec_husband,
             'shockdec':shockdec,'vol_ladder':vol_ladder}
+
+def vol_stack_figure(models, samples, labels, name_file, mode='3seg'):
+    """
+    Stacked-bar figure of private-consumption volatility for a list of model
+    versions (e.g. the policy variants of an experiment). Bars are GROUPED BY
+    SPOUSE: all variants' wife bars first, then all variants' husband bars.
+    Each bar decomposes the RAW variance of one-year log-consumption growth
+    (couples present in t and t+1, x100), based on the exact identity
+    Var(dlog c^g) = Var(dlog C_priv) + Var(dlog s^g) + 2Cov, with `mode`:
+
+      '3seg'    exact 3-segment stack: V_s (blue) starts at zero, V_C stacks
+                on top, 2Cov stacks above when positive and HANGS BELOW ZERO
+                when negative; a black OUTLINED RECTANGLE from 0 to the NET
+                total marks Var(dlog c^g)
+      'fold'    2 segments, 2Cov folded into the household part:
+                [V_C + 2Cov | V_s]  (exact adding-up preserved)
+      'rescale' 2 segments rescaled to the total:
+                [V_cg*V_C/(V_C+V_s) | V_cg*V_s/(V_C+V_s)]
+
+    Saved to root+'/Output files/model/'+name_file+'.eps'.
+    """
+    col_C, col_s, col_cov = '#fdae6b', '#6baed6', '#bdbdbd'
+
+    def _raw_vars(m, sample):
+        s1 = np.roll(sample, 1, axis=1)
+        smm = (m.sim.couple[s1] == 1) & (m.sim.couple[sample] == 1)
+        def V(x):
+            dx = np.log(x[s1]/x[sample])[smm]
+            return dx.var(ddof=1)
+        cp = m.sim.Cw+m.sim.Cm
+        return {'V_C': V(cp),
+                'w': (V(m.sim.Cw), V(m.sim.Cw/cp)),
+                'm': (V(m.sim.Cm), V(m.sim.Cm/cp))}
+
+    lab_C  = r'Var$(\Delta\log C_t)$'
+    lab_Cf = r'Var$(\Delta\log C_t)+2\,$Cov'
+    lab_s  = r'Var$(\Delta\log s^g_t)$'
+    lab_cv = r'$2\,$Cov'
+    lab_T  = r'Var$(\Delta\log c^g_t)$'
+
+    D = [_raw_vars(m, sample) for m, sample in zip(models, samples)]
+    n = len(models)
+    fig, ax = plt.subplots(figsize=(0.9+0.65*2*n, 3.6))
+    seen = set()
+    xs_all, ticklabs = [], []
+    for j, g in enumerate(('w', 'm')):           # wife group first, then husband
+        for i, (d, lab) in enumerate(zip(D, labels)):
+            x = j*(n+0.8) + i*1.0
+            V_cg, V_s = d[g]
+            V_C = d['V_C']
+            cov2 = V_cg - V_C - V_s
+            if   mode == '3seg':
+                segs = ((lab_s, V_s, col_s), (lab_C, V_C, col_C), (lab_cv, cov2, col_cov))
+            elif mode == 'fold':
+                segs = ((lab_s, V_s, col_s), (lab_Cf, V_C + cov2, col_C))
+            elif mode == 'rescale':
+                tot = V_C + V_s
+                segs = ((lab_s, V_cg*V_s/tot, col_s), (lab_C, V_cg*V_C/tot, col_C))
+            else:
+                raise ValueError(f"Unknown mode: {mode!r}")
+            cum = 0.0
+            for slab, val, col in segs:
+                if mode == '3seg' and slab == lab_cv and val < 0.0:
+                    # negative covariance hangs below zero instead of being
+                    # buried inside the stack
+                    ax.bar(x, 100*val, bottom=0.0, width=0.8, color=col,
+                           edgecolor='white', linewidth=0.8, zorder=2)
+                else:
+                    ax.bar(x, 100*val, bottom=100*cum, width=0.8, color=col,
+                           edgecolor='white', linewidth=0.8, zorder=2)
+                    cum += val
+                seen.add(slab)
+            if mode == '3seg':
+                # outlined rectangle from 0 to the NET total Var(dlog c^g)
+                from matplotlib.patches import Rectangle
+                ax.add_patch(Rectangle((x-0.4, 0.0), 0.8, 100*V_cg,
+                                       fill=False, edgecolor='black',
+                                       linewidth=1.4, zorder=3))
+            xs_all.append(x); ticklabs.append(lab)
+        ax.text(j*(n+0.8) + (n-1)/2, -0.30,
+                'Wife ($c^w$)' if g == 'w' else 'Husband ($c^m$)',
+                ha='center', va='top', fontsize=12,
+                transform=ax.get_xaxis_transform())
+    ax.set_xticks(xs_all)
+    ax.set_xticklabels(ticklabs, fontsize=10, rotation=30, ha='right')
+    ax.tick_params(axis='y', labelsize=10)
+    ax.set_ylabel(r'Volatility ($\times 100$)', fontsize=12)
+    ax.set_ylim(-0.2, 0.9)                   # common scale across experiments
+    ax.axhline(0.0, color='0.4', linewidth=0.8)
+    ax.grid(True, axis='y', linewidth=0.4, alpha=0.35); ax.set_axisbelow(True)
+    # explicit legend (top left), one entry per volatility object with symbol
+    from matplotlib.patches import Patch, Rectangle as _Rect
+    handles = [Patch(facecolor=col_s, edgecolor='white', label=lab_s),
+               Patch(facecolor=col_C, edgecolor='white',
+                     label=lab_Cf if mode == 'fold' else lab_C)]
+    if mode == '3seg':
+        handles += [Patch(facecolor=col_cov, edgecolor='white', label=lab_cv),
+                    _Rect((0, 0), 1, 1, fill=False, edgecolor='black',
+                          linewidth=1.4, label=lab_T)]
+    ax.legend(handles=handles, loc='upper left', frameon=False, fontsize=9.5,
+              ncol=2, columnspacing=1.0, handlelength=1.4,
+              handletextpad=0.5)             # two rows (2x2) for legibility
+    fig.tight_layout()
+    fig.savefig(root+'/Output files/model/'+name_file+'.eps',
+                format='eps', bbox_inches='tight')
+    plt.show()
+
+
+def share_var_decomposition(models, samples, labels):
+    """
+    Decompose the (uncentered) variance of LOG share growth, per variant and
+    spouse, into SIZE of share changes vs LEVEL at which they occur:
+        E[(dlog s)^2] = freq * E[dS^2|ren] * E[M^2|ren] * R
+    dS   = change of the OWN share in LEVELS (same magnitude for the two
+           spouses, so freq and E[dS^2|ren] are common: the entire spouse
+           asymmetry is in M and R)
+    M    = dlog s / dS, the exact 'effective 1/share' at which the change is
+           evaluated (mean-value form)
+    ren  = cells with dS != 0; freq = their frequency
+    R    = E[dS^2 M^2|ren] / (E[dS^2|ren] E[M^2|ren]), size-level interaction
+    ren  = RENEGOTIATION cells (power != power_lag): off those cells the share
+           still moves microscopically (interpolation of the intra-period
+           allocation over the power/resources grids), so the identity holds
+           for the renegotiation PART of E[y^2]; the residual non-reneg noise
+           share is reported in the last column ('nonren%', should be tiny).
+    Factors are log-additive across variants.
+    """
+    print()
+    print('=== Share-growth variance: size vs level decomposition ===')
+    print('    (tow.w / tow.m: renegotiation frequency by DIRECTION -- '
+          'power toward the wife / toward the husband)')
+    print(f"{'variant':18s} {'sp':>3s} {'E[y2]x100':>10s} {'freq':>7s} "
+          f"{'tow.w':>7s} {'tow.m':>7s} "
+          f"{'E[dS2|r]x100':>13s} {'E[M2|r]':>9s} {'R':>7s} {'nonren%':>8s}")
+    for m, sample, lab in zip(models, samples, labels):
+        s1 = np.roll(sample, 1, axis=1)
+        smm = np.roll(sample, -1, axis=1)[sample]
+        cp = m.sim.Cw + m.sim.Cm
+        pw_now, pw_lag = m.sim.power[s1][smm], m.sim.power_lag[s1][smm]
+        ren = pw_now != pw_lag
+        f_up = (ren & (pw_now > pw_lag)).mean()    # renegotiation toward the wife
+        f_dn = (ren & (pw_now < pw_lag)).mean()    # renegotiation toward the husband
+        for g in ('w', 'm'):
+            sh = (m.sim.Cw/cp) if g == 'w' else (m.sim.Cm/cp)
+            X = (sh[s1]-sh[sample])[smm]
+            y = np.log(sh[s1]/sh[sample])[smm]
+            freq = ren.mean()
+            Ey2 = np.mean(y**2)
+            nonren = np.mean((y**2)*(~ren))/Ey2 if Ey2 > 0 else 0.0
+            r_ok = ren & (np.abs(X) > 1e-14)
+            if not r_ok.any():
+                print(f'{lab:18s} {g:>3s} {100*Ey2:10.4f} {freq:7.4f} '
+                      f'{f_up:7.4f} {f_dn:7.4f}'
+                      f'            -         -       - {100*nonren:8.2f}')
+                continue
+            EX2 = np.mean(X[r_ok]**2)
+            M = y[r_ok]/X[r_ok]
+            EM2 = np.mean(M**2)
+            R = np.mean((X[r_ok]**2)*(M**2))/(EX2*EM2)
+            # identity check on the renegotiation part of E[y^2]
+            Ey2_ren = np.mean((y**2)*r_ok)
+            gap = abs(r_ok.mean()*EX2*EM2*R - Ey2_ren)/max(Ey2_ren, 1e-16)
+            flag = '' if gap < 1e-6 else f'  [identity gap {gap:.1e}]'
+            print(f'{lab:18s} {g:>3s} {100*Ey2:10.4f} {freq:7.4f} '
+                  f'{f_up:7.4f} {f_dn:7.4f} '
+                  f'{100*EX2:13.5f} {EM2:9.2f} {R:7.3f} {100*nonren:8.2f}'+flag)

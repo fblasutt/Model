@@ -90,7 +90,7 @@ class HouseholdModelClass(EconModelClass):
         par.d0=0.1697;par.d1=0.01349;par.d2=-0.55 # Husband deduction parameters
                 
         # Post-divorce transfers
-        par.alimony=0.0       #Alimony used for experiments
+        par.alimony=0.0       #Alimony RATE (share of ex-husband's gross income), used for experiments
         par.div_A_share = 0.5 # Asset share to wife at divorce
         
         # Meeting probability
